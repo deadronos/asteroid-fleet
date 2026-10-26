@@ -1,14 +1,71 @@
-import { createHash } from 'node:crypto';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import type { firing as realFiring } from './cards';
 import { PRESETS } from './config';
-import { createShip, enterSystem, newGame, unlockRule } from './state';
+import { cargoCap, nearestPirate } from './ctx';
+import { dist } from './math';
+import { createShip, enterSystem, h2Storm, newGame, unlockRule } from './state';
 import { stressGame } from './stress';
 import { step } from './tick';
 import { SHIP_CLASSES, type GameState, type RuleId, type ShipClass } from './types';
 
-// Golden equivalence for #82. The digests below were recorded with the fixed
-// `Rule` system (before condition/action cards). Each scenario now runs with the
-// equivalent preset cards and must land on exactly the same state.
+// Golden equivalence for #82. Each scenario runs twice in this process from the
+// same seed: once through the card engine with the preset cards, once with the
+// card evaluator swapped for the fixed rules' checks, copied from the code before
+// cards (commit dbac7d6). Both runs must land on exactly the same state.
+//
+// The comparison is in-process because stored hashes of a 2000-tick run differ
+// between platforms (libm), so they cannot be checked in CI.
+
+/** While set, `firing` answers with the old rule checks for these params. */
+const legacy = vi.hoisted(() => ({ spec: null as Partial<Record<string, number | false>> | null }));
+
+vi.mock('./cards', async (importOriginal) => {
+  const mod = await importOriginal<typeof import('./cards')>();
+  const firing: typeof realFiring = (s, list, ship) =>
+    legacy.spec ? oldRule(s, list, ship) : mod.firing(s, list, ship);
+  return { ...mod, firing };
+});
+
+/**
+ * The fixed rules' checks, keyed by the action of the preset they became. The
+ * card engine still decides whether the rule is on (enabled and unlocked), as
+ * `rule()` did; this only replaces the condition.
+ */
+const oldRule: typeof realFiring = (s, list, ship) => {
+  const card = list[0];
+  // No active card: the rule was off (or locked), so `rule()` returned null.
+  if (!card) return null;
+  const spec = legacy.spec!;
+  const param = (id: RuleId) => spec[id] as number;
+  let on: boolean;
+  switch (card.then.kind) {
+    case 'stance':
+      on = ship?.cls === 'fighter' && (s.wave.warning || s.wave.active);
+      break;
+    case 'callHauler':
+      on = !!ship && ship.cargo / cargoCap(s, 'barge', ship) >= param('bargeCallHauler');
+      break;
+    case 'fallBack':
+      on = ship?.cls === 'barge' && !!nearestPirate(s, ship.pos, 28);
+      break;
+    case 'unloadAtBarge':
+      on = !!ship && dist(ship.pos, s.carrier.pos) > param('droneUnloadAtBarge');
+      break;
+    case 'park':
+      on = ship?.cls === 'hauler';
+      break;
+    case 'recall':
+      on = s.carrier.shield < param('recallOnLowShields') && s.pirates.length > 0;
+      break;
+    case 'reserveWarp':
+      on = !ship;
+      break;
+    case 'shelter':
+      on = ship?.cls === 'harvester' && h2Storm(s);
+      break;
+  }
+  return on ? card : null;
+};
 
 const IDS = Object.keys(PRESETS) as RuleId[];
 /** The old rules' default params. */
@@ -40,14 +97,7 @@ function configure(s: GameState, spec: Spec) {
 }
 
 function digest(s: GameState): string {
-  const {
-    cards: _c,
-    unlockedRules: _u,
-    version: _v,
-    savedAt: _s,
-    ...rest
-  } = s as GameState & Record<string, unknown>;
-  return createHash('sha256').update(JSON.stringify(rest)).digest('hex').slice(0, 16);
+  return JSON.stringify({ ...s, savedAt: 0 });
 }
 
 /** Tier-3 gas giant at scale, under attack with shields down: every rule fires. */
@@ -84,10 +134,15 @@ function campaign(seed: number): GameState {
   return s;
 }
 
-function run(make: (seed: number) => GameState, seed: number, spec: Spec): string {
+function run(make: (seed: number) => GameState, seed: number, spec: Spec, old: boolean): string {
   const s = make(seed);
   configure(s, spec);
-  for (let i = 0; i < TICKS; i++) step(s);
+  legacy.spec = old ? spec : null;
+  try {
+    for (let i = 0; i < TICKS; i++) step(s);
+  } finally {
+    legacy.spec = null;
+  }
   return digest(s);
 }
 
@@ -116,28 +171,41 @@ const CASES: [name: string, make: (seed: number) => GameState, seed: number, spe
   ['campaign, tuned params', campaign, 7, VARIANT],
 ];
 
-const GOLDEN: Record<string, string> = {
-  'stress, all rules': 'c537dbd047105bae',
-  'stress, tuned params': 'ae35e31c398bbf2a',
-  'stress, no rules': '72c5907330c4b5b9',
-  'stress, all but fightersEscortOnWave': 'b97174a935d136d6',
-  'stress, all but bargeCallHauler': '8fea1adfff7b9b53',
-  'stress, all but bargeFallBack': '6bf8288673cad2ab',
-  'stress, all but droneUnloadAtBarge': '632e085f228de596',
-  'stress, all but haulerPark': 'd8679767bd4dda99',
-  'stress, all but recallOnLowShields': '5021227d1fb57a61',
-  'stress, all but reserveWarpEnergy': '3e153385ad6e2a61',
-  'stress, all but harvesterStormShelter': 'aed994e1a0ef56c1',
-  'campaign, all rules': '66d70b7c16dbe425',
-  'campaign, tuned params': '056f469f8e865ec8',
-};
+/** Old-rule runs by case name, for checking that every rule matters. */
+const OLD = new Map<string, string>();
 
 describe('preset cards match the fixed rules (#82)', () => {
   it.each(CASES)(
     '%s',
     (name, make, seed, spec) => {
-      expect(run(make, seed, spec)).toBe(GOLDEN[name]);
+      const old = run(make, seed, spec, true);
+      OLD.set(name, old);
+      expect(run(make, seed, spec, false) === old).toBe(true);
     },
     30_000,
   );
+
+  it("presets default to the old rules' params", () => {
+    const defaults = IDS.filter((id) => PRESETS[id].param !== undefined).map((id) => [
+      id,
+      PRESETS[id].card.when[PRESETS[id].param!].value,
+    ]);
+    expect(defaults).toEqual([
+      ['bargeCallHauler', DEFAULT_PARAM.bargeCallHauler],
+      ['droneUnloadAtBarge', DEFAULT_PARAM.droneUnloadAtBarge],
+      ['recallOnLowShields', DEFAULT_PARAM.recallOnLowShields],
+    ]);
+  });
+
+  it('every rule changes the outcome of the stress scenario', () => {
+    const all = OLD.get('stress, all rules');
+    expect(all).toBeDefined();
+    const runs = [
+      all,
+      OLD.get('stress, no rules'),
+      ...IDS.map((id) => OLD.get(`stress, all but ${id}`)),
+    ];
+    expect(runs.every((r) => r !== undefined)).toBe(true);
+    expect(new Set(runs).size).toBe(runs.length);
+  });
 });
