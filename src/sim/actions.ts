@@ -9,6 +9,7 @@ import {
   moduleLocked,
   REFINERY_COST,
   MAX_HANGAR_SLOTS,
+  MAX_HANGARS,
   NEW_HANGAR_COST,
   OFFLINE_CAP_S,
   OFFLINE_EFFICIENCY,
@@ -122,7 +123,7 @@ export function apply(s: GameState, c: Command): string | null {
     }
     case 'buyHangar': {
       const cost = NEW_HANGAR_COST(s.hangars.length);
-      if (s.hangars.length >= 5) return 'The carrier has no room for more hangars';
+      if (s.hangars.length >= MAX_HANGARS) return 'The carrier has no room for more hangars';
       {
         const locked = hangarLocked(c.hangarType, s.stats.furthestTier);
         if (locked) return locked;

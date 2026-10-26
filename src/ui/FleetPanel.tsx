@@ -7,6 +7,7 @@ import {
   HANGAR_TYPES,
   hangarLocked,
   MAX_HANGAR_SLOTS,
+  MAX_HANGARS,
   MODULE_IDS,
   MODULE_SLOTS,
   MODULES,
@@ -462,7 +463,7 @@ export function FleetPanel() {
           )}
         </div>
       ))}
-      {hangarCount < 5 && (
+      {hangarCount < MAX_HANGARS && (
         <>
           <h3>New hangar · {fmt(NEW_HANGAR_COST(hangarCount))} cr</h3>
           <div className="row">

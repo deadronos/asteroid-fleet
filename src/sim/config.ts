@@ -183,6 +183,7 @@ export const BASE_STORAGE = 2000;
 export const HANGAR_SLOT_COST = (slots: number) => Math.round(120 * Math.pow(1.45, slots - 6));
 export const NEW_HANGAR_COST = (count: number) => Math.round(1500 * Math.pow(3, count - 2));
 export const MAX_HANGAR_SLOTS = 12;
+export const MAX_HANGARS = 5;
 
 export const DEFAULT_STANCE: Stance = {
   engagement: 'defensive',
