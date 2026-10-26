@@ -4,7 +4,7 @@ import { emit, focused, focusOp, newGame } from '../sim/state';
 import { stressGame } from '../sim/stress';
 import { step, stepSim } from '../sim/tick';
 import type { GameState } from '../sim/types';
-import { createLocalHost } from './host';
+import { createLocalHost } from './localHost';
 import { MODES, encodeFrame, type OutMsg } from './protocol';
 
 const TICK_MS = 100;

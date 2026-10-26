@@ -4,6 +4,8 @@ test('app loads, renders the canvas, and opens settings without console errors',
   page,
 }) => {
   const errors: string[] = [];
+  const requested: string[] = [];
+  page.on('request', (req) => requested.push(req.url()));
   page.on('console', (msg) => {
     if (msg.type() === 'error') errors.push(msg.text());
   });
@@ -29,6 +31,8 @@ test('app loads, renders the canvas, and opens settings without console errors',
   expect(before.kind).toBe('worker');
   await expect.poll(async () => (await sim()).time).toBeGreaterThan(before.time);
 
+  // With a working worker the main-thread fallback sim is never downloaded.
+  expect(requested.filter((u) => /localHost-/.test(u))).toEqual([]);
   expect(errors).toEqual([]);
 });
 

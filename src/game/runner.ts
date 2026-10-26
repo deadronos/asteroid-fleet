@@ -4,13 +4,12 @@ import { focusOp } from '../sim/state';
 import { step } from '../sim/tick';
 import type { GameState } from '../sim/types';
 import { EventAggregator } from './events';
-import { encodeFrame, type InMsg, type OutMsg } from './protocol';
+import { PUMP_MS, encodeFrame, type InMsg, type OutMsg } from './protocol';
 import { encodeSnapshot } from './snapshot';
 
 const TICK_MS = DT * 1000;
 const MAX_CATCHUP_TICKS = 600; // a minute of sim; longer gaps go through offline settlement
 const UI_HZ = 5;
-export const PUMP_MS = 25;
 
 export type Post = (msg: OutMsg, transfer?: Transferable[]) => void;
 

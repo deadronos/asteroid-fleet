@@ -3,6 +3,9 @@ import type { Carrier, Fx, GameState, Operation, ShipMode, Warp } from '../sim/t
 import type { BusEvent } from './events';
 import type { UiSnapshot } from './snapshot';
 
+/** How often the sim host pumps its tick loop (ms). */
+export const PUMP_MS = 25;
+
 /** Ship modes by index, for the per-tick `modes` byte array. */
 export const MODES: ShipMode[] = [
   'docked',

@@ -12,12 +12,11 @@ const BUDGET = {
   initial: 115 * KB,
   // Any single JS chunk; three.js is the largest.
   chunk: 200 * KB,
-  // All JS and CSS, lazy chunks and the sim worker included. Raised from 415 for the typed
-  // event bus (#72), which put main at 415.3 kB; the sim ships in both the worker and the
-  // main-thread fallback, so sim code counts twice. Raised to 425 for condition/action rule
-  // cards (#82), which put the total at 421.7 kB for the same reason. Raised to 430 for the
-  // toast queue and event inbox (#73), which put the total at 425.4 kB.
-  total: 430 * KB,
+  // Worst-case download: everything except the sim you don't run. The sim ships twice, as the
+  // Web Worker bundle and as the lazy main-thread fallback chunk (only fetched when the worker
+  // fails); a user gets one of them, so the total counts the larger once, not both.
+  // Measured 425.6 kB at the time of writing, so ~10% headroom (468 kB).
+  total: 468 * KB,
 };
 
 const dist = 'dist';
@@ -36,10 +35,21 @@ for (const [f, n] of [...sizes].sort((a, b) => b[1] - a[1])) {
   console.log(`${fmt(n).padStart(10)}  ${f}${lazy}`);
   if (f.endsWith('.js') && n > BUDGET.chunk) failures.push(`${f} ${fmt(n)} > ${fmt(BUDGET.chunk)}`);
 }
+const workerFile = files.find((f) => /^sim\.worker-.*\.js$/.test(f));
+const fallbackFile = files.find((f) => /^localHost-.*\.js$/.test(f));
+if (!workerFile || !fallbackFile) {
+  console.error('Could not find the worker bundle and the fallback chunk in dist/assets.');
+  process.exit(1);
+}
 const initialSize = initial.reduce((s, f) => s + (sizes.get(f) ?? 0), 0);
-const total = [...sizes.values()].reduce((s, n) => s + n, 0);
-console.log(`\ninitial ${fmt(initialSize)} / ${fmt(BUDGET.initial)}`);
-console.log(`total   ${fmt(total)} / ${fmt(BUDGET.total)}`);
+const everything = [...sizes.values()].reduce((s, n) => s + n, 0);
+const worker = sizes.get(workerFile);
+const fallback = sizes.get(fallbackFile);
+const total = everything - Math.min(worker, fallback);
+console.log(`\nworker   ${fmt(worker)}  ${workerFile}`);
+console.log(`fallback ${fmt(fallback)}  ${fallbackFile}`);
+console.log(`initial ${fmt(initialSize)} / ${fmt(BUDGET.initial)}`);
+console.log(`total   ${fmt(total)} (worst case, sim counted once) / ${fmt(BUDGET.total)}`);
 if (initialSize > BUDGET.initial)
   failures.push(`initial ${fmt(initialSize)} > ${fmt(BUDGET.initial)}`);
 if (total > BUDGET.total) failures.push(`total ${fmt(total)} > ${fmt(BUDGET.total)}`);
