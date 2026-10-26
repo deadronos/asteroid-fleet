@@ -6,6 +6,7 @@ import type { BusEvent } from './events';
 import { createSimHost, type SimHost } from './host';
 import { MODES, type Frame, type OutMsg } from './protocol';
 import { PUMP_MS } from './runner';
+import { applySnapshot } from './snapshot';
 import { allowSaveOverwrite, loadGame, saveGame, saveOverwriteBlocked } from './save';
 import { getActiveSlot, writeSlot } from './slots';
 
@@ -13,8 +14,9 @@ const AUTOSAVE_MS = 15000;
 
 /**
  * Main-thread side of the game. The sim runs in a worker (see `runner.ts`); this class
- * keeps a mirror of its state for React and the renderer. The full state arrives a few
- * times per second; positions, modes and effects arrive after every sim pump as typed arrays.
+ * keeps a mirror of its state for React and the renderer. A packed snapshot of the whole state
+ * arrives a few times per second (see `UiSnapshot`); positions, modes and effects arrive after
+ * every sim pump as typed arrays.
  * The renderer interpolates between the last two pumps.
  */
 class Engine {
@@ -77,7 +79,7 @@ class Engine {
   private receive(msg: OutMsg) {
     switch (msg.t) {
       case 'state':
-        this.adopt(msg.state);
+        this.adopt(applySnapshot(this.state, msg.snap));
         if (msg.offline) this.offline = msg.offline;
         if (this.ready) {
           this.ready();
@@ -106,7 +108,7 @@ class Engine {
     }
   }
 
-  /** A full state replaces the mirror. Positions keep coming from frames in between. */
+  /** A new state replaces the mirror. Positions keep coming from frames in between. */
   private adopt(state: GameState) {
     const first = this.ships.size === 0 && this.pirates.size === 0;
     this.state = state;
