@@ -15,6 +15,8 @@ function busyGame(): GameState {
   s.events.length = 0;
   // The one mode frames do not carry.
   s.ships.find((x) => x.cls === 'drone' && x.mode !== 'docked')!.mode = 'carried';
+  // A timed stance card in force (#82).
+  s.ships.find((x) => x.cls === 'fighter')!.hold = { card: 3, until: s.time + 4.5 };
   return s;
 }
 
@@ -37,6 +39,7 @@ describe('UI snapshot', () => {
     const s = busyGame();
     expect(s.ships.some((x) => x.station)).toBe(true);
     expect(s.ships.some((x) => x.mode === 'carried')).toBe(true);
+    expect(s.ships.some((x) => x.hold)).toBe(true);
     expect(Object.keys(s.fields).length).toBeGreaterThan(0);
     expect(roundTrip(s, null)).toEqual({ ...s, fx: [] });
   });
@@ -47,6 +50,8 @@ describe('UI snapshot', () => {
     const ship = prev.ships[0];
     for (let i = 0; i < 20; i++) step(s);
     s.events.length = 0;
+    // A hold that ran out must not linger on the reused mirror ship.
+    for (const sh of s.ships) delete sh.hold;
     const next = roundTrip(s, prev, false);
     expect(next.ships[0]).toBe(ship);
     expect(next.fields).toBe(prev.fields);
