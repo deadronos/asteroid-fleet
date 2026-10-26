@@ -7,6 +7,7 @@ import { SHIP_CLASSES } from '../sim/types';
 import { CarrierPanel } from './CarrierPanel';
 import { DoctrinePanel } from './DoctrinePanel';
 import { downloadFile } from './download';
+import { formatEvent, toneClass } from './events';
 import { SceneBoundary } from './ErrorBoundary';
 import { FleetPanel } from './FleetPanel';
 import { Hud, fmt } from './Hud';
@@ -66,9 +67,9 @@ function LogPanel() {
       <h3>Event log</h3>
       <div className="log">
         {s.log.map((l, i) => (
-          <div key={i} className={`tone-${l.tone}`}>
+          <div key={i} className={toneClass(l.severity)}>
             <span className="t">{new Date(l.t * 1000).toISOString().slice(11, 19)}</span>
-            {l.text}
+            {formatEvent(l)}
           </div>
         ))}
       </div>

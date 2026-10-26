@@ -1,5 +1,6 @@
 import type { Command, OfflineReport } from '../sim/actions';
 import type { Carrier, Fx, GameState, ShipMode, Warp } from '../sim/types';
+import type { BusEvent } from './events';
 
 /** Ship modes by index, for the per-tick `modes` byte array. */
 export const MODES: ShipMode[] = [
@@ -50,6 +51,8 @@ export interface Frame {
 export type OutMsg =
   | Frame
   | { t: 'state'; state: GameState; offline: OfflineReport | null }
+  /** New or grown events since the last batch, most severe first. */
+  | { t: 'events'; events: BusEvent[] }
   | { t: 'error'; text: string }
   | { t: 'snapshot'; id: number; state: GameState };
 

@@ -20,13 +20,14 @@ import { effectiveStance, rule } from './doctrine';
 import { carrierStorage } from './hangar';
 import { copy, dist, dist2, moveToward } from './math';
 import { lvl } from './research';
-import { log } from './state';
+import { emit } from './state';
 import { PointGrid } from './spatial';
 import {
   SHIP_CLASSES,
   type Asteroid,
   type GameState,
   type Hangar,
+  type LossCause,
   type ModuleId,
   type Pirate,
   type Ship,
@@ -307,12 +308,12 @@ export function damageCarrier(s: GameState, dmg: number) {
   c.hull -= dmg;
 }
 
-export function destroyShip(s: GameState, ship: Ship, why: string) {
+export function destroyShip(s: GameState, ship: Ship, cause: LossCause) {
   s.fx.push({ kind: 'explosion', a: copy(ship.pos), b: copy(ship.pos), ttl: 0.8 });
   for (const h of s.hangars) h.items = h.items.filter((it) => it.shipId !== ship.id);
   s.stats.shipsLost++;
   queueRebuild(s, ship);
-  log(s, `${SHIP_STATS[ship.cls].name} lost (${why}).`, 'bad');
+  emit(s, 'ShipLost', { cls: ship.cls, cause });
 }
 
 // ---------- cargo ----------

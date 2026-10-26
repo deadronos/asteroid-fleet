@@ -1,0 +1,146 @@
+{
+  "version": 7,
+  "seed": 1337,
+  "rng": 1337,
+  "time": 42,
+  "nextId": 2,
+  "credits": 420,
+  "research": 3,
+  "researchLevels": {
+    "yield": 1
+  },
+  "unlocked": ["hauler"],
+  "unlockedRules": [],
+  "carrier": {
+    "pos": {
+      "x": 1,
+      "y": 2,
+      "z": 3
+    },
+    "target": null,
+    "hull": 1800,
+    "maxHull": 2000,
+    "energy": 40,
+    "shield": 0.5,
+    "ore": 12,
+    "oreValue": 80,
+    "h2": 1,
+    "stance": "hold",
+    "refinery": 2
+  },
+  "hangars": [],
+  "ships": [
+    {
+      "id": 1,
+      "cls": "drone",
+      "hangarId": 1,
+      "mode": "mining",
+      "pos": {
+        "x": 4,
+        "y": 0,
+        "z": -2
+      },
+      "hull": 8,
+      "cargo": 6,
+      "cargoValue": 30,
+      "h2": 0,
+      "targetId": 9,
+      "escortId": -1,
+      "station": null,
+      "fireCooldown": 0,
+      "bargeId": -1,
+      "modules": []
+    }
+  ],
+  "pirates": [],
+  "asteroids": [],
+  "hazards": [],
+  "systems": [],
+  "systemId": 0,
+  "doctrine": {
+    "fleet": {
+      "engagement": "defensive",
+      "underFire": "retreatHull",
+      "retreatAt": 0.3,
+      "mining": "safe"
+    },
+    "byClass": {}
+  },
+  "rules": [],
+  "warp": null,
+  "wave": {
+    "timer": null,
+    "warning": false,
+    "active": false,
+    "size": 2
+  },
+  "storm": {
+    "timer": null,
+    "active": 0
+  },
+  "reserveTimers": {},
+  "stats": {
+    "oreValueDelivered": 500,
+    "creditsEarned": 200,
+    "shipsLost": 1,
+    "piratesKilled": 4,
+    "furthestTier": 2
+  },
+  "lifetime": {
+    "prestiges": 1,
+    "researchEarned": 3
+  },
+  "incomeAvg": 1.5,
+  "powerMode": "income",
+  "fx": [],
+  "log": [
+    {
+      "t": 40,
+      "text": "Fighter lost (destroyed).",
+      "tone": "bad"
+    },
+    {
+      "t": 20,
+      "text": "Pirate wave repelled.",
+      "tone": "good"
+    },
+    {
+      "t": 10,
+      "text": "Docked.",
+      "tone": "info"
+    }
+  ],
+  "savedAt": 1700000000000,
+  "automation": {
+    "autoBuy": false,
+    "autoRebuild": true,
+    "creditFloor": 100,
+    "rebuildQueue": [],
+    "timer": 0
+  },
+  "fields": {
+    "1": {
+      "left": 10,
+      "rocks": [[0, 0.5, 0]]
+    }
+  },
+  "containers": [
+    {
+      "id": 9001,
+      "pos": {
+        "x": 20,
+        "y": 0,
+        "z": -12
+      },
+      "cargo": 40,
+      "cargoValue": 80,
+      "ttl": 60
+    }
+  ],
+  "recon": {
+    "clusters": [],
+    "veins": [],
+    "hazards": []
+  },
+  "miningIncomeAvg": 3.5
+}

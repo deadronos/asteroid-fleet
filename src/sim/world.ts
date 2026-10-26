@@ -10,7 +10,6 @@ import {
   FUSION_RATE,
   REFINE_ENERGY,
   refineRate,
-  SHIP_STATS,
   warpCost,
 } from './config';
 import { SHIELD_HP, damageShip, inHazard, type Ctx } from './ctx';
@@ -23,7 +22,7 @@ import {
   createShip,
   gasGiantPos,
   h2Storm,
-  log,
+  emit,
   maxEnergy,
   solarRate,
   spawnAsteroid,
@@ -144,7 +143,7 @@ export function reserves(s: GameState, dt: number, ctx: Ctx) {
     s.reserveTimers[cls] = t;
     if (t <= 0) {
       if (createShip(s, cls)) {
-        log(s, `Reserve rebuilt a ${SHIP_STATS[cls].name.toLowerCase()}.`, 'good');
+        emit(s, 'ReserveRebuilt', { cls });
         // The free reserve covered this loss; do not also pay for it.
         const q = s.automation.rebuildQueue;
         const i = q.findIndex((x) => x.cls === cls);

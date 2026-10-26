@@ -1,6 +1,5 @@
 import {
   HANGAR_SLOT_COST,
-  HANGAR_TYPES,
   hangarLocked,
   MAX_REFINERY,
   MODULE_SLOTS,
@@ -21,7 +20,7 @@ import {
 import { autoBuyUnlocked, autoRebuildUnlocked, engagementUnlocked } from './automation';
 import { moveShip as moveOnBoard } from './hangar';
 import { buyResearch as buyNode, lvl, reserveDefs } from './research';
-import { createShip, log, maxEnergy, newGame, solarRate, upkeepRate } from './state';
+import { createShip, emit, maxEnergy, newGame, solarRate, upkeepRate } from './state';
 import { executeJump } from './tick';
 import type {
   CarrierStance,
@@ -141,7 +140,7 @@ export function apply(s: GameState, c: Command): string | null {
         launchTimer: 0,
         target: {},
       });
-      log(s, `New ${HANGAR_TYPES[c.hangarType].name.toLowerCase()} installed.`, 'good');
+      emit(s, 'HangarInstalled', { hangarType: c.hangarType });
       return null;
     }
     case 'retrofitHangar': {
@@ -197,7 +196,7 @@ export function apply(s: GameState, c: Command): string | null {
       s.carrier.energy -= pay.energy;
       s.carrier.h2 -= pay.h2;
       s.warp = { targetSystem: to.id, charge: WARP_CHARGE * (1 - 0.15 * lvl(s, 'warpCharge')) };
-      log(s, `Warp drive charging for ${to.name}. Recalling the fleet.`, 'warn');
+      emit(s, 'WarpCharging', { system: to.name });
       return null;
     }
     case 'cancelWarp': {
@@ -209,7 +208,7 @@ export function apply(s: GameState, c: Command): string | null {
         s.carrier.energy + warpCost(from.distance, to.distance) * 0.75,
       );
       s.warp = null;
-      log(s, 'Jump cancelled.', 'info');
+      emit(s, 'WarpCancelled', {});
       return null;
     }
     case 'jumpNow':
@@ -283,7 +282,7 @@ export function prestige(s: GameState): GameState {
     rules: structuredClone(s.rules),
     automation: structuredClone(s.automation),
   });
-  log(next, `Operation reset. +${rp} research points.`, 'good');
+  emit(next, 'Prestiged', { research: rp });
   return next;
 }
 
@@ -322,10 +321,6 @@ export function settleOffline(s: GameState, elapsedS: number): OfflineReport | n
     const n = Math.min(Math.max(0, min - have), Math.floor(t / cooldown));
     for (let i = 0; i < n; i++) if (createShip(s, cls)) rebuilt++;
   }
-  log(
-    s,
-    `Welcome back. The fleet earned ${Math.round(credits)} credits while you were away.`,
-    'good',
-  );
+  emit(s, 'WelcomeBack', { credits: Math.round(credits) });
   return { seconds: t, credits, rebuilt };
 }

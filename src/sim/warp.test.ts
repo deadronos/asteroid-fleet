@@ -45,7 +45,7 @@ describe('warp jump', () => {
     expect(drone.mode).toBe('docked');
     expect(inHangar(s, barge.id)).toBe(true);
     expect(inHangar(s, drone.id)).toBe(true);
-    expect(s.log.some((l) => l.text.includes('outside at jump time'))).toBe(false);
+    expect(s.log.some((l) => l.kind === 'ShipLost' && l.data.cause === 'leftBehind')).toBe(false);
   });
 
   it('keeps bay drones when the charge runs out on the tick their barge docks', () => {

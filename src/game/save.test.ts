@@ -7,6 +7,7 @@ import saveV3 from './fixtures/save-v3.json';
 import saveV4 from './fixtures/save-v4.json';
 import saveV5 from './fixtures/save-v5.json';
 import saveV6 from './fixtures/save-v6.json';
+import saveV7 from './fixtures/save-v7.json';
 import { applyMigrationSteps, migrate, type SaveBlob } from './migrate';
 import {
   SAVE_BACKUP_FAILED_NOTICE,
@@ -179,6 +180,32 @@ describe('migrate', () => {
     expect(r.state.miningIncomeAvg).toBe(3.5);
   });
 
+  it('turns v7 plain-text log lines into Legacy events (#72)', () => {
+    expect(saveV7.version).toBe(7);
+    const r = migrate(saveV7);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.state.events).toEqual([]);
+    expect(r.state.log).toEqual([
+      {
+        kind: 'Legacy',
+        carrierId: 0,
+        systemId: saveV7.systemId,
+        severity: 'critical',
+        t: 40,
+        count: 1,
+        data: { text: 'Fighter lost (destroyed).' },
+      },
+      expect.objectContaining({ severity: 'good', t: 20, data: { text: 'Pirate wave repelled.' } }),
+      expect.objectContaining({ severity: 'info', t: 10, data: { text: 'Docked.' } }),
+    ]);
+    // Lines from older saves come through every step too.
+    const v1 = migrate(saveV1);
+    expect(v1.ok && v1.state.log.map((l) => l.kind)).toEqual(['Legacy']);
+    const noLog = migrate({ ...structuredClone(saveV7), log: undefined });
+    expect(noLog.ok && noLog.state.log).toEqual([]);
+  });
+
   it('rebuilds a missing systems map from the seed (#40)', () => {
     expect(saveV1.systems).toEqual([]);
     const r = migrate(saveV1);
@@ -199,6 +226,7 @@ describe('migrate', () => {
     ['v4', saveV4],
     ['v5', saveV5],
     ['v6', saveV6],
+    ['v7', saveV7],
   ])('a migrated %s fixture keeps running through step()', (_, fixture) => {
     const r = migrate(fixture);
     expect(r.ok).toBe(true);

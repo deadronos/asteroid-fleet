@@ -3,13 +3,13 @@
 import { DOCK_RADIUS } from './config';
 import { destroyShip, dock } from './ctx';
 import { copy, dist } from './math';
-import { enterSystem, log } from './state';
+import { emit, enterSystem } from './state';
 import type { GameState, Ship } from './types';
 
 export function carrierDisabled(s: GameState) {
-  log(s, 'Carrier hull critical! Emergency jump to the starter system.', 'bad');
+  emit(s, 'EmergencyJump', {});
   const lost = s.ships.filter((x) => x.mode !== 'docked');
-  for (const l of lost) destroyShip(s, l, 'left behind in emergency jump');
+  for (const l of lost) destroyShip(s, l, 'emergencyJump');
   s.ships = s.ships.filter((x) => x.mode === 'docked');
   s.carrier.hull = s.carrier.maxHull * 0.5;
   s.carrier.shield = 0;
@@ -53,11 +53,11 @@ export function executeJump(s: GameState) {
   for (const x of s.ships)
     if (x.mode !== 'docked' && x.mode !== 'carried' && !lost.has(x)) dock(s, x);
   for (const x of s.ships) if (x.mode === 'carried' && !lost.has(x)) dock(s, x);
-  for (const l of outside) destroyShip(s, l, 'outside at jump time');
+  for (const l of outside) destroyShip(s, l, 'leftBehind');
   s.ships = s.ships.filter((x) => x.mode === 'docked');
   s.fx.push({ kind: 'warp', a: copy(s.carrier.pos), b: copy(s.carrier.pos), ttl: 1.5 });
   s.warp = null;
   enterSystem(s, target);
   for (const sh of s.ships) sh.pos = copy(s.carrier.pos);
-  log(s, `Warped to ${s.systems[target].name}.`, 'good');
+  emit(s, 'Warped', { system: s.systems[target].name });
 }

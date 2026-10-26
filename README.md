@@ -53,7 +53,7 @@ Every save schema change needs all three of these:
 
 1. Bump `SAVE_VERSION`.
 2. Add the `migrations[n]` step that upgrades the previous version to the new one.
-3. Check in a fixture of the previous version under `src/game/fixtures/` and a test that loads it and migrates it to the current version. `src/game/fixtures/save-v1.json` is the v1 fixture `save-v2.json` the v2 one (automation, #11) `save-v3.json` the v3 one (field records, #14) `save-v4.json` the v4 one (containers, #13), `save-v5.json` the v5 one (modules, #9) and `save-v6.json` the v6 one (`miningIncomeAvg`, #38). Every fixture is also migrated and run through `step()` in `src/game/save.test.ts`.
+3. Check in a fixture of the previous version under `src/game/fixtures/` and a test that loads it and migrates it to the current version. `src/game/fixtures/save-v1.json` is the v1 fixture `save-v2.json` the v2 one (automation, #11) `save-v3.json` the v3 one (field records, #14) `save-v4.json` the v4 one (containers, #13), `save-v5.json` the v5 one (modules, #9) `save-v6.json` the v6 one (`miningIncomeAvg`, #38) and `save-v7.json` the v7 one (plain-text log, #72). Every fixture is also migrated and run through `step()` in `src/game/save.test.ts`.
 
 v3 added `fields`: when the carrier leaves a system it keeps a compact depletion record (`[index, oreFraction, respawn]` for each rock that is not full). On return the field is regenerated from the seed, the record applied, and refill added for the sim time spent away (depleted timers count down, partly mined rocks refill over `FIELD_REFILL_SECS`). All records together stay under 16 KB of save, tested in `src/sim/fields.test.ts`.
 

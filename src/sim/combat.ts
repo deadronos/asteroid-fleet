@@ -24,7 +24,7 @@ import {
 } from './ctx';
 import { copy, dist, dist2, moveToward, rand, randRange, seeded } from './math';
 import { lvl } from './research';
-import { clusterCenters, log, maxHull } from './state';
+import { clusterCenters, emit, maxHull } from './state';
 import type { GameState, Pirate, Ship, Vec3 } from './types';
 
 export function cargoHeat(s: GameState): number {
@@ -163,7 +163,7 @@ export function scout(s: GameState, ship: Ship, dt: number, ctx: Ctx) {
     const h = s.hazards[i];
     if (dist2(h.pos, ship.pos) < sensor2) {
       r.hazards.push(i);
-      log(s, `Scout charted a ${h.kind} field.`, 'warn');
+      emit(s, 'HazardCharted', { hazard: h.kind });
     }
   }
   const centers = clusterCenters(s.systems[s.systemId]);
@@ -211,7 +211,7 @@ export function surveyCluster(s: GameState, i: number, ctx: Ctx) {
     ctx.veins.add(a.id);
     found++;
   }
-  if (found > 0) log(s, `Scout found ${found} rich vein${found > 1 ? 's' : ''}.`, 'good');
+  if (found > 0) emit(s, 'VeinFound', { veins: found });
 }
 
 export function repairDrone(s: GameState, ship: Ship, dt: number, ctx: Ctx) {
@@ -264,7 +264,7 @@ export function threats(s: GameState, dt: number) {
   if (!w.warning && w.timer <= warn) {
     w.warning = true;
     w.size = Math.max(1, Math.round((1 + sys.distance * 0.7 + (sys.tier - 2) * 2) * heatFactor(s)));
-    log(s, `Pirate wave inbound: ${w.size} raiders in ${Math.ceil(w.timer)} s.`, 'warn');
+    emit(s, 'PirateWaveIncoming', { size: w.size, eta: Math.ceil(w.timer) });
   }
   if (w.timer <= 0) {
     w.warning = false;
@@ -289,23 +289,20 @@ export function threats(s: GameState, dt: number) {
         fireCooldown: 0,
       });
     }
-    log(s, 'Pirates have arrived!', 'bad');
+    emit(s, 'PiratesArrived', { size: w.size });
     w.timer = WAVE_INTERVAL(sys.tier) * randRange(s, 0.8, 1.2);
   }
   // Solar storms in the frontier and beyond; H2 storms at gas giants.
   const st = s.storm;
   if (st.active > 0) {
     st.active -= dt;
-    if (st.active <= 0)
-      log(s, s.systems[s.systemId].gasGiant ? 'H2 storm passed.' : 'Solar storm passed.', 'info');
+    if (st.active <= 0) emit(s, 'StormPassed', { h2: s.systems[s.systemId].gasGiant });
   } else {
     st.timer -= dt;
     if (st.timer <= 0) {
       st.active = 20;
       st.timer = randRange(s, 120, 220);
-      if (s.systems[s.systemId].gasGiant)
-        log(s, 'H2 storm: ships near the gas giant take damage, harvest yield up.', 'warn');
-      else log(s, 'Solar storm: ships outside take damage, solar output up.', 'warn');
+      emit(s, 'StormStarted', { h2: s.systems[s.systemId].gasGiant });
     }
   }
 }

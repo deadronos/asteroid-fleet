@@ -18,7 +18,7 @@ import {
 import { rule } from './doctrine';
 import { dist, dist2, moveToward, rand } from './math';
 import { lvl } from './research';
-import { clusterCenters, gasGiantPos, h2Storm, log, maxHull } from './state';
+import { clusterCenters, emit, gasGiantPos, h2Storm, maxHull } from './state';
 import type { Asteroid, Container, GameState, Ship, Vec3 } from './types';
 
 /** Drones a barge's drone bay holds per `bargeBay` level. */
@@ -108,7 +108,7 @@ export function dropContainer(s: GameState, b: Ship) {
     cargoValue: b.cargoValue * CONTAINER_SHARE,
     ttl: CONTAINER_TTL,
   });
-  log(s, 'Barge wreck dropped a cargo container. Haulers can salvage it.', 'warn');
+  emit(s, 'BargeWrecked', {});
 }
 
 export function decayContainers(s: GameState, dt: number) {
@@ -287,7 +287,7 @@ export function barge(s: GameState, ship: Ship, dt: number, ctx: Ctx, mining: 'g
   const v = speed(s, ship) * dt;
   if (rule(s, 'bargeFallBack') && nearestPirate(s, ship.pos, 28)) {
     ship.mode = 'retreat';
-    log(s, 'Barge falling back to the carrier.', 'warn');
+    emit(s, 'BargeFallback', {});
     return;
   }
   const haulersExist = ctx.byClass.hauler.length > 0;

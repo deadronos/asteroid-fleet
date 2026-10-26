@@ -2,7 +2,7 @@ import { automation } from './automation';
 // One fixed simulation step. Behaviour lives in mining.ts, combat.ts, world.ts
 // and warp.ts; ctx.ts holds the per-tick lookups they share.
 
-import { DT, HANGAR_TYPES, PIRATE_BASE, SHIP_STATS } from './config';
+import { DT, HANGAR_TYPES, PIRATE_BASE } from './config';
 import { fighter, pirateStep, repairDrone, scout, threats } from './combat';
 import {
   buildCtx,
@@ -29,7 +29,7 @@ import {
 } from './mining';
 import { copy, moveAway, onSphere, rand } from './math';
 import { lvl } from './research';
-import { log, maxHull } from './state';
+import { emit, maxHull } from './state';
 import { carrierDisabled, executeJump, warpStep } from './warp';
 import { drift, field, hazards, power, refine, reserves } from './world';
 import type { GameState, Ship, ShipClass } from './types';
@@ -104,7 +104,7 @@ export function step(s: GameState, dt = DT) {
   s.pirates.length = alive;
   if (s.wave.active && s.pirates.length === 0) {
     s.wave.active = false;
-    log(s, 'Pirate wave repelled.', 'good');
+    emit(s, 'WaveRepelled', {});
   }
   if (s.carrier.hull <= 0) carrierDisabled(s);
 
@@ -189,7 +189,7 @@ function behave(s: GameState, ship: Ship, dt: number, ctx: Ctx) {
   // Under-fire stances.
   if (st.underFire === 'retreatHull' && ship.hull < mh * st.retreatAt) {
     ship.mode = 'retreat';
-    log(s, `${SHIP_STATS[ship.cls].name} retreating for repairs.`, 'warn');
+    emit(s, 'ShipRetreating', { cls: ship.cls });
     return;
   }
   const threat = nearestPirate(s, ship.pos, ship.cls === 'fighter' ? 0 : 18);

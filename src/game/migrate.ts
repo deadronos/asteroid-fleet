@@ -1,5 +1,5 @@
 import { SAVE_VERSION, makeSystems } from '../sim/state';
-import type { GameState } from '../sim/types';
+import type { GameState, Severity } from '../sim/types';
 
 export type SaveFailure = 'corrupt' | 'newer' | 'unknown';
 
@@ -59,6 +59,29 @@ export const migrations: Record<number, Migration> = {
   // v7: every asteroid now draws its rare-ore roll (#40), so fields regenerate differently
   // and old depletion records would land on other rocks. Drop them: rocks refill anyway.
   6: (save) => ({ ...save, fields: {} }),
+  // v8: typed events replace plain-text log lines (#72). Old lines keep their text.
+  7: (save) => {
+    const systemId = typeof save.systemId === 'number' ? save.systemId : 0;
+    const old = Array.isArray(save.log) ? save.log : [];
+    save.log = old.filter(isRecord).map((l) => ({
+      kind: 'Legacy',
+      carrierId: 0,
+      systemId,
+      severity: (typeof l.tone === 'string' && LEGACY_TONE[l.tone]) || 'info',
+      t: typeof l.t === 'number' ? l.t : 0,
+      count: 1,
+      data: { text: typeof l.text === 'string' ? l.text : '' },
+    }));
+    save.events = [];
+    return save;
+  },
+};
+
+const LEGACY_TONE: Record<string, Severity> = {
+  info: 'info',
+  good: 'good',
+  warn: 'warn',
+  bad: 'critical',
 };
 
 export function applyMigrationSteps(
@@ -129,6 +152,9 @@ function validateSave(save: SaveBlob): MigrateResult {
   if (!isRecord(save.automation)) return { ok: false, reason: 'corrupt' };
   if (!isRecord(save.wave) || !isTimer(save.wave.timer)) return { ok: false, reason: 'corrupt' };
   if (!isRecord(save.storm) || !isTimer(save.storm.timer)) return { ok: false, reason: 'corrupt' };
+
+  if (!Array.isArray(save.log)) save.log = [];
+  if (!Array.isArray(save.events)) save.events = [];
 
   // NaN is stored as null; a non-finite income would poison the rolling average.
   if (typeof save.miningIncomeAvg !== 'number' || !Number.isFinite(save.miningIncomeAvg))

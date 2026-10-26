@@ -16,6 +16,7 @@ import { onSphere, seeded, v3 } from './math';
 import { lvl } from './research';
 import type {
   Asteroid,
+  EventData,
   FieldRecord,
   GameState,
   Hangar,
@@ -23,12 +24,15 @@ import type {
   RuleId,
   Ship,
   ShipClass,
+  Severity,
+  SimEvent,
+  SimEventKind,
   StarSystem,
   Vec3,
 } from './types';
 
 /** Bump together with a `migrations[n]` step and a fixture. See README "Save migrations". */
-export const SAVE_VERSION = 7;
+export const SAVE_VERSION = 8;
 
 const NAMES = [
   'Kestrel',
@@ -314,9 +318,50 @@ export function createShip(
   return ship;
 }
 
-export function log(s: GameState, text: string, tone: 'info' | 'warn' | 'bad' | 'good' = 'info') {
-  s.log.unshift({ t: s.time, text, tone });
-  if (s.log.length > 40) s.log.length = 40;
+export const SEVERITY: Record<SimEventKind, Severity> = {
+  CarrierOnline: 'good',
+  ShipLost: 'warn',
+  ShipRetreating: 'warn',
+  PirateWaveIncoming: 'warn',
+  PiratesArrived: 'critical',
+  WaveRepelled: 'good',
+  StormStarted: 'warn',
+  StormPassed: 'info',
+  HazardCharted: 'warn',
+  VeinFound: 'good',
+  BargeWrecked: 'warn',
+  BargeFallback: 'warn',
+  ReserveRebuilt: 'good',
+  ShipRebuilt: 'good',
+  HangarInstalled: 'good',
+  WarpCharging: 'warn',
+  WarpCancelled: 'info',
+  Warped: 'good',
+  EmergencyJump: 'critical',
+  Prestiged: 'good',
+  WelcomeBack: 'good',
+  Legacy: 'info',
+};
+
+const LOG_CAP = 40;
+/** Bounds the outbox when nothing drains it (tests, headless balance runs). */
+const OUTBOX_CAP = 256;
+
+/** Report an event to the player. Write-only: the sim never reads events back. */
+export function emit<K extends SimEventKind>(s: GameState, kind: K, data: EventData[K]) {
+  const ev = {
+    kind,
+    carrierId: 0,
+    systemId: s.systemId,
+    severity: SEVERITY[kind],
+    t: s.time,
+    count: 1,
+    data,
+  } as SimEvent;
+  s.log.unshift(ev);
+  if (s.log.length > LOG_CAP) s.log.length = LOG_CAP;
+  s.events.push({ ...ev });
+  if (s.events.length > OUTBOX_CAP) s.events.splice(0, s.events.length - OUTBOX_CAP);
 }
 
 interface Carry {
@@ -413,6 +458,7 @@ export function newGame(seed = 1337, carry?: Carry): GameState {
     powerMode: 'balanced',
     fx: [],
     log: [],
+    events: [],
     savedAt: Date.now(),
   };
   s.unlockedRules = [];
@@ -421,10 +467,6 @@ export function newGame(seed = 1337, carry?: Carry): GameState {
   s.carrier.energy = maxEnergy(s) * 0.6;
   enterSystem(s, 0);
   for (let i = 0; i < 4; i++) createShip(s, 'drone', 1);
-  log(
-    s,
-    'Carrier online in ' + s.systems[0].name + '. Set your doctrine, then let the fleet work.',
-    'good',
-  );
+  emit(s, 'CarrierOnline', { system: s.systems[0].name });
   return s;
 }

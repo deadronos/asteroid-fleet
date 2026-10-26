@@ -2,6 +2,7 @@ import { useSyncExternalStore } from 'react';
 import type { Command, OfflineReport } from '../sim/actions';
 import { newGame } from '../sim/state';
 import type { GameState, Pirate, Ship, Vec3 } from '../sim/types';
+import type { BusEvent } from './events';
 import { createSimHost, type SimHost } from './host';
 import { MODES, type Frame, type OutMsg } from './protocol';
 import { PUMP_MS } from './runner';
@@ -24,6 +25,8 @@ class Engine {
   paused = false;
   offline: OfflineReport | null = null;
   toast: { text: string; at: number } | null = null;
+  /** Recent events from the sim, newest first; a merged event replaces its earlier copy. */
+  events: BusEvent[] = [];
   /** Shown when the stored save could not be loaded. Autosave stays off. */
   saveNotice: string | null = null;
   /** The notice is up because the backup write itself failed. */
@@ -85,6 +88,11 @@ class Engine {
       case 'frame':
         this.applyFrame(msg);
         return;
+      case 'events': {
+        const ids = new Set(msg.events.map((e) => e.id));
+        this.events = [...msg.events, ...this.events.filter((e) => !ids.has(e.id))].slice(0, 50);
+        return;
+      }
       case 'error':
         this.toast = { text: msg.text, at: Date.now() };
         this.emit();

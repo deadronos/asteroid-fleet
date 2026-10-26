@@ -1,8 +1,7 @@
-import { SHIP_STATS } from './config';
 import { shipCost } from './actions';
 import { firstFit } from './hangar';
 import { lvl } from './research';
-import { createShip, log } from './state';
+import { createShip, emit } from './state';
 import { SHIP_CLASSES, type GameState, type Ship, type ShipClass } from './types';
 
 /** Seconds between automation passes; buying is not urgent and boards are scanned per pass. */
@@ -69,7 +68,7 @@ export function automation(s: GameState, dt: number) {
       if (!createShip(s, next.cls, home)) break;
       s.credits -= cost;
       a.rebuildQueue.shift();
-      log(s, `Rebuilt a ${SHIP_STATS[next.cls].name.toLowerCase()} for ${cost} credits.`, 'good');
+      emit(s, 'ShipRebuilt', { cls: next.cls, cost });
     }
   }
 

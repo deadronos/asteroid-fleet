@@ -229,11 +229,52 @@ export interface Fx {
   ttl: number;
 }
 
-export interface LogEntry {
-  t: number;
-  text: string;
-  tone: 'info' | 'warn' | 'bad' | 'good';
+export type Severity = 'info' | 'good' | 'warn' | 'critical';
+
+/** Why a ship was destroyed. */
+export type LossCause = 'destroyed' | 'emergencyJump' | 'leftBehind';
+
+/** Small payload per event kind. The UI turns kind + data into text. */
+export interface EventData {
+  CarrierOnline: { system: string };
+  ShipLost: { cls: ShipClass; cause: LossCause };
+  ShipRetreating: { cls: ShipClass };
+  PirateWaveIncoming: { size: number; eta: number };
+  PiratesArrived: { size: number };
+  WaveRepelled: Record<string, never>;
+  StormStarted: { h2: boolean };
+  StormPassed: { h2: boolean };
+  HazardCharted: { hazard: Hazard['kind'] };
+  VeinFound: { veins: number };
+  BargeWrecked: Record<string, never>;
+  BargeFallback: Record<string, never>;
+  ReserveRebuilt: { cls: ShipClass };
+  ShipRebuilt: { cls: ShipClass; cost: number };
+  HangarInstalled: { hangarType: HangarType };
+  WarpCharging: { system: string };
+  WarpCancelled: Record<string, never>;
+  Warped: { system: string };
+  EmergencyJump: Record<string, never>;
+  Prestiged: { research: number };
+  WelcomeBack: { credits: number };
+  /** A plain-text line from a save written before typed events (v7 and older). */
+  Legacy: { text: string };
 }
+export type SimEventKind = keyof EventData;
+
+interface SimEventOf<K extends SimEventKind> {
+  kind: K;
+  /** Always 0 until there are several carriers (#75). */
+  carrierId: number;
+  systemId: number;
+  severity: Severity;
+  t: number; // sim seconds
+  /** How many events were merged into this one; 1 when emitted. */
+  count: number;
+  data: EventData[K];
+}
+/** Something the sim reports to the player. Never read back by the sim. */
+export type SimEvent = { [K in SimEventKind]: SimEventOf<K> }[SimEventKind];
 
 export interface Stats {
   oreValueDelivered: number;
@@ -279,6 +320,9 @@ export interface GameState {
   miningIncomeAvg: number; // rolling credits/s from refined ore only, used for offline settlement
   powerMode: 'balanced' | 'income' | 'defense';
   fx: Fx[];
-  log: LogEntry[];
+  /** The last few events, newest first, for the Log tab. Saved. */
+  log: SimEvent[];
+  /** Outbox of events since the host last drained it, oldest first. */
+  events: SimEvent[];
   savedAt: number; // wall-clock ms
 }

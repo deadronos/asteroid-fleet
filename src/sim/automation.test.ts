@@ -15,7 +15,7 @@ const count = (s: GameState, cls: ShipClass, hangarId?: number) =>
 const lose = (s: GameState, cls: ShipClass) => {
   const ship = s.ships.find((x) => x.cls === cls)!;
   s.ships = s.ships.filter((x) => x !== ship);
-  destroyShip(s, ship, 'test');
+  destroyShip(s, ship, 'destroyed');
   return ship;
 };
 

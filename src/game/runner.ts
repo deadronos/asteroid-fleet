@@ -2,6 +2,7 @@ import { apply, prestige, settleOffline, type OfflineReport } from '../sim/actio
 import { DT } from '../sim/config';
 import { step } from '../sim/tick';
 import type { GameState } from '../sim/types';
+import { EventAggregator } from './events';
 import { encodeFrame, type InMsg, type OutMsg } from './protocol';
 
 const TICK_MS = DT * 1000;
@@ -25,6 +26,7 @@ export class SimRunner {
   private dirty = false;
   private offline: OfflineReport | null = null;
   private timer: ReturnType<typeof setInterval> | null = null;
+  private events = new EventAggregator();
 
   constructor(
     private post: Post,
@@ -34,9 +36,10 @@ export class SimRunner {
   handle(msg: InMsg) {
     switch (msg.t) {
       case 'init': {
-        this.state = msg.state;
+        this.adopt(msg.state);
         if (msg.settle)
-          this.offline = settleOffline(this.state, (msg.now - msg.state.savedAt) / 1000);
+          this.offline = settleOffline(msg.state, (msg.now - msg.state.savedAt) / 1000);
+        this.sendEvents();
         this.sendState();
         this.start();
         return;
@@ -45,6 +48,7 @@ export class SimRunner {
         if (!this.state) return;
         const err = apply(this.state, msg.cmd);
         if (err) this.post({ t: 'error', text: err });
+        this.sendEvents();
         this.sendState();
         return;
       }
@@ -56,12 +60,13 @@ export class SimRunner {
         return;
       case 'prestige':
         if (!this.state) return;
-        this.state = prestige(this.state);
+        this.adopt(prestige(this.state));
+        this.sendEvents();
         this.sendState();
         this.sendFrame();
         return;
       case 'replace':
-        this.state = msg.state;
+        this.adopt(msg.state);
         this.acc = 0;
         this.sendState();
         this.sendFrame();
@@ -114,7 +119,23 @@ export class SimRunner {
       this.dirty = true;
       this.sendFrame();
     }
+    this.sendEvents();
     if (this.dirty && now - this.lastUi > 1000 / UI_HZ) this.sendState(now);
+  }
+
+  /** A new state (a load, an import, a new run) starts with no open merges. */
+  private adopt(state: GameState) {
+    this.state = state;
+    this.events.reset();
+  }
+
+  /** Drain the sim's outbox, merge and rank it, and send what changed. */
+  private sendEvents() {
+    const s = this.state;
+    if (!s || s.events.length === 0) return;
+    const events = this.events.push(s.events);
+    s.events.length = 0;
+    this.post({ t: 'events', events });
   }
 
   private sendFrame() {
