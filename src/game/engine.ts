@@ -36,6 +36,8 @@ class Engine {
   loaded = false;
 
   private host: SimHost | null = null;
+  /** Pending while `init` loads the save; the sim host does not exist yet. */
+  private starting: Promise<void> | null = null;
   private version = 0;
   private listeners = new Set<() => void>();
   private ships = new Map<number, Ship>();
@@ -48,6 +50,8 @@ class Engine {
   private writeFailures = new Set<string>();
 
   async init(preferWorker = true) {
+    let started: (() => void) | undefined;
+    this.starting = new Promise((r) => (started = r));
     const saved = await loadGame();
     let state = newGame();
     let settle = false;
@@ -59,6 +63,7 @@ class Engine {
       this.saveBackupFailed = !saved.backedUp;
     }
     this.host = createSimHost((msg) => this.receive(msg), preferWorker);
+    started?.();
     const first = new Promise<void>((r) => (this.ready = r));
     this.host.post({ t: 'init', state, now: Date.now(), settle });
     await first;
@@ -185,9 +190,11 @@ class Engine {
   }
 
   /** The sim's current state, exact (unlike the mirror, which is up to one UI tick behind). */
-  fullState(): Promise<GameState> {
+  async fullState(): Promise<GameState> {
+    // Before the save is loaded, `state` is a placeholder new game, not the sim's state.
+    await this.starting;
     const host = this.host;
-    if (!host) return Promise.resolve(this.state);
+    if (!host) return this.state;
     const id = this.nextReq++;
     return new Promise((resolve) => {
       this.requests.set(id, resolve);

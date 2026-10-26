@@ -8,6 +8,8 @@ import { makeGame, openApp, seedSave, simState } from './helpers';
 // re-add a preset, and the cards survive a save and reload.
 
 test('rule cards can be added, edited, reordered and deleted', async ({ page }) => {
+  // The longest flow here, polling the worker at every step; CI renders in software at a few fps.
+  test.setTimeout(90_000);
   const s = makeGame(9);
   for (const id of Object.keys(PRESETS) as RuleId[]) unlockRule(s, id);
   const presets = s.cards.length;
