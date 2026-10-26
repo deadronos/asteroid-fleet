@@ -3,9 +3,9 @@ import { PointGrid } from './spatial';
 import { stressGame } from './stress';
 import { step } from './tick';
 
-// The sim runs at 10 Hz on the main thread (later in a worker, #7). 8 ms per
-// tick keeps a 1000-ship fleet under 10% of one core and still allows a
-// minute of catch-up (600 ticks) in about 5 s. It is several times the
+// The sim runs at 10 Hz in a Web Worker (#7). 8 ms per tick keeps a
+// 1000-ship fleet under 10% of one core and still allows a minute of
+// catch-up (600 ticks) in about 5 s. It is several times the
 // locally measured cost so slower CI runners stay green.
 const BUDGET_MS = 8;
 
