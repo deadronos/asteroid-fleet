@@ -63,7 +63,7 @@ class Engine {
     this.host.post({ t: 'init', state, now: Date.now(), settle });
     await first;
     this.loaded = true;
-    setInterval(() => this.save(), AUTOSAVE_MS);
+    setInterval(() => void this.save(), AUTOSAVE_MS);
     // The page may be frozen or gone before the worker could answer, so these write the mirror.
     window.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden') this.saveMirror();
@@ -208,7 +208,7 @@ class Engine {
     this.adopt(state);
     this.snapshot();
     this.host?.post({ t: 'replace', state });
-    this.write(state);
+    void this.write(state);
     this.emit();
   }
 
@@ -234,28 +234,31 @@ class Engine {
   }
 
   /** Saves the sim's exact state. False when autosave is blocked by an unreadable save. */
-  save(): boolean {
+  /**
+   * Saves the sim's exact state. Resolves once the write has landed, true if storage kept it;
+   * false when it did not, or when autosave is blocked by an unreadable save.
+   */
+  async save(): Promise<boolean> {
     if (saveOverwriteBlocked()) return false;
-    void this.fullState().then((s) => this.write(s));
-    return true;
+    return this.write(await this.fullState());
   }
 
   private saveMirror() {
-    if (!saveOverwriteBlocked()) this.write(this.state);
+    if (!saveOverwriteBlocked()) void this.write(this.state);
   }
 
-  private write(state: GameState) {
-    if (saveOverwriteBlocked()) return;
+  private async write(state: GameState): Promise<boolean> {
+    if (saveOverwriteBlocked()) return false;
     state.savedAt = Date.now();
-    void saveGame(state).then((ok) =>
-      this.reportWrite(ok, 'Autosave failed: storage is unavailable.'),
-    );
     const slot = getActiveSlot();
     if (slot !== null)
       this.reportWrite(
         writeSlot(slot, state),
         `Could not write save slot ${slot}: browser storage may be full. Export your save.`,
       );
+    const ok = await saveGame(state);
+    this.reportWrite(ok, 'Autosave failed: storage is unavailable.');
+    return ok;
   }
 
   /** Toast a failed write once, not on every autosave, until a write succeeds again. */

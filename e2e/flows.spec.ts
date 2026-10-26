@@ -65,7 +65,6 @@ test.describe('prestige and research', () => {
     await page.getByRole('tab', { name: 'Save Management' }).click();
     await page.getByRole('button', { name: 'Save now' }).click();
     await expect(page.getByText('Saved.')).toBeVisible();
-    await page.waitForTimeout(300);
     await page.reload();
     await expect.poll(async () => (await simState(page)).lifetime.prestiges).toBe(1);
     const reloaded = await simState(page);

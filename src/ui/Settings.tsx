@@ -319,13 +319,18 @@ function SavesTab() {
       <h3>Danger zone</h3>
       <div className="row">
         <button
-          onClick={() => {
-            if (engine.save()) setMsg({ text: 'Saved.' });
-            else
+          onClick={async () => {
+            if (saveOverwriteBlocked()) {
               setMsg({
                 text: `${engine.saveBackupFailed ? SAVE_BACKUP_FAILED_NOTICE : SAVE_BACKUP_NOTICE} It was not overwritten.`,
                 bad: true,
               });
+              return;
+            }
+            setMsg({ text: 'Saving…' });
+            // "Saved." only once storage holds it, so a reload right after keeps it.
+            if (await engine.save()) setMsg({ text: 'Saved.' });
+            else setMsg({ text: 'Save failed: storage is unavailable.', bad: true });
           }}
         >
           Save now
