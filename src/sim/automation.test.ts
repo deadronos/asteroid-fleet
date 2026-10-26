@@ -1,18 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { apply, shipCost } from './actions';
+import { order, shipCost } from './actions';
 import { AUTOMATION_INTERVAL, automation, rebuildQueueCap } from './automation';
 import { destroyShip } from './ctx';
 import { ZONE_RULE_UNLOCKS } from './config';
 import { buyResearch } from './research';
-import { newGame } from './state';
-import { step } from './tick';
-import type { GameState, ShipClass } from './types';
+import { stepSim } from './tick';
+import type { Sim, ShipClass } from './types';
+import { stateOf } from './state';
+import { game } from './testing';
 
-const pass = (s: GameState) => automation(s, AUTOMATION_INTERVAL);
-const count = (s: GameState, cls: ShipClass, hangarId?: number) =>
+const pass = (s: Sim) => automation(s, AUTOMATION_INTERVAL);
+const count = (s: Sim, cls: ShipClass, hangarId?: number) =>
   s.ships.filter((x) => x.cls === cls && (hangarId === undefined || x.hangarId === hangarId))
     .length;
-const lose = (s: GameState, cls: ShipClass) => {
+const lose = (s: Sim, cls: ShipClass) => {
   const ship = s.ships.find((x) => x.cls === cls)!;
   s.ships = s.ships.filter((x) => x !== ship);
   destroyShip(s, ship, 'destroyed');
@@ -20,28 +21,28 @@ const lose = (s: GameState, cls: ShipClass) => {
 };
 
 const setup = () => {
-  const s = newGame(3);
+  const s = game(3);
   s.researchLevels.autoRebuild = 1;
   s.researchLevels.autoBuy = 1;
-  expect(apply(s, { type: 'setAutomation', patch: { autoBuy: true } })).toBeNull();
-  apply(s, { type: 'setHangarTarget', hangarId: 2, cls: 'hauler', count: 2 });
+  expect(order(s, { type: 'setAutomation', patch: { autoBuy: true } })).toBeNull();
+  order(s, { type: 'setHangarTarget', hangarId: 2, cls: 'hauler', count: 2 });
   return s;
 };
 
 const make = () => {
-  const s = newGame(9);
+  const s = game(9);
   s.researchLevels.autoRebuild = 1;
   s.researchLevels.autoBuy = 1;
-  apply(s, { type: 'setAutomation', patch: { autoBuy: true, autoRebuild: true } });
-  apply(s, { type: 'setHangarTarget', hangarId: 1, cls: 'drone', count: 6 });
-  for (let i = 0; i < 1200; i++) step(s);
-  return JSON.stringify({ ...s, savedAt: 0 });
+  order(s, { type: 'setAutomation', patch: { autoBuy: true, autoRebuild: true } });
+  order(s, { type: 'setHangarTarget', hangarId: 1, cls: 'drone', count: 6 });
+  for (let i = 0; i < 1200; i++) stepSim(s);
+  return JSON.stringify({ ...stateOf(s), savedAt: 0 });
 };
 
 describe('auto-buy', () => {
   it('is locked until researched', () => {
-    const s = newGame(3);
-    expect(apply(s, { type: 'setAutomation', patch: { autoBuy: true } })).not.toBeNull();
+    const s = game(3);
+    expect(order(s, { type: 'setAutomation', patch: { autoBuy: true } })).not.toBeNull();
     expect(s.automation.autoBuy).toBe(false);
   });
 
@@ -55,7 +56,7 @@ describe('auto-buy', () => {
   it('never spends below the credit floor', () => {
     const s = setup();
     const cost = shipCost(s, 'hauler');
-    apply(s, { type: 'setAutomation', patch: { creditFloor: 1000 } });
+    order(s, { type: 'setAutomation', patch: { creditFloor: 1000 } });
     s.credits = 1000 + cost - 1;
     pass(s);
     expect(count(s, 'hauler')).toBe(0);
@@ -69,7 +70,7 @@ describe('auto-buy', () => {
 
   it('stays off when disabled', () => {
     const s = setup();
-    apply(s, { type: 'setAutomation', patch: { autoBuy: false } });
+    order(s, { type: 'setAutomation', patch: { autoBuy: false } });
     s.credits = 1e5;
     pass(s);
     expect(count(s, 'hauler')).toBe(0);
@@ -78,11 +79,11 @@ describe('auto-buy', () => {
 
 describe('auto-rebuild', () => {
   it('pays to rebuild a lost ship of any class into its hangar', () => {
-    const s = newGame(3);
+    const s = game(3);
     buyResearchFree(s, 'autoRebuild');
-    apply(s, { type: 'setAutomation', patch: { autoRebuild: true } });
+    order(s, { type: 'setAutomation', patch: { autoRebuild: true } });
     s.credits = 1e5;
-    apply(s, { type: 'buyShip', cls: 'barge', hangarId: 2 });
+    order(s, { type: 'buyShip', cls: 'barge', hangarId: 2 });
     lose(s, 'barge');
     const before = s.credits;
     const cost = shipCost(s, 'barge');
@@ -93,9 +94,9 @@ describe('auto-rebuild', () => {
   });
 
   it('waits above the credit floor, then rebuilds', () => {
-    const s = newGame(3);
+    const s = game(3);
     buyResearchFree(s, 'autoRebuild');
-    apply(s, { type: 'setAutomation', patch: { autoRebuild: true, creditFloor: 500 } });
+    order(s, { type: 'setAutomation', patch: { autoRebuild: true, creditFloor: 500 } });
     lose(s, 'drone');
     s.credits = 500;
     pass(s);
@@ -106,16 +107,16 @@ describe('auto-rebuild', () => {
   });
 
   it('does not queue losses while the toggle is off', () => {
-    const s = newGame(3);
+    const s = game(3);
     buyResearchFree(s, 'autoRebuild');
     lose(s, 'drone');
     expect(s.automation.rebuildQueue).toHaveLength(0);
   });
 
   it('clears the queue when switched off and caps it at hangar capacity', () => {
-    const s = newGame(3);
+    const s = game(3);
     buyResearchFree(s, 'autoRebuild');
-    apply(s, { type: 'setAutomation', patch: { autoRebuild: true } });
+    order(s, { type: 'setAutomation', patch: { autoRebuild: true } });
     const cap = rebuildQueueCap(s);
     for (let i = 0; i < cap + 20; i++) {
       s.automation.rebuildQueue.push({ cls: 'drone', hangarId: 1 });
@@ -124,12 +125,12 @@ describe('auto-rebuild', () => {
     expect(s.automation.rebuildQueue.length).toBeLessThanOrEqual(cap);
     lose(s, 'drone');
     expect(s.automation.rebuildQueue.length).toBeLessThanOrEqual(cap);
-    apply(s, { type: 'setAutomation', patch: { autoRebuild: false } });
+    order(s, { type: 'setAutomation', patch: { autoRebuild: false } });
     expect(s.automation.rebuildQueue).toHaveLength(0);
   });
 
   it('does not queue losses before the research', () => {
-    const s = newGame(3);
+    const s = game(3);
     lose(s, 'drone');
     expect(s.automation.rebuildQueue).toHaveLength(0);
   });
@@ -137,15 +138,15 @@ describe('auto-rebuild', () => {
 
 describe('research unlocks', () => {
   it('tactical doctrine unlocks frontier rules and engagement stances', () => {
-    const s = newGame(3);
+    const s = game(3);
     expect(
-      apply(s, { type: 'setStance', scope: 'fleet', patch: { engagement: 'aggressive' } }),
+      order(s, { type: 'setStance', scope: 'fleet', patch: { engagement: 'aggressive' } }),
     ).not.toBeNull();
     s.research = 10;
     expect(buyResearch(s, 'tactics')).toBe(true);
     for (const id of ZONE_RULE_UNLOCKS[2]) expect(s.unlockedRules).toContain(id);
     expect(
-      apply(s, { type: 'setStance', scope: 'fleet', patch: { engagement: 'aggressive' } }),
+      order(s, { type: 'setStance', scope: 'fleet', patch: { engagement: 'aggressive' } }),
     ).toBeNull();
   });
 });
@@ -156,7 +157,7 @@ describe('automation determinism', () => {
   });
 });
 
-function buyResearchFree(s: GameState, id: string) {
+function buyResearchFree(s: Sim, id: string) {
   s.research += 100;
   expect(buyResearch(s, id)).toBe(true);
 }

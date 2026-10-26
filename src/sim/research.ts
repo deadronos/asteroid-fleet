@@ -1,6 +1,6 @@
 import { HANGAR_TYPES, ZONE_RULE_UNLOCKS } from './config';
 import { unlockRule } from './state';
-import type { GameState, ShipClass } from './types';
+import type { Sim, ShipClass } from './types';
 
 export type Branch =
   | 'Logistics'
@@ -432,12 +432,12 @@ export const RESEARCH_BY_ID = Object.fromEntries(RESEARCH.map((r) => [r.id, r]))
   ResearchNode
 >;
 
-export function lvl(s: GameState, id: string): number {
+export function lvl(s: Sim, id: string): number {
   return s.researchLevels[id] ?? 0;
 }
 
 /** Reserve classes, their minimum count and rebuild cooldown (seconds). */
-export function reserveDefs(s: GameState): [ShipClass, number, number][] {
+export function reserveDefs(s: Sim): [ShipClass, number, number][] {
   let cd = (1 - 0.2 * lvl(s, 'reserveCd')) * (1 - 0.15 * lvl(s, 'deepFabrication'));
   // A fabrication bay speeds rebuilds; more than one doesn't stack.
   cd *= Math.min(1, ...s.hangars.map((h) => HANGAR_TYPES[h.type].rebuildMult ?? 1));
@@ -449,7 +449,7 @@ export function reserveDefs(s: GameState): [ShipClass, number, number][] {
   ];
 }
 
-export function canBuyResearch(s: GameState, id: string): boolean {
+export function canBuyResearch(s: Sim, id: string): boolean {
   const node = RESEARCH_BY_ID[id];
   if (!node) return false;
   const l = lvl(s, id);
@@ -459,7 +459,7 @@ export function canBuyResearch(s: GameState, id: string): boolean {
   return s.research >= node.cost(l);
 }
 
-export function buyResearch(s: GameState, id: string): boolean {
+export function buyResearch(s: Sim, id: string): boolean {
   if (!canBuyResearch(s, id)) return false;
   const node = RESEARCH_BY_ID[id];
   s.research -= node.cost(lvl(s, id));

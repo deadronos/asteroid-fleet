@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { researchPayout } from '../actions';
 import { RP_DIVISOR } from '../config';
-import { newGame } from '../state';
 import { clock, compact, formatReport, parseArgs, payout, runBalance } from './harness';
 import { steadyPolicy } from './policy';
+import { game } from '../testing';
 
 const short = () => ({
   hours: 0.25,
@@ -16,7 +16,7 @@ const short = () => ({
 
 describe('balance harness', () => {
   it('agrees with the game payout at the shipped divisor', () => {
-    const s = newGame(1);
+    const s = game(1);
     s.stats.oreValueDelivered = 123_456;
     s.stats.furthestTier = 2;
     expect(payout(s, RP_DIVISOR)).toBe(researchPayout(s));

@@ -1,18 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { apply, prestige } from './actions';
+import { order, prestige } from './actions';
 import { conditionHolds } from './cards';
 import { CARD_SLOTS, PRESETS } from './config';
 import { buildCtx, stanceOf } from './ctx';
 import { effectiveStance, stanceSource } from './doctrine';
-import { createShip, enterSystem, newGame, unlockRule } from './state';
-import { step } from './tick';
-import type { GameState, RuleCard, RuleId, Ship } from './types';
+import { createShip, enterSystem, unlockRule, stateOf } from './state';
+import { stepSim } from './tick';
+import type { Sim, RuleCard, RuleId, Ship } from './types';
+import { game as freshGame } from './testing';
 
 type NewCard = Omit<RuleCard, 'id'>;
 
 /** A frontier game with every preset unlocked and no cards dealt. */
-function game(): GameState {
-  const s = newGame(21);
+function game(): Sim {
+  const s = freshGame(21);
   for (const id of Object.keys(PRESETS) as RuleId[]) unlockRule(s, id);
   if (!s.unlocked.includes('fighter')) s.unlocked.push('fighter');
   s.cards = [];
@@ -20,7 +21,7 @@ function game(): GameState {
   return s;
 }
 
-function launched(s: GameState, cls: Ship['cls'], hangarId = 1): Ship {
+function launched(s: Sim, cls: Ship['cls'], hangarId = 1): Ship {
   if (!s.unlocked.includes(cls)) s.unlocked.push(cls);
   const sh = createShip(s, cls, hangarId)!;
   sh.mode = 'idle';
@@ -37,7 +38,7 @@ const stanceCard = (scope: RuleCard['scope'], to: string, seconds?: number): New
 
 describe('rule cards (#82)', () => {
   it('a new game deals the starter presets, enabled', () => {
-    const s = newGame(1);
+    const s = freshGame(1);
     expect(s.cards.map((c) => [c.preset, c.enabled])).toEqual([
       ['droneUnloadAtBarge', true],
       ['bargeCallHauler', true],
@@ -47,7 +48,7 @@ describe('rule cards (#82)', () => {
   });
 
   it('frontier presets are dealt disabled, once', () => {
-    const s = newGame(1);
+    const s = freshGame(1);
     enterSystem(
       s,
       s.systems.findIndex((x) => x.tier === 2),
@@ -55,7 +56,7 @@ describe('rule cards (#82)', () => {
     const escort = s.cards.find((c) => c.preset === 'fightersEscortOnWave')!;
     expect(escort.enabled).toBe(false);
     // A deleted preset stays deleted when the zone is entered again.
-    expect(apply(s, { type: 'deleteCard', id: escort.id })).toBeNull();
+    expect(order(s, { type: 'deleteCard', id: escort.id })).toBeNull();
     enterSystem(
       s,
       s.systems.findIndex((x) => x.tier === 2),
@@ -65,10 +66,10 @@ describe('rule cards (#82)', () => {
   });
 
   it('prestige carries cards and unlocks without dealing presets again', () => {
-    const s = newGame(1);
-    apply(s, { type: 'deleteCard', id: s.cards[0].id });
-    apply(s, { type: 'moveCard', id: s.cards[1].id, to: 0 });
-    const next = prestige(s);
+    const s = freshGame(1);
+    order(s, { type: 'deleteCard', id: s.cards[0].id });
+    order(s, { type: 'moveCard', id: s.cards[1].id, to: 0 });
+    const next = prestige(stateOf(s));
     expect(next.cards).toEqual(s.cards);
     expect(next.unlockedRules).toEqual(s.unlockedRules);
   });
@@ -77,13 +78,13 @@ describe('rule cards (#82)', () => {
     const s = game();
     const f = launched(s, 'fighter', 1);
     const other = launched(s, 'fighter', 2);
-    apply(s, { type: 'addCard', card: stanceCard({ kind: 'fleet' }, 'engagement:passive') });
-    apply(s, {
+    order(s, { type: 'addCard', card: stanceCard({ kind: 'fleet' }, 'engagement:passive') });
+    order(s, {
       type: 'addCard',
       card: stanceCard({ kind: 'class', cls: 'fighter' }, 'engagement:aggressive'),
     });
-    apply(s, { type: 'addCard', card: stanceCard({ kind: 'hangar', id: 1 }, 'engagement:escort') });
-    apply(s, {
+    order(s, { type: 'addCard', card: stanceCard({ kind: 'hangar', id: 1 }, 'engagement:escort') });
+    order(s, {
       type: 'addCard',
       card: stanceCard({ kind: 'hangar', id: 1 }, 'engagement:defensive'),
     });
@@ -94,7 +95,7 @@ describe('rule cards (#82)', () => {
     expect(stanceSource(s, f, 'engagement')).toBe('rule');
     expect(stanceSource(s, f, 'mining')).not.toBe('rule');
     // Reordering within a level changes the winner.
-    apply(s, { type: 'moveCard', id: s.cards[3].id, to: 0 });
+    order(s, { type: 'moveCard', id: s.cards[3].id, to: 0 });
     expect(stanceOf(s, buildCtx(s), f).engagement).toBe('defensive');
     // A disabled card is skipped; the next level down takes over.
     for (const c of s.cards) if (c.scope.kind === 'hangar') c.enabled = false;
@@ -104,7 +105,7 @@ describe('rule cards (#82)', () => {
   it('a card whose conditions fail falls through to a broader one', () => {
     const s = game();
     const f = launched(s, 'fighter');
-    apply(s, {
+    order(s, {
       type: 'addCard',
       card: {
         enabled: true,
@@ -113,7 +114,7 @@ describe('rule cards (#82)', () => {
         then: { kind: 'stance', to: 'underFire:retreatHull' },
       },
     });
-    apply(s, { type: 'addCard', card: stanceCard({ kind: 'fleet' }, 'underFire:stand') });
+    order(s, { type: 'addCard', card: stanceCard({ kind: 'fleet' }, 'underFire:stand') });
     expect(stanceOf(s, buildCtx(s), f).underFire).toBe('stand');
     f.hull = 1;
     expect(stanceOf(s, buildCtx(s), f).underFire).toBe('retreatHull');
@@ -123,7 +124,7 @@ describe('rule cards (#82)', () => {
     const s = game();
     const f = launched(s, 'fighter');
     s.wave.warning = true;
-    apply(s, {
+    order(s, {
       type: 'addCard',
       card: {
         enabled: true,
@@ -146,7 +147,7 @@ describe('rule cards (#82)', () => {
     const s = game();
     const d = launched(s, 'drone');
     const f = launched(s, 'fighter');
-    apply(s, {
+    order(s, {
       type: 'addCard',
       card: {
         enabled: true,
@@ -156,7 +157,7 @@ describe('rule cards (#82)', () => {
       },
     });
     s.carrier.energy = 0;
-    step(s);
+    stepSim(s);
     expect(d.mode).toBe('recall');
     expect(f.mode).not.toBe('recall');
   });
@@ -164,7 +165,7 @@ describe('rule cards (#82)', () => {
   it('fall back works for any ship type', () => {
     const s = game();
     const sc = launched(s, 'scout');
-    apply(s, {
+    order(s, {
       type: 'addCard',
       card: {
         enabled: true,
@@ -174,7 +175,7 @@ describe('rule cards (#82)', () => {
       },
     });
     sc.hull = 1;
-    step(s);
+    stepSim(s);
     expect(sc.mode).toBe('retreat');
     expect(s.events.some((e) => e.kind === 'ShipRetreating')).toBe(true);
   });
@@ -233,11 +234,11 @@ describe('rule cards (#82)', () => {
       when: [{ kind: 'cargoAbove', value: 7 }],
       then: { kind: 'callHauler', to: 'mining:greedy' },
     };
-    expect(apply(s, { type: 'addCard', card: ok })).toBeNull();
+    expect(order(s, { type: 'addCard', card: ok })).toBeNull();
     // Values are clamped and stray fields dropped.
     expect(s.cards[0].when[0].value).toBe(1);
     expect(s.cards[0].then).toEqual({ kind: 'callHauler' });
-    const bad = (card: NewCard) => apply(s, { type: 'addCard', card });
+    const bad = (card: NewCard) => order(s, { type: 'addCard', card });
     expect(bad({ ...ok, scope: { kind: 'class', cls: 'drone' } })).toMatch(/nothing/);
     expect(bad({ ...ok, when: [] })).toMatch(/conditions/);
     expect(
@@ -264,17 +265,17 @@ describe('rule cards (#82)', () => {
   it('caps cards at the slot count and edits in place', () => {
     const s = game();
     const card = stanceCard({ kind: 'fleet' }, 'mining:greedy');
-    for (let i = 0; i < CARD_SLOTS; i++) expect(apply(s, { type: 'addCard', card })).toBeNull();
-    expect(apply(s, { type: 'addCard', card })).toMatch(/slots/);
+    for (let i = 0; i < CARD_SLOTS; i++) expect(order(s, { type: 'addCard', card })).toBeNull();
+    expect(order(s, { type: 'addCard', card })).toMatch(/slots/);
     const id = s.cards[2].id;
     expect(
-      apply(s, { type: 'updateCard', id, card: { ...card, enabled: false, preset: 'haulerPark' } }),
+      order(s, { type: 'updateCard', id, card: { ...card, enabled: false, preset: 'haulerPark' } }),
     ).toBeNull();
     expect(s.cards[2]).toMatchObject({ id, enabled: false });
-    expect(apply(s, { type: 'updateCard', id: 12345, card })).toMatch(/No such/);
-    expect(apply(s, { type: 'moveCard', id, to: 99 })).toBeNull();
+    expect(order(s, { type: 'updateCard', id: 12345, card })).toMatch(/No such/);
+    expect(order(s, { type: 'moveCard', id, to: 99 })).toBeNull();
     expect(s.cards.at(-1)!.id).toBe(id);
-    expect(apply(s, { type: 'deleteCard', id })).toBeNull();
+    expect(order(s, { type: 'deleteCard', id })).toBeNull();
     expect(s.cards).toHaveLength(CARD_SLOTS - 1);
   });
 });

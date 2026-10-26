@@ -1,8 +1,8 @@
 import { BASE_STORAGE, HANGAR_TYPES, SHIP_STATS } from './config';
 import { lvl } from './research';
-import type { GameState, Hangar, ShipClass } from './types';
+import type { Sim, Hangar, ShipClass } from './types';
 
-export function occupancy(s: GameState, h: Hangar): (number | null)[] {
+export function occupancy(s: Sim, h: Hangar): (number | null)[] {
   const occ: (number | null)[] = Array.from({ length: h.slots }, () => null);
   for (const it of h.items) {
     const ship = s.ships.find((sh) => sh.id === it.shipId);
@@ -13,13 +13,7 @@ export function occupancy(s: GameState, h: Hangar): (number | null)[] {
   return occ;
 }
 
-export function fits(
-  s: GameState,
-  h: Hangar,
-  cls: ShipClass,
-  start: number,
-  ignoreShip = -1,
-): boolean {
+export function fits(s: Sim, h: Hangar, cls: ShipClass, start: number, ignoreShip = -1): boolean {
   const size = SHIP_STATS[cls].slots;
   if (start < 0 || start + size > h.slots) return false;
   const occ = occupancy(s, h);
@@ -28,14 +22,14 @@ export function fits(
   return true;
 }
 
-export function firstFit(s: GameState, h: Hangar, cls: ShipClass): number {
+export function firstFit(s: Sim, h: Hangar, cls: ShipClass): number {
   for (let i = 0; i < h.slots; i++) if (fits(s, h, cls, i)) return i;
   return -1;
 }
 
 /** Find a hangar + slot for a new ship, preferring `preferred`. */
 export function findSpace(
-  s: GameState,
+  s: Sim,
   cls: ShipClass,
   preferred?: number,
 ): { hangar: Hangar; start: number } | null {
@@ -50,7 +44,7 @@ export function findSpace(
 }
 
 /** Ship ids directly next to `shipId` on its hangar board. */
-export function neighbours(s: GameState, h: Hangar, shipId: number): number[] {
+export function neighbours(s: Sim, h: Hangar, shipId: number): number[] {
   const occ = occupancy(s, h);
   const idx = occ.indexOf(shipId);
   if (idx < 0) return [];
@@ -62,16 +56,16 @@ export function neighbours(s: GameState, h: Hangar, shipId: number): number[] {
   return out;
 }
 
-export function hangarOf(s: GameState, shipId: number): Hangar | undefined {
+export function hangarOf(s: Sim, shipId: number): Hangar | undefined {
   return s.hangars.find((h) => h.items.some((it) => it.shipId === shipId));
 }
 
-export function carrierStorage(s: GameState): number {
+export function carrierStorage(s: Sim): number {
   return BASE_STORAGE + s.hangars.reduce((a, h) => a + HANGAR_TYPES[h.type].storage, 0);
 }
 
 /** Repair rate for a docked ship, including the repair-drone adjacency synergy. */
-export function dockRepairRate(s: GameState, shipId: number): number {
+export function dockRepairRate(s: Sim, shipId: number): number {
   const h = hangarOf(s, shipId);
   if (!h) return 0;
   let rate = HANGAR_TYPES[h.type].repairRate;
@@ -89,7 +83,7 @@ export function dockRepairRate(s: GameState, shipId: number): number {
   return rate * (1 + 0.3 * lvl(s, 'repair'));
 }
 
-export function moveShip(s: GameState, shipId: number, toHangar: number, start: number): boolean {
+export function moveShip(s: Sim, shipId: number, toHangar: number, start: number): boolean {
   const ship = s.ships.find((x) => x.id === shipId);
   const target = s.hangars.find((h) => h.id === toHangar);
   if (!ship || !target) return false;

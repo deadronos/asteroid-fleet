@@ -47,7 +47,7 @@ function ShipLayer({
     const nm = near.current;
     const fm = far.current;
     if (!fm) return;
-    const s = engine.state;
+    const s = engine.view;
     const a = engine.alpha();
     const lod2 = model ? lodDistance * lodDistance : -1;
     camPos.copy(camera.position);
@@ -154,7 +154,7 @@ function Trails() {
   useFrame(() => {
     const m = mesh.current;
     if (!m) return;
-    const s = engine.state;
+    const s = engine.view;
     const a = engine.alpha();
     pruneHeadings();
     let n = 0;

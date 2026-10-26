@@ -65,13 +65,15 @@ v6 (#38) guarantees `miningIncomeAvg` is a finite number: older saves lacked it,
 
 v7 (#40): every asteroid now draws its rare-ore roll whether or not rare ore is researched, so researching it no longer shifts the rocks after the first rare roll and a restored depletion record stays on the right rocks. That changes how fields generate, so the v7 step drops the old `fields` records (the current system's rocks are saved as-is; other systems simply come back full). `validateSave` also rebuilds a missing or empty `systems` list from `seed` (early saves had `systems: []`).
 
+v10 (#75): per-carrier state moves into `ops: Operation[]`, so several carriers can be played at once later (#53). The carrier, hangars, ships, pirates, asteroids, containers, hazards, recon, `systemId`, warp, wave, storm, reserve timers, fx, `rng` and the income averages of a v9 save become operation `0`; credits, research, unlocks, cards, stats and the event log stay on the top level. `save-v9.json` is the fixture.
+
 The primary save lives in IndexedDB; the localStorage copy is only written when IndexedDB cannot hold it, and a stale one is removed, so a large fleet does not fill the localStorage quota the save slots use. A failed autosave or active-slot write shows a toast once, until a write succeeds again.
 
 A save that is corrupt, from a newer version than this build, or otherwise unknown is not deleted and not overwritten. The raw text is copied to `asteroid-fleet-save-backup` in both IndexedDB and the localStorage fallback (the same pair of stores as the primary key `asteroid-fleet-save`). A later failure that is byte-for-byte the same does not rewrite that copy. A different failure is written to `asteroid-fleet-save-backup-<timestamp>` so the earlier backup stays. Only the newest five backups (`MAX_BACKUPS`) are kept in each store. The game shows "Your save could not be loaded and was backed up." and pauses automatic saving so the original stays put. If both stores reject the copy, it shows "could not be backed up" instead, and a reset or import then warns that the save will be lost. A hard reset or a successful import may reuse the primary slot; backup keys are left alone. A bad import is rejected and does not write any key.
 
 ## Layout
 
-- `src/sim/`: deterministic simulation (seeded RNG, fixed 10 Hz tick), pure TypeScript with no React or three.js. `step()` in `tick.ts` is the whole game loop; `actions.ts` holds every player command.
+- `src/sim/`: deterministic simulation (seeded RNG, fixed 10 Hz tick), pure TypeScript with no React or three.js. `step(global, op)` in `tick.ts` is the whole game loop for one operation (carrier); the sim works on a `Sim`, the run-wide state and one operation bound together by `bind()` in `state.ts`. `actions.ts` holds every player command; each `Command` names its `carrierId`.
 - `src/game/`: the engine that interpolates positions for the renderer, the sim host (`host.ts`, `runner.ts`, `protocol.ts`) that runs the tick loop in a Web Worker, plus save/load.
 - `src/render/`: the 3D scene.
 - `src/ui/`: HTML/React panels over the canvas.

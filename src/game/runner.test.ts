@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { apply } from '../sim/actions';
-import { emit, newGame } from '../sim/state';
+import { emit, focused, focusOp, newGame } from '../sim/state';
 import { stressGame } from '../sim/stress';
-import { step } from '../sim/tick';
+import { step, stepSim } from '../sim/tick';
 import type { GameState } from '../sim/types';
 import { createLocalHost } from './host';
 import { MODES, encodeFrame, type OutMsg } from './protocol';
@@ -19,7 +19,7 @@ function local(state: GameState) {
 
 function pay(speed: number) {
   const s = newGame(2);
-  s.miningIncomeAvg = 10;
+  s.ops[0].miningIncomeAvg = 10;
   const { host } = local(s);
   host.post({ t: 'speed', v: speed });
   host.runner.resetClock(0);
@@ -35,10 +35,10 @@ describe('sim runner', () => {
     host.runner.resetClock(t);
     for (let i = 0; i < 300; i++) {
       if (i === 40) {
-        apply(direct, { type: 'buyShip', cls: 'drone' });
-        host.post({ t: 'cmd', cmd: { type: 'buyShip', cls: 'drone' } });
+        apply(direct, { type: 'buyShip', cls: 'drone', carrierId: 0 });
+        host.post({ t: 'cmd', cmd: { type: 'buyShip', cls: 'drone', carrierId: 0 } });
       }
-      step(direct);
+      step(direct, focusOp(direct));
       t += TICK_MS;
       host.runner.pump(t);
     }
@@ -60,20 +60,20 @@ describe('sim runner', () => {
     first.snap.global.credits = -1;
     first.snap.focus.carrier.hull = -1;
     expect(host.runner.state?.credits).not.toBe(-1);
-    expect(host.runner.state?.carrier.hull).not.toBe(-1);
+    expect(host.runner.state?.ops[0].carrier.hull).not.toBe(-1);
   });
 
   it('reports command errors', () => {
     const s = newGame(1);
     s.credits = 0;
     const { host, out } = local(s);
-    host.post({ t: 'cmd', cmd: { type: 'buyShip', cls: 'drone' } });
+    host.post({ t: 'cmd', cmd: { type: 'buyShip', cls: 'drone', carrierId: 0 } });
     expect(out.some((m) => m.t === 'error')).toBe(true);
   });
 
   it('settles offline time on init', () => {
     const s = newGame(2);
-    s.miningIncomeAvg = 10;
+    s.ops[0].miningIncomeAvg = 10;
     s.savedAt = Date.now() - 3600_000;
     const out: OutMsg[] = [];
     const host = createLocalHost((m) => out.push(m));
@@ -94,9 +94,9 @@ describe('sim runner', () => {
     const st = host.runner.state;
     if (!st) throw new Error('no state');
     st.time = 100;
-    emit(st, 'ReserveRebuilt', { cls: 'drone' });
-    emit(st, 'PiratesArrived', { size: 3 });
-    emit(st, 'ReserveRebuilt', { cls: 'scout' });
+    emit(focused(st), 'ReserveRebuilt', { cls: 'drone' });
+    emit(focused(st), 'PiratesArrived', { size: 3 });
+    emit(focused(st), 'ReserveRebuilt', { cls: 'scout' });
     host.runner.resetClock(0);
     host.runner.pump(1);
     const batch = out.find((m) => m.t === 'events');
@@ -122,7 +122,7 @@ describe('sim runner', () => {
 describe('frame encoding', () => {
   it('round-trips positions exactly and every mode', () => {
     const s = stressGame(200, 100, 10);
-    for (let i = 0; i < 20; i++) step(s);
+    for (let i = 0; i < 20; i++) stepSim(s);
     const { frame } = encodeFrame(s);
     expect(frame.nShips).toBe(s.ships.length);
     s.ships.forEach((sh, i) => {

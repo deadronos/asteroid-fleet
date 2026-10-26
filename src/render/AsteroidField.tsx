@@ -39,7 +39,7 @@ function Field({
     camPos.copy(st.camera.position);
     let nn = 0;
     let nf = 0;
-    for (const a of engine.state.asteroids) {
+    for (const a of engine.view.asteroids) {
       if (a.ore <= 0) continue;
       if (nn + nf >= MAX_ASTEROIDS) break;
       const k = 0.45 + 0.55 * (a.ore / a.maxOre);

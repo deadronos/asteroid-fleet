@@ -1,6 +1,6 @@
 import { presetCard } from '../sim/cards';
 import { PRESETS } from '../sim/config';
-import { SAVE_VERSION, makeSystems } from '../sim/state';
+import { OP_KEYS, SAVE_VERSION, makeSystems } from '../sim/state';
 import type { GameState, RuleCard, RuleId, Severity } from '../sim/types';
 
 export type SaveFailure = 'corrupt' | 'newer' | 'unknown';
@@ -91,6 +91,17 @@ export const migrations: Record<number, Migration> = {
     delete save.rules;
     return save;
   },
+  // v10: per-carrier state moves into `ops` (#75). The one carrier becomes operation 0.
+  9: (save) => {
+    const op: SaveBlob = { id: 0 };
+    for (const k of OP_KEYS) {
+      if (k === 'id') continue;
+      if (k in save) op[k] = save[k];
+      delete save[k];
+    }
+    save.ops = [op];
+    return save;
+  },
 };
 
 const LEGACY_TONE: Record<string, Severity> = {
@@ -154,45 +165,60 @@ function isTimer(value: unknown): boolean {
 
 function validateSave(save: SaveBlob): MigrateResult {
   if (save.version !== SAVE_VERSION) return { ok: false, reason: 'corrupt' };
-  if (!Array.isArray(save.ships)) return { ok: false, reason: 'corrupt' };
-  if (!Array.isArray(save.asteroids)) return { ok: false, reason: 'corrupt' };
-  if (!Array.isArray(save.hangars)) return { ok: false, reason: 'corrupt' };
+  if (!Array.isArray(save.ops) || save.ops.length === 0) return { ok: false, reason: 'corrupt' };
   if (!Array.isArray(save.systems)) return { ok: false, reason: 'corrupt' };
-  if (!Array.isArray(save.containers)) return { ok: false, reason: 'corrupt' };
-  if (!isRecord(save.recon)) return { ok: false, reason: 'corrupt' };
   if (!isRecord(save.fields)) return { ok: false, reason: 'corrupt' };
-  if (!isRecord(save.carrier)) return { ok: false, reason: 'corrupt' };
   if (!isRecord(save.stats)) return { ok: false, reason: 'corrupt' };
   if (!isRecord(save.doctrine)) return { ok: false, reason: 'corrupt' };
-  if (typeof save.rng !== 'number') return { ok: false, reason: 'corrupt' };
   if (!isRecord(save.automation)) return { ok: false, reason: 'corrupt' };
-  if (!isRecord(save.wave) || !isTimer(save.wave.timer)) return { ok: false, reason: 'corrupt' };
-  if (!isRecord(save.storm) || !isTimer(save.storm.timer)) return { ok: false, reason: 'corrupt' };
 
   if (!Array.isArray(save.log)) save.log = [];
   if (!Array.isArray(save.cards)) save.cards = [];
   if (!Array.isArray(save.unlockedRules)) save.unlockedRules = [];
   if (!Array.isArray(save.events)) save.events = [];
 
-  // NaN is stored as null; a non-finite income would poison the rolling average.
-  if (typeof save.miningIncomeAvg !== 'number' || !Number.isFinite(save.miningIncomeAvg))
-    save.miningIncomeAvg = 0;
   if (typeof save.credits !== 'number' || !Number.isFinite(save.credits))
     return { ok: false, reason: 'corrupt' };
 
-  if (typeof save.systemId !== 'number' || !Number.isInteger(save.systemId) || save.systemId < 0)
-    return { ok: false, reason: 'corrupt' };
-  // Early saves were written with `systems: []`; rebuild the map from the seed (#40).
-  if (!isRecord(save.systems[save.systemId])) {
-    if (typeof save.seed !== 'number') return { ok: false, reason: 'corrupt' };
-    const systems = makeSystems(save.seed);
-    if (!systems[save.systemId]) return { ok: false, reason: 'corrupt' };
-    save.systems = systems;
+  const ids = new Set<unknown>();
+  for (const op of save.ops) {
+    if (!isRecord(op) || typeof op.id !== 'number' || ids.has(op.id))
+      return { ok: false, reason: 'corrupt' };
+    ids.add(op.id);
+    if (!validOp(op)) return { ok: false, reason: 'corrupt' };
+    // Early saves were written with `systems: []`; rebuild the map from the seed (#40).
+    if (!isRecord((save.systems as unknown[])[op.systemId as number])) {
+      if (typeof save.seed !== 'number') return { ok: false, reason: 'corrupt' };
+      const systems = makeSystems(save.seed);
+      if (!systems[op.systemId as number]) return { ok: false, reason: 'corrupt' };
+      save.systems = systems;
+    }
   }
 
   const state = save as unknown as GameState;
-  // JSON turns Infinity into null; restore "no timer".
-  if (state.wave.timer === null) state.wave.timer = Infinity;
-  if (state.storm.timer === null) state.storm.timer = Infinity;
+  for (const op of state.ops) {
+    // JSON turns Infinity into null; restore "no timer".
+    if (op.wave.timer === null) op.wave.timer = Infinity;
+    if (op.storm.timer === null) op.storm.timer = Infinity;
+  }
   return { ok: true, state };
+}
+
+/** Checks one operation, filling fields that may safely default. */
+function validOp(op: SaveBlob): boolean {
+  if (!Array.isArray(op.ships)) return false;
+  if (!Array.isArray(op.asteroids)) return false;
+  if (!Array.isArray(op.hangars)) return false;
+  if (!Array.isArray(op.containers)) return false;
+  if (!isRecord(op.recon)) return false;
+  if (!isRecord(op.carrier)) return false;
+  if (typeof op.rng !== 'number') return false;
+  if (!isRecord(op.wave) || !isTimer(op.wave.timer)) return false;
+  if (!isRecord(op.storm) || !isTimer(op.storm.timer)) return false;
+  // NaN is stored as null; a non-finite income would poison the rolling average.
+  if (typeof op.miningIncomeAvg !== 'number' || !Number.isFinite(op.miningIncomeAvg))
+    op.miningIncomeAvg = 0;
+  if (typeof op.systemId !== 'number' || !Number.isInteger(op.systemId) || op.systemId < 0)
+    return false;
+  return true;
 }

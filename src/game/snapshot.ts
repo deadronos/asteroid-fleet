@@ -1,4 +1,5 @@
 import { MODULE_IDS, MODULE_SLOTS } from '../sim/config';
+import { focusOp } from '../sim/state';
 import {
   SHIP_CLASSES,
   type Asteroid,
@@ -6,6 +7,7 @@ import {
   type Hangar,
   type HangarItem,
   type ModuleId,
+  type Operation,
   type Pirate,
   type Ship,
   type ShipMode,
@@ -26,43 +28,27 @@ export interface UiSnapshot {
   focus: FocusPart;
 }
 
-/** Sent as packed rows, sent only when changed, or not part of the snapshot at all. */
-type PackedKey = 'ships' | 'pirates' | 'asteroids' | 'hangars' | 'fields' | 'events' | 'fx';
-const FOCUS_KEYS = [
-  'carrier',
-  'systemId',
-  'warp',
-  'powerMode',
-  'doctrine',
-  'cards',
-  'automation',
-  'reserveTimers',
-  'wave',
-  'storm',
-  'containers',
-  'hazards',
-  'recon',
-] as const satisfies readonly (keyof GameState)[];
-type FocusKey = (typeof FOCUS_KEYS)[number];
-const FOCUS = new Set<string>(FOCUS_KEYS);
+/** Operation fields sent as packed rows, or (fx) with frames instead. */
+type PackedKey = 'ships' | 'pirates' | 'asteroids' | 'hangars' | 'fx';
 const PACKED = new Set<string>([
   'ships',
   'pirates',
   'asteroids',
   'hangars',
-  'fields',
-  'events',
   'fx',
 ] satisfies PackedKey[]);
+/** Run-wide fields that are sent only when changed, or not at all. */
+const GLOBAL_SKIP = new Set<string>(['ops', 'fields', 'events'] satisfies (keyof GameState)[]);
 
 /** Every other GameState field, as is; new fields land here without codec changes. */
-export type GlobalPart = Omit<GameState, PackedKey | FocusKey> & {
+export type GlobalPart = Omit<GameState, 'ops' | 'fields' | 'events'> & {
   /** Only when it may have changed: on a new state or after a jump. */
   fields?: GameState['fields'];
 };
 
-export type FocusPart = Pick<GameState, FocusKey> & {
-  hangars: (Omit<Hangar, 'items'> & { items: Int32Array })[];
+/** The focused operation; new Operation fields land here without codec changes. */
+export type FocusPart = Omit<Operation, PackedKey> & {
+  hangars: (Omit<Hangar, 'items'> & { items: Int32Array<ArrayBuffer> })[];
   ships: Float64Array;
   pirates: Float64Array;
   asteroids: Float64Array;
@@ -100,16 +86,15 @@ const PIRATE_ROW = 10;
 const ASTEROID_ROW = 9;
 
 export function encodeSnapshot(
-  s: GameState,
+  g: GameState,
   withFields: boolean,
 ): { snap: UiSnapshot; transfer: ArrayBuffer[] } {
+  const s = focusOp(g);
   const global: Record<string, unknown> = {};
   const focus: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(s)) {
-    if (FOCUS.has(k)) focus[k] = v;
-    else if (!PACKED.has(k)) global[k] = v;
-  }
-  if (withFields) global.fields = s.fields;
+  for (const [k, v] of Object.entries(g)) if (!GLOBAL_SKIP.has(k)) global[k] = v;
+  for (const [k, v] of Object.entries(s)) if (!PACKED.has(k)) focus[k] = v;
+  if (withFields) global.fields = g.fields;
 
   const ships = new Float64Array(s.ships.length * SHIP_ROW);
   let o = 0;
@@ -176,14 +161,15 @@ export function encodeSnapshot(
     o += ASTEROID_ROW;
   }
 
-  const hangars = s.hangars.map((h) => {
+  const hangars: FocusPart['hangars'] = [];
+  for (const h of s.hangars) {
     const items = new Int32Array(h.items.length * 2);
     h.items.forEach((it, i) => {
       items[i * 2] = it.shipId;
       items[i * 2 + 1] = it.start;
     });
-    return { ...h, items };
-  });
+    hangars.push({ ...h, items });
+  }
 
   focus.hangars = hangars;
   focus.ships = ships;
@@ -206,7 +192,8 @@ export function encodeSnapshot(
  * `fx` and `fields` carry over from `prev` (fx arrive with frames); `events` is always empty,
  * since the worker drains it.
  */
-export function applySnapshot(prev: GameState | null, snap: UiSnapshot): GameState {
+export function applySnapshot(prevState: GameState | null, snap: UiSnapshot): GameState {
+  const prev = prevState ? focusOp(prevState) : null;
   const {
     hangars,
     ships: shipRows,
@@ -279,10 +266,8 @@ export function applySnapshot(prev: GameState | null, snap: UiSnapshot): GameSta
     asteroids.push(a);
   }
 
-  return {
-    ...global,
+  const op: Operation = {
     ...focus,
-    fields: fields ?? prev?.fields ?? {},
     // The received hangars are this thread's own copies, so they can be reused.
     hangars: hangars.map((h) => {
       const items: HangarItem[] = [];
@@ -293,7 +278,12 @@ export function applySnapshot(prev: GameState | null, snap: UiSnapshot): GameSta
     ships,
     pirates,
     asteroids,
-    events: [],
     fx: prev?.fx ?? [],
+  };
+  return {
+    ...global,
+    fields: fields ?? prevState?.fields ?? {},
+    events: [],
+    ops: [op],
   };
 }

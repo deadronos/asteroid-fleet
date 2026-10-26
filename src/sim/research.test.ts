@@ -3,20 +3,21 @@ import { SHIP_STATS } from './config';
 import { cargoCap, damageShip, speed } from './ctx';
 import { RESEARCH, canBuyResearch, buyResearch } from './research';
 import { SHIP_CLASSES } from './types';
-import { createShip, maxHull, newGame, spawnAsteroid } from './state';
-import { step } from './tick';
-import type { GameState } from './types';
+import { createShip, maxHull, spawnAsteroid } from './state';
+import { stepSim } from './tick';
+import type { Sim } from './types';
+import { game } from './testing';
 
-const run = (s: GameState, seconds: number) => {
-  for (let i = 0; i < seconds * 10; i++) step(s);
+const run = (s: Sim, seconds: number) => {
+  for (let i = 0; i < seconds * 10; i++) stepSim(s);
 };
 const withLevel = (id: string, n = 1) => {
-  const s = newGame(5);
+  const s = game(5);
   s.researchLevels[id] = n;
   return s;
 };
 
-const ship = (s: GameState, cls: (typeof SHIP_CLASSES)[number]) => {
+const ship = (s: Sim, cls: (typeof SHIP_CLASSES)[number]) => {
   s.unlocked.push(cls);
   s.credits = 1e6;
   return s.ships.find((x) => x.cls === cls) ?? createShip(s, cls)!;
@@ -44,7 +45,7 @@ describe('research tree', () => {
   });
 
   it('gates harvester nodes behind fusion', () => {
-    const s = newGame(1);
+    const s = game(1);
     s.research = 99;
     expect(canBuyResearch(s, 'harvestCargo')).toBe(false);
     expect(buyResearch(s, 'fusion')).toBe(true);

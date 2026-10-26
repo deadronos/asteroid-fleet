@@ -4,9 +4,9 @@ import { DOCK_RADIUS } from './config';
 import { destroyShip, dock } from './ctx';
 import { copy, dist } from './math';
 import { emit, enterSystem } from './state';
-import type { GameState, Ship } from './types';
+import type { Sim, Ship } from './types';
 
-export function carrierDisabled(s: GameState) {
+export function carrierDisabled(s: Sim) {
   emit(s, 'EmergencyJump', {});
   const lost = s.ships.filter((x) => x.mode !== 'docked');
   for (const l of lost) destroyShip(s, l, 'emergencyJump');
@@ -21,7 +21,7 @@ export function carrierDisabled(s: GameState) {
 
 // ---------- warp ----------
 
-export function warpStep(s: GameState, dt: number) {
+export function warpStep(s: Sim, dt: number) {
   if (!s.warp) return;
   s.warp.charge -= dt;
   if (s.warp.charge > 0) return;
@@ -32,19 +32,19 @@ export function warpStep(s: GameState, dt: number) {
  * Whether a ship makes the jump: docked, within DOCK_RADIUS of the carrier
  * (it docks a tick or two later anyway), or riding in a barge that does.
  */
-function aboard(s: GameState, ship: Ship, byId: Map<number, Ship>): boolean {
+function aboard(s: Sim, ship: Ship, byId: Map<number, Ship>): boolean {
   const host = ship.mode === 'carried' ? byId.get(ship.bargeId) : ship;
   if (!host || host.hull <= 0) return false;
   return host.mode === 'docked' || dist(host.pos, s.carrier.pos) <= DOCK_RADIUS;
 }
 
 /** Ships that would be lost if the carrier jumped now. Shared with the HUD count. */
-export function leftBehind(s: GameState): Ship[] {
+export function leftBehind(s: Sim): Ship[] {
   const byId = new Map(s.ships.map((x) => [x.id, x]));
   return s.ships.filter((x) => !aboard(s, x, byId));
 }
 
-export function executeJump(s: GameState) {
+export function executeJump(s: Sim) {
   if (!s.warp) return;
   const target = s.warp.targetSystem;
   const outside = leftBehind(s);

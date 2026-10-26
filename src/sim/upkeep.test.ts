@@ -2,14 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { settleOffline } from './actions';
 import { DT, HANGAR_UPKEEP, SHIP_UPKEEP } from './config';
 import { buildCtx } from './ctx';
-import { hangarUpkeep, newGame, solarRate, upkeep, upkeepRate } from './state';
-import { step } from './tick';
-import type { GameState } from './types';
+import { hangarUpkeep, solarRate, upkeep, upkeepRate, stateOf } from './state';
+import { stepSim } from './tick';
+import type { Sim } from './types';
 import { power } from './world';
+import { game } from './testing';
 
 /** A calm game with every ship docked, no ore to refine and the carrier holding still. */
-function calm(seed = 5): GameState {
-  const s = newGame(seed);
+function calm(seed = 5): Sim {
+  const s = game(seed);
   for (const x of s.ships) x.mode = 'docked';
   s.carrier.stance = 'hold';
   s.carrier.ore = 0;
@@ -20,7 +21,7 @@ function calm(seed = 5): GameState {
 }
 
 /** Make solar exactly `rate` energy/s in the current system. */
-function setSolar(s: GameState, rate: number) {
+function setSolar(s: Sim, rate: number) {
   const sys = s.systems[s.systemId];
   sys.brightness = 1;
   sys.brightness = rate / solarRate(s);
@@ -82,7 +83,7 @@ describe('power upkeep', () => {
     idle.pos = { ...s.carrier.pos };
     for (const h of s.hangars) h.launchTimer = 0;
     const dockedBefore = s.ships.filter((x) => x.mode === 'docked').length;
-    step(s);
+    stepSim(s);
     // No launches, and the idle drone headed home and docked.
     expect(idle.mode).toBe('docked');
     expect(s.ships.filter((x) => x.mode === 'docked').length).toBe(dockedBefore + 1);
@@ -90,7 +91,7 @@ describe('power upkeep', () => {
 
     // With power back, the hangars launch again.
     setSolar(s, 6);
-    for (let i = 0; i < 20; i++) step(s);
+    for (let i = 0; i < 20; i++) stepSim(s);
     expect(s.ships.some((x) => x.mode !== 'docked')).toBe(true);
   });
 
@@ -99,14 +100,14 @@ describe('power upkeep', () => {
     for (const x of s.ships) x.mode = 'idle';
     s.carrier.energy = 100;
     setSolar(s, upkeepRate(s) + 0.1);
-    settleOffline(s, 600);
+    settleOffline(stateOf(s), 600);
     expect(s.carrier.energy).toBeCloseTo(100 + 0.1 * 600);
 
     const t = calm();
     for (const x of t.ships) x.mode = 'idle';
     t.carrier.energy = 100;
     setSolar(t, 0);
-    settleOffline(t, 3600);
+    settleOffline(stateOf(t), 3600);
     expect(t.carrier.energy).toBe(0);
   });
 });

@@ -15,7 +15,7 @@ import type {
   CardScope,
   Condition,
   ConditionKind,
-  GameState,
+  Sim,
   RuleCard,
   RuleId,
   StanceSwitch,
@@ -55,7 +55,7 @@ const scopeOption = (sc: CardScope, label: string) => (
   </option>
 );
 
-function newDraft(s: GameState): Draft {
+function newDraft(s: Sim): Draft {
   const then = ACTION_KINDS.find((a) => s.unlockedRules.includes(ACTION_DEFS[a].unlock));
   return {
     enabled: true,

@@ -16,7 +16,7 @@ import { focus, isDoubleMiss } from './focus';
 import { engine, lerpPos } from '../game/engine';
 import { COVER_RADIUS, H2_STORM_RADIUS, SHIP_STATS } from '../sim/config';
 import { gasGiantPos } from '../sim/state';
-import { SHIP_CLASSES, type GameState, type Vec3 } from '../sim/types';
+import { SHIP_CLASSES, type Sim, type Vec3 } from '../sim/types';
 import { AsteroidField } from './AsteroidField';
 import { Containers } from './Containers';
 import { Fleet } from './Fleet';
@@ -29,7 +29,7 @@ const dummy = new THREE.Object3D();
 const tmp: Vec3 = { x: 0, y: 0, z: 0 };
 /** Re-renders only when the system changes, not on every 5 Hz UI tick. */
 function useSystemId(): number {
-  return useSyncExternalStore(engine.subscribe, () => engine.state.systemId);
+  return useSyncExternalStore(engine.subscribe, () => engine.view.systemId);
 }
 
 export interface ViewOptions {
@@ -60,7 +60,7 @@ function Beams() {
     return g;
   }, []);
   useFrame(() => {
-    const s = engine.state;
+    const s = engine.view;
     const a = engine.alpha();
     const pos = geo.getAttribute('position') as THREE.BufferAttribute;
     const col = geo.getAttribute('color') as THREE.BufferAttribute;
@@ -102,7 +102,7 @@ function Explosions() {
     const m = mesh.current;
     if (!m) return;
     let n = 0;
-    for (const f of engine.state.fx) {
+    for (const f of engine.view.fx) {
       if (f.kind !== 'explosion' && f.kind !== 'warp') continue;
       const life = f.kind === 'warp' ? 1.5 : 0.8;
       const k = 1 - f.ttl / life;
@@ -132,7 +132,7 @@ function Carrier() {
   const shield = useRef<THREE.Mesh>(null);
   const warpRing = useRef<THREE.Mesh>(null);
   useFrame((st) => {
-    const s = engine.state;
+    const s = engine.view;
     const a = engine.alpha();
     const p = engine.prevCarrier;
     const c = s.carrier.pos;
@@ -223,7 +223,7 @@ const Hazards = memo(function Hazards() {
   const systemId = useSystemId();
   return (
     <>
-      {engine.state.hazards.map((h, i) => (
+      {engine.view.hazards.map((h, i) => (
         <group key={`${systemId}-${i}`} position={[h.pos.x, h.pos.y, h.pos.z]}>
           <mesh>
             <sphereGeometry args={[h.radius, 24, 16]} />
@@ -250,7 +250,7 @@ const Hazards = memo(function Hazards() {
 });
 
 const GasGiant = memo(function GasGiant() {
-  const sys = engine.state.systems[useSystemId()];
+  const sys = engine.view.systems[useSystemId()];
   const mat = useMemo(
     () =>
       new THREE.ShaderMaterial({
@@ -266,7 +266,7 @@ const GasGiant = memo(function GasGiant() {
     // H2 storm: one translucent shell, hidden (no draw call) when calm.
     const m = storm.current;
     if (m) {
-      m.visible = engine.state.storm.active > 0;
+      m.visible = engine.view.storm.active > 0;
       if (m.visible) m.rotation.y = st.clock.elapsedTime * 0.4;
     }
   });
@@ -308,7 +308,7 @@ const TIER_SKY: Record<number, [string, string]> = {
 };
 
 const Sky = memo(function Sky() {
-  const sys = engine.state.systems[useSystemId()];
+  const sys = engine.view.systems[useSystemId()];
   const tier = sys.tier;
   const mat = useMemo(
     () =>
@@ -358,7 +358,7 @@ const ICON_COLORS: Record<string, THREE.Color> = {
   vein: new THREE.Color('#5affef').multiplyScalar(2.2),
 };
 
-function veinPos(s: GameState, id: number): Vec3 | null {
+function veinPos(s: Sim, id: number): Vec3 | null {
   for (const a of s.asteroids) if (a.id === id) return a.ore > 0 ? a.pos : null;
   return null;
 }
@@ -373,7 +373,7 @@ function Tactical({ on }: { on: boolean }) {
   const ring = useRef<THREE.Group>(null);
   useFrame(() => {
     if (!on) return;
-    const s = engine.state;
+    const s = engine.view;
     const a = engine.alpha();
     const pos = geo.getAttribute('position') as THREE.BufferAttribute;
     const col = geo.getAttribute('color') as THREE.BufferAttribute;

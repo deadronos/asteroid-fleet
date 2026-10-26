@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { apply } from './actions';
+import { order } from './actions';
 import { HANGAR_SLOT_COST, NEW_HANGAR_COST } from './config';
-import { newGame } from './state';
+import { game } from './testing';
 
 describe('hangar growth has no hard cap', () => {
   it('slot and hangar costs rise steeply and monotonically past the old maxima', () => {
@@ -21,15 +21,15 @@ describe('hangar growth has no hard cap', () => {
   });
 
   it('lets a rich player buy past 12 slots and 5 hangars', () => {
-    const s = newGame(1);
+    const s = game(1);
     s.credits = 1e15;
     s.stats.furthestTier = 9;
     const h = s.hangars[0];
     h.slots = 12;
-    expect(apply(s, { type: 'buySlot', hangarId: h.id })).toBeNull();
+    expect(order(s, { type: 'buySlot', hangarId: h.id })).toBeNull();
     expect(h.slots).toBe(13);
     while (s.hangars.length < 6) {
-      expect(apply(s, { type: 'buyHangar', hangarType: s.hangars[0].type })).toBeNull();
+      expect(order(s, { type: 'buyHangar', hangarType: s.hangars[0].type })).toBeNull();
     }
     expect(s.hangars.length).toBe(6);
   });

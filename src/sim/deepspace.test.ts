@@ -1,18 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { apply } from './actions';
+import { order } from './actions';
 import { H2_STORM_RADIUS, ZONE_RULE_UNLOCKS } from './config';
 import { buildCtx } from './ctx';
 import { pirateStep, pirateTargetScore } from './combat';
 import { harvester } from './mining';
 import { buyResearch, canBuyResearch, reserveDefs, RESEARCH } from './research';
-import { createShip, enterSystem, gasGiantPos, h2Storm, newGame } from './state';
+import { createShip, enterSystem, gasGiantPos, h2Storm } from './state';
 import { hazards } from './world';
-import type { GameState, Ship } from './types';
+import type { Sim, Ship } from './types';
+import { game } from './testing';
 
-const gasSystem = (s: GameState) => s.systems.findIndex((x) => x.gasGiant);
-const deepSystem = (s: GameState) => s.systems.findIndex((x) => x.tier === 3);
+const gasSystem = (s: Sim) => s.systems.findIndex((x) => x.gasGiant);
+const deepSystem = (s: Sim) => s.systems.findIndex((x) => x.tier === 3);
 
-const launch = (s: GameState, cls: Ship['cls'], x: number) => {
+const launch = (s: Sim, cls: Ship['cls'], x: number) => {
   if (!s.unlocked.includes(cls)) s.unlocked.push(cls);
   s.credits = 1e6;
   const sh = createShip(s, cls)!;
@@ -23,16 +24,16 @@ const launch = (s: GameState, cls: Ship['cls'], x: number) => {
 
 describe('deep space unlocks', () => {
   it('gates the fabrication bay behind tier 3', () => {
-    const s = newGame(3);
+    const s = game(3);
     s.credits = 1e6;
-    expect(apply(s, { type: 'buyHangar', hangarType: 'fabricator' })).toMatch(/deep space/);
+    expect(order(s, { type: 'buyHangar', hangarType: 'fabricator' })).toMatch(/deep space/);
     enterSystem(s, deepSystem(s));
     expect(s.stats.furthestTier).toBe(3);
-    expect(apply(s, { type: 'buyHangar', hangarType: 'fabricator' })).toBeNull();
+    expect(order(s, { type: 'buyHangar', hangarType: 'fabricator' })).toBeNull();
   });
 
   it('a fabrication bay shortens reserve rebuilds once, not per bay', () => {
-    const s = newGame(3);
+    const s = game(3);
     s.researchLevels.reserveDrone = 1;
     const base = reserveDefs(s)[0][2];
     s.hangars[0].type = 'fabricator';
@@ -42,7 +43,7 @@ describe('deep space unlocks', () => {
   });
 
   it('unlocks the storm-shelter rule card in deep space', () => {
-    const s = newGame(3);
+    const s = game(3);
     expect(s.unlockedRules).not.toContain('harvesterStormShelter');
     enterSystem(s, deepSystem(s));
     for (const id of ZONE_RULE_UNLOCKS[3]) expect(s.unlockedRules).toContain(id);
@@ -51,7 +52,7 @@ describe('deep space unlocks', () => {
   it('gates deep research behind furthest tier 3', () => {
     const deep = RESEARCH.filter((n) => n.tier === 3);
     expect(deep.length).toBeGreaterThan(0);
-    const s = newGame(3);
+    const s = game(3);
     s.research = 100;
     s.researchLevels.reserveCd = 1;
     s.stats.furthestTier = 2;
@@ -63,7 +64,7 @@ describe('deep space unlocks', () => {
 
 describe('gas giants', () => {
   it('pirates prefer harvesters only in gas giant systems', () => {
-    const s = newGame(4);
+    const s = game(4);
     const hv = launch(s, 'harvester', 0);
     const hauler = launch(s, 'hauler', 0);
     expect(pirateTargetScore(s, hv)).toBe(pirateTargetScore(s, hauler));
@@ -72,7 +73,7 @@ describe('gas giants', () => {
   });
 
   it('a pirate picks the harvester over an equally close hauler', () => {
-    const s = newGame(4);
+    const s = game(4);
     enterSystem(s, gasSystem(s));
     const hv = launch(s, 'harvester', 40);
     launch(s, 'hauler', -40);
@@ -91,7 +92,7 @@ describe('gas giants', () => {
   });
 
   it('H2 storms hurt ships near the gas giant and boost harvesting', () => {
-    const s = newGame(4);
+    const s = game(4);
     enterSystem(s, gasSystem(s));
     expect(Number.isFinite(s.storm.timer)).toBe(true);
     s.researchLevels.fusion = 1;
@@ -112,7 +113,7 @@ describe('gas giants', () => {
   });
 
   it('the shelter rule sends harvesters home during an H2 storm', () => {
-    const s = newGame(4);
+    const s = game(4);
     enterSystem(s, deepSystem(s));
     enterSystem(s, gasSystem(s));
     s.cards.find((c) => c.preset === 'harvesterStormShelter')!.enabled = true;

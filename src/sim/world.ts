@@ -27,9 +27,9 @@ import {
   spawnAsteroid,
   upkeepRate,
 } from './state';
-import type { GameState, Vec3 } from './types';
+import type { Sim, Vec3 } from './types';
 
-export function power(s: GameState, dt: number, ctx: Ctx) {
+export function power(s: Sim, dt: number, ctx: Ctx) {
   const c = s.carrier;
   const max = maxEnergy(s);
   let gain = solarRate(s) * (s.storm.active > 0 && !h2Storm(s) ? 1.6 : 1);
@@ -56,7 +56,7 @@ export function power(s: GameState, dt: number, ctx: Ctx) {
   }
 }
 
-export function refine(s: GameState, dt: number, ctx: Ctx) {
+export function refine(s: Sim, dt: number, ctx: Ctx) {
   const c = s.carrier;
   if (c.ore <= 0) return;
   const max = maxEnergy(s);
@@ -85,7 +85,7 @@ export function refine(s: GameState, dt: number, ctx: Ctx) {
   ctx.mining += value;
 }
 
-export function hazards(s: GameState, dt: number) {
+export function hazards(s: Sim, dt: number) {
   const shield = 1 - 0.3 * lvl(s, 'stormShielding');
   const h2 = h2Storm(s);
   const solarStorm = s.storm.active > 0 && !h2;
@@ -102,7 +102,7 @@ export function hazards(s: GameState, dt: number) {
 
 // ---------- field, reserves, carrier ----------
 
-export function field(s: GameState, dt: number) {
+export function field(s: Sim, dt: number) {
   const sys = s.systems[s.systemId];
   let scouts = -1;
   let centers: Vec3[] | null = null;
@@ -129,7 +129,7 @@ export function field(s: GameState, dt: number) {
   }
 }
 
-export function reserves(s: GameState, dt: number, ctx: Ctx) {
+export function reserves(s: Sim, dt: number, ctx: Ctx) {
   const defs = reserveDefs(s);
   for (const [cls, min, cooldown] of defs) {
     if (min <= 0 || !s.unlocked.includes(cls)) continue;
@@ -153,7 +153,7 @@ export function reserves(s: GameState, dt: number, ctx: Ctx) {
   }
 }
 
-export function drift(s: GameState, dt: number) {
+export function drift(s: Sim, dt: number) {
   // Hold still while the warp charges, so recalled ships aren't chasing the carrier.
   if (s.warp) return;
   const c = s.carrier;

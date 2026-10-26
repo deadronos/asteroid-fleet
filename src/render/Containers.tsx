@@ -16,7 +16,7 @@ export function Containers() {
     if (!m) return;
     const t = st.clock.elapsedTime;
     let n = 0;
-    for (const c of engine.state.containers) {
+    for (const c of engine.view.containers) {
       if (n >= MAX_CONTAINERS) break;
       dummy.position.set(c.pos.x, c.pos.y, c.pos.z);
       dummy.rotation.set(t * 0.4 + c.id, t * 0.3, 0);

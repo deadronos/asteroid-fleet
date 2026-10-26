@@ -1,4 +1,4 @@
-import type { GameState, Vec3 } from './types';
+import type { Sim, Vec3 } from './types';
 
 /** mulberry32 step: returns [value in 0..1, next state]. */
 export function mulberry(seed: number): [number, number] {
@@ -10,13 +10,13 @@ export function mulberry(seed: number): [number, number] {
 }
 
 /** Deterministic RNG whose state lives in the save. */
-export function rand(s: GameState): number {
+export function rand(s: Sim): number {
   const [v, next] = mulberry(s.rng);
   s.rng = next;
   return v;
 }
 
-export function randRange(s: GameState, a: number, b: number): number {
+export function randRange(s: Sim, a: number, b: number): number {
   return a + (b - a) * rand(s);
 }
 

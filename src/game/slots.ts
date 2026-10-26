@@ -1,3 +1,4 @@
+import { focusOp } from '../sim/state';
 import type { GameState } from '../sim/types';
 import { decodeSave, type DecodeResult } from './save';
 
@@ -30,9 +31,10 @@ function isSlot(slot: number): boolean {
 }
 
 export function summarize(state: GameState): string {
-  const system = state.systems[state.systemId]?.name ?? 'Unknown system';
+  const system = state.systems[focusOp(state).systemId]?.name ?? 'Unknown system';
   const credits = Math.floor(state.credits).toLocaleString('en-US');
-  return `${system} · ${credits} credits · ${state.ships.length} ships · prestige ×${state.lifetime.prestiges}`;
+  const ships = state.ops.reduce((n, op) => n + op.ships.length, 0);
+  return `${system} · ${credits} credits · ${ships} ships · prestige ×${state.lifetime.prestiges}`;
 }
 
 /** Slot text is plain JSON, so it decodes (and migrates) the same way as a save file. */

@@ -2,20 +2,20 @@ import { shipCost } from './actions';
 import { firstFit } from './hangar';
 import { lvl } from './research';
 import { createShip, emit } from './state';
-import { SHIP_CLASSES, type GameState, type Ship, type ShipClass } from './types';
+import { SHIP_CLASSES, type Sim, type Ship, type ShipClass } from './types';
 
 /** Seconds between automation passes; buying is not urgent and boards are scanned per pass. */
 export const AUTOMATION_INTERVAL = 1;
 
-export const autoBuyUnlocked = (s: GameState) => lvl(s, 'autoBuy') > 0;
-export const autoRebuildUnlocked = (s: GameState) => lvl(s, 'autoRebuild') > 0;
+export const autoBuyUnlocked = (s: Sim) => lvl(s, 'autoBuy') > 0;
+export const autoRebuildUnlocked = (s: Sim) => lvl(s, 'autoRebuild') > 0;
 
 /** Engagement stances unlock with fighters (the frontier) or with the tactics research. */
-export const engagementUnlocked = (s: GameState) =>
+export const engagementUnlocked = (s: Sim) =>
   s.unlocked.includes('fighter') || lvl(s, 'tactics') > 0;
 
 /** Remember a lost ship so paid auto-rebuild can replace it. */
-export function queueRebuild(s: GameState, ship: Ship) {
+export function queueRebuild(s: Sim, ship: Ship) {
   if (!s.automation.autoRebuild || !autoRebuildUnlocked(s)) return;
   const q = s.automation.rebuildQueue;
   q.push({ cls: ship.cls, hangarId: ship.hangarId });
@@ -23,16 +23,16 @@ export function queueRebuild(s: GameState, ship: Ship) {
 }
 
 /** The queue never holds more losses than the hangars have slots. */
-export const rebuildQueueCap = (s: GameState) => s.hangars.reduce((n, h) => n + h.slots, 0);
+export const rebuildQueueCap = (s: Sim) => s.hangars.reduce((n, h) => n + h.slots, 0);
 
-function trimQueue(s: GameState) {
+function trimQueue(s: Sim) {
   const q = s.automation.rebuildQueue;
   const extra = q.length - rebuildQueueCap(s);
   if (extra > 0) q.splice(0, extra); // drop the oldest
 }
 
 /** Buy one ship into `hangarId` if it fits and the credit floor holds. */
-function tryBuy(s: GameState, cls: ShipClass, hangarId: number): boolean {
+function tryBuy(s: Sim, cls: ShipClass, hangarId: number): boolean {
   if (!s.unlocked.includes(cls)) return false;
   const cost = shipCost(s, cls);
   if (s.credits - cost < s.automation.creditFloor) return false;
@@ -43,7 +43,7 @@ function tryBuy(s: GameState, cls: ShipClass, hangarId: number): boolean {
   return true;
 }
 
-export function automation(s: GameState, dt: number) {
+export function automation(s: Sim, dt: number) {
   const a = s.automation;
   a.timer -= dt;
   if (a.timer > 0) return;

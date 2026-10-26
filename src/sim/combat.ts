@@ -25,26 +25,26 @@ import {
 import { copy, dist, dist2, moveToward, rand, randRange, seeded } from './math';
 import { lvl } from './research';
 import { clusterCenters, emit, maxHull } from './state';
-import type { GameState, Pirate, Ship, Vec3 } from './types';
+import type { Sim, Pirate, Ship, Vec3 } from './types';
 
-export function cargoHeat(s: GameState): number {
+export function cargoHeat(s: Sim): number {
   let v = s.carrier.oreValue;
   for (const sh of s.ships) if (sh.mode !== 'docked') v += sh.cargoValue;
   return v;
 }
 
-export function heatFactor(s: GameState): number {
+export function heatFactor(s: Sim): number {
   const tier = s.systems[s.systemId].tier;
   return 1 + Math.min(2, cargoHeat(s) / (2500 * tier));
 }
 
-export function waveWarning(s: GameState): number {
+export function waveWarning(s: Sim): number {
   let scouts = 0;
   for (const x of s.ships) if (x.cls === 'scout' && x.mode !== 'docked') scouts++;
   return WAVE_WARNING + (lvl(s, 'scoutRelay') > 0 ? 10 * scouts : 0);
 }
 
-function fighterTarget(s: GameState, ship: Ship, ctx: Ctx, engagement: string): Pirate | null {
+function fighterTarget(s: Sim, ship: Ship, ctx: Ctx, engagement: string): Pirate | null {
   const sensor = SHIP_STATS.fighter.sensor;
   if (engagement === 'passive') return null;
   if (engagement === 'aggressive')
@@ -106,7 +106,7 @@ function orbit(p: Vec3, c: Vec3, r: number, t: number, phase: number, step: numb
   );
 }
 
-export function fighter(s: GameState, ship: Ship, dt: number, ctx: Ctx, engagement: string) {
+export function fighter(s: Sim, ship: Ship, dt: number, ctx: Ctx, engagement: string) {
   const v = speed(s, ship) * dt;
   if (engagement === 'escort') {
     const ward = ctx.ships.get(ship.escortId);
@@ -155,7 +155,7 @@ export function fighter(s: GameState, ship: Ship, dt: number, ctx: Ctx, engageme
  * system is surveyed they patrol and start a fresh sweep, so respawned rocks
  * get scanned too.
  */
-export function scout(s: GameState, ship: Ship, dt: number, ctx: Ctx) {
+export function scout(s: Sim, ship: Ship, dt: number, ctx: Ctx) {
   const r = s.recon;
   const sensor2 = SHIP_STATS.scout.sensor * SHIP_STATS.scout.sensor;
   for (let i = 0; i < s.hazards.length; i++) {
@@ -196,7 +196,7 @@ export function scout(s: GameState, ship: Ship, dt: number, ctx: Ctx) {
 }
 
 /** Mark cluster `i` surveyed and its rich rocks as veins. */
-export function surveyCluster(s: GameState, i: number, ctx: Ctx) {
+export function surveyCluster(s: Sim, i: number, ctx: Ctx) {
   const r = s.recon;
   if (!r.clusters.includes(i)) r.clusters.push(i);
   const c = clusterCenters(s.systems[s.systemId])[i];
@@ -214,7 +214,7 @@ export function surveyCluster(s: GameState, i: number, ctx: Ctx) {
   if (found > 0) emit(s, 'VeinFound', { veins: found });
 }
 
-export function repairDrone(s: GameState, ship: Ship, dt: number, ctx: Ctx) {
+export function repairDrone(s: Sim, ship: Ship, dt: number, ctx: Ctx) {
   const v = speed(s, ship) * dt;
   let patient = ctx.ships.get(ship.targetId);
   if (!patient || patient.mode === 'docked' || patient.hull >= maxHull(s, patient.cls) * 0.98) {
@@ -255,7 +255,7 @@ export function repairDrone(s: GameState, ship: Ship, dt: number, ctx: Ctx) {
   }
 }
 
-export function threats(s: GameState, dt: number) {
+export function threats(s: Sim, dt: number) {
   const sys = s.systems[s.systemId];
   if (sys.tier === 1) return;
   const w = s.wave;
@@ -308,24 +308,24 @@ export function threats(s: GameState, dt: number) {
 }
 
 /** Gas giant pirates hunt harvesters: H2 is easy to fence. */
-function gasGiantTargetBias(s: GameState, sh: Ship): number {
+function gasGiantTargetBias(s: Sim, sh: Ship): number {
   if (sh.cls !== 'harvester' || !s.systems[s.systemId].gasGiant) return 1;
   return GAS_PIRATE_HARVESTER_BIAS;
 }
 
-export function pirateTargetScore(s: GameState, sh: Ship): number {
+export function pirateTargetScore(s: Sim, sh: Ship): number {
   if (sh.mode === 'docked') return 0;
   return baseTargetScore(s, sh) * gasGiantTargetBias(s, sh);
 }
 
-function baseTargetScore(s: GameState, sh: Ship): number {
+function baseTargetScore(s: Sim, sh: Ship): number {
   if (sh.cls === 'barge') return 4 + (sh.cargo / cargoCap(s, 'barge', sh)) * 6; // full barges first
   if (sh.cls === 'hauler' || sh.cls === 'harvester') return 2 + sh.cargo / 60;
   if (sh.cls === 'fighter') return 1.5;
   return 1;
 }
 
-export function pirateStep(s: GameState, dt: number, ctx: Ctx) {
+export function pirateStep(s: Sim, dt: number, ctx: Ctx) {
   for (const p of s.pirates) {
     let tgtPos: Vec3 | null =
       p.targetId === CARRIER ? s.carrier.pos : (ctx.ships.get(p.targetId)?.pos ?? null);

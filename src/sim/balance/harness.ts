@@ -19,9 +19,9 @@
 // `apply`, like the UI), or a field to `Sample` and a column to `formatReport`.
 
 import { RP_DIVISOR, TICK_HZ, TIER_NAMES } from '../config';
-import { newGame } from '../state';
-import { step } from '../tick';
-import { SHIP_CLASSES, type GameState, type ShipClass } from '../types';
+import { focused, newGame } from '../state';
+import { stepSim } from '../tick';
+import { SHIP_CLASSES, type Sim, type ShipClass } from '../types';
 import { ACT_INTERVAL_TICKS, POLICIES, shipCounts, type Counts, type Policy } from './policy';
 
 export interface BalanceOptions {
@@ -80,11 +80,11 @@ export interface BalanceResult {
 }
 
 /** `researchPayout` with the divisor as a parameter, so divisors can be compared in one run. */
-export function payout(s: GameState, divisor: number): number {
+export function payout(s: Sim, divisor: number): number {
   return Math.floor(Math.sqrt(s.stats.oreValueDelivered / divisor)) * s.stats.furthestTier;
 }
 
-function sample(s: GameState, o: BalanceOptions): Sample {
+function sample(s: Sim, o: BalanceOptions): Sample {
   return {
     t: Math.round(s.time),
     systemId: s.systemId,
@@ -104,7 +104,7 @@ function sample(s: GameState, o: BalanceOptions): Sample {
 
 export function runBalance(o: BalanceOptions): BalanceResult {
   const t0 = performance.now();
-  const s = newGame(o.seed);
+  const s = focused(newGame(o.seed));
   Object.assign(s.researchLevels, o.research);
   o.policy.setup?.(s);
 
@@ -118,7 +118,7 @@ export function runBalance(o: BalanceOptions): BalanceResult {
   for (let t = 1; t <= ticks; t++) {
     const from = s.systemId;
     const warpTo = s.warp?.targetSystem;
-    step(s);
+    stepSim(s);
     if (s.systemId !== from) {
       jumps.push({ t: s.time, to: s.systemId, kind: s.systemId === warpTo ? 'warp' : 'emergency' });
       const tier = s.systems[s.systemId].tier;

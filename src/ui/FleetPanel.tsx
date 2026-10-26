@@ -20,7 +20,7 @@ import { maxHull } from '../sim/state';
 import { cargoCap } from '../sim/tick';
 import {
   SHIP_CLASSES,
-  type GameState,
+  type Sim,
   type Hangar,
   type HangarType,
   type ModuleId,
@@ -60,7 +60,7 @@ const UNLOCK_HINT: Partial<Record<ShipClass, string>> = {
 const indexes = new WeakMap<Ship[], Map<number, Ship>>();
 
 /** Ships by id, built once per ships array (a fleet board would otherwise be O(ships²)). */
-function shipIndex(s: GameState): Map<number, Ship> {
+function shipIndex(s: Sim): Map<number, Ship> {
   let m = indexes.get(s.ships);
   if (!m) {
     m = new Map(s.ships.map((sh) => [sh.id, sh]));
@@ -309,7 +309,7 @@ function ShipDetail({ id }: { id: number }) {
   );
 }
 
-function ModuleSlots({ ship, s }: { ship: Ship; s: GameState }) {
+function ModuleSlots({ ship, s }: { ship: Ship; s: Sim }) {
   const slots = MODULE_SLOTS[ship.cls];
   const docked = ship.mode === 'docked';
   return (
@@ -352,7 +352,7 @@ function ModuleSlots({ ship, s }: { ship: Ship; s: GameState }) {
 }
 
 const setAutomation = (
-  patch: Partial<Pick<GameState['automation'], 'autoBuy' | 'autoRebuild' | 'creditFloor'>>,
+  patch: Partial<Pick<Sim['automation'], 'autoBuy' | 'autoRebuild' | 'creditFloor'>>,
 ) => engine.dispatch({ type: 'setAutomation', patch });
 
 function AutomationBar() {

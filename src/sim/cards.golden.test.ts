@@ -3,10 +3,11 @@ import type { firing as realFiring } from './cards';
 import { PRESETS } from './config';
 import { cargoCap, nearestPirate } from './ctx';
 import { dist } from './math';
-import { createShip, enterSystem, h2Storm, newGame, unlockRule } from './state';
+import { createShip, enterSystem, h2Storm, unlockRule, stateOf } from './state';
 import { stressGame } from './stress';
-import { step } from './tick';
-import { SHIP_CLASSES, type GameState, type RuleId, type ShipClass } from './types';
+import { stepSim } from './tick';
+import { SHIP_CLASSES, type Sim, type RuleId, type ShipClass } from './types';
+import { game } from './testing';
 
 // Golden equivalence for #82. Each scenario runs twice in this process from the
 // same seed: once through the card engine with the preset cards, once with the
@@ -85,7 +86,7 @@ const TICKS = 2000;
 type Spec = Partial<Record<RuleId, number | false>>;
 
 /** Set each preset card the way the old `Rule { enabled, param }` was set. */
-function configure(s: GameState, spec: Spec) {
+function configure(s: Sim, spec: Spec) {
   expect(new Set(s.cards.map((c) => c.preset))).toEqual(new Set(IDS));
   expect(s.cards).toHaveLength(IDS.length);
   for (const card of s.cards) {
@@ -96,12 +97,12 @@ function configure(s: GameState, spec: Spec) {
   }
 }
 
-function digest(s: GameState): string {
-  return JSON.stringify({ ...s, savedAt: 0 });
+function digest(s: Sim): string {
+  return JSON.stringify({ ...stateOf(s), savedAt: 0 });
 }
 
 /** Tier-3 gas giant at scale, under attack with shields down: every rule fires. */
-function stress(seed: number): GameState {
+function stress(seed: number): Sim {
   const s = stressGame(200, 200, 25, seed);
   s.wave.timer = 40;
   s.carrier.shield = 0.1;
@@ -109,8 +110,8 @@ function stress(seed: number): GameState {
 }
 
 /** A mid-game frontier fleet launching from its hangars. */
-function campaign(seed: number): GameState {
-  const s = newGame(seed);
+function campaign(seed: number): Sim {
+  const s = game(seed);
   for (const c of SHIP_CLASSES) if (!s.unlocked.includes(c)) s.unlocked.push(c);
   for (const id of IDS) unlockRule(s, id);
   s.researchLevels = { fusion: 1, bargeBay: 1 };
@@ -134,12 +135,12 @@ function campaign(seed: number): GameState {
   return s;
 }
 
-function run(make: (seed: number) => GameState, seed: number, spec: Spec, old: boolean): string {
+function run(make: (seed: number) => Sim, seed: number, spec: Spec, old: boolean): string {
   const s = make(seed);
   configure(s, spec);
   legacy.spec = old ? spec : null;
   try {
-    for (let i = 0; i < TICKS; i++) step(s);
+    for (let i = 0; i < TICKS; i++) stepSim(s);
   } finally {
     legacy.spec = null;
   }
@@ -154,7 +155,7 @@ const VARIANT: Spec = {
   droneUnloadAtBarge: 40,
 };
 
-const CASES: [name: string, make: (seed: number) => GameState, seed: number, spec: Spec][] = [
+const CASES: [name: string, make: (seed: number) => Sim, seed: number, spec: Spec][] = [
   ['stress, all rules', stress, 5, ALL],
   ['stress, tuned params', stress, 5, VARIANT],
   ['stress, no rules', stress, 5, {}],
@@ -162,7 +163,7 @@ const CASES: [name: string, make: (seed: number) => GameState, seed: number, spe
     (id) =>
       [`stress, all but ${id}`, stress, 5, { ...ALL, [id]: false }] as [
         string,
-        (seed: number) => GameState,
+        (seed: number) => Sim,
         number,
         Spec,
       ],

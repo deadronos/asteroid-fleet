@@ -40,7 +40,7 @@ export function CameraRig({
   useFrame((_, dt) => {
     const c = controls.current;
     if (!c) return;
-    const s = engine.state;
+    const s = engine.view;
     const a = engine.alpha();
 
     const id = resolveFocus(s, focus.get());
@@ -105,7 +105,7 @@ export function CameraRig({
 /** Carrier position uses its own previous-tick snapshot rather than the per-id map. */
 function carrierPos(a: number) {
   const p = engine.prevCarrier;
-  const cur = engine.state.carrier.pos;
+  const cur = engine.view.carrier.pos;
   tmp.x = p.x + (cur.x - p.x) * a;
   tmp.y = p.y + (cur.y - p.y) * a;
   tmp.z = p.z + (cur.z - p.z) * a;

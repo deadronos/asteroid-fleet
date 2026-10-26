@@ -1,32 +1,32 @@
 import { describe, expect, it } from 'vitest';
-import { apply } from './actions';
+import { order } from './actions';
 import { DOCK_RADIUS, WARP_H2_PER_ENERGY, warpCost } from './config';
-import { newGame } from './state';
-import { step } from './tick';
-import type { GameState, Ship } from './types';
+import { stepSim } from './tick';
+import type { Sim, Ship } from './types';
 import { leftBehind } from './warp';
+import { game } from './testing';
 
 /** A barge with a drone in its bay, both launched, plus a warp charging to system 1. */
 function recallGame() {
-  const s = newGame(21);
+  const s = game(21);
   s.credits = 10000;
   s.researchLevels.bargeBay = 1;
-  expect(apply(s, { type: 'buyShip', cls: 'barge', hangarId: 2 })).toBeNull();
-  expect(apply(s, { type: 'buyShip', cls: 'drone', hangarId: 2 })).toBeNull();
+  expect(order(s, { type: 'buyShip', cls: 'barge', hangarId: 2 })).toBeNull();
+  expect(order(s, { type: 'buyShip', cls: 'drone', hangarId: 2 })).toBeNull();
   const barge = s.ships.find((x) => x.cls === 'barge')!;
   const drone = s.ships.find((x) => x.cls === 'drone' && x.id > barge.id)!;
   barge.mode = 'idle';
   drone.mode = 'carried';
   drone.bargeId = barge.id;
   s.carrier.energy = 1000;
-  expect(apply(s, { type: 'warp', systemId: 1 })).toBeNull();
+  expect(order(s, { type: 'warp', systemId: 1 })).toBeNull();
   return { s, barge, drone };
 }
 
-const at = (s: GameState, ship: Ship, d: number) => {
+const at = (s: Sim, ship: Ship, d: number) => {
   ship.pos = { x: s.carrier.pos.x + d, y: s.carrier.pos.y, z: s.carrier.pos.z };
 };
-const inHangar = (s: GameState, id: number) =>
+const inHangar = (s: Sim, id: number) =>
   s.hangars.some((h) => h.items.some((it) => it.shipId === id));
 
 describe('warp jump', () => {
@@ -38,7 +38,7 @@ describe('warp jump', () => {
     for (const x of s.ships) if (x !== barge && x !== drone) x.mode = 'docked';
     expect(leftBehind(s)).toEqual([]);
     const lost = s.stats.shipsLost;
-    apply(s, { type: 'jumpNow' });
+    order(s, { type: 'jumpNow' });
     expect(s.systemId).toBe(1);
     expect(s.stats.shipsLost).toBe(lost);
     expect(barge.mode).toBe('docked');
@@ -57,7 +57,7 @@ describe('warp jump', () => {
     at(s, drone, DOCK_RADIUS * 0.5 + 0.01);
     s.warp!.charge = 0.05;
     const lost = s.stats.shipsLost;
-    step(s);
+    stepSim(s);
     expect(s.systemId).toBe(1);
     expect(s.stats.shipsLost).toBe(lost);
     expect(inHangar(s, drone.id)).toBe(true);
@@ -70,7 +70,7 @@ describe('warp jump', () => {
     const expected = leftBehind(s).length;
     expect(expected).toBeGreaterThanOrEqual(2);
     const lost = s.stats.shipsLost;
-    apply(s, { type: 'jumpNow' });
+    order(s, { type: 'jumpNow' });
     expect(s.stats.shipsLost - lost).toBe(expected);
     expect(inHangar(s, barge.id)).toBe(false);
     expect(inHangar(s, drone.id)).toBe(false);
@@ -80,13 +80,13 @@ describe('warp jump', () => {
     const { s } = recallGame();
     s.carrier.target = { x: s.carrier.pos.x + 50, y: 0, z: s.carrier.pos.z };
     const before = { ...s.carrier.pos };
-    for (let i = 0; i < 20; i++) step(s);
+    for (let i = 0; i < 20; i++) stepSim(s);
     expect(s.carrier.pos).toEqual(before);
   });
 });
 
 const cost = () => {
-  const s = newGame(21);
+  const s = game(21);
   return { s, c: warpCost(s.systems[s.systemId].distance, s.systems[1].distance) };
 };
 
@@ -95,7 +95,7 @@ describe('warp payment', () => {
     const { s, c } = cost();
     s.carrier.energy = c + 50;
     s.carrier.h2 = 40;
-    expect(apply(s, { type: 'warp', systemId: 1 })).toBeNull();
+    expect(order(s, { type: 'warp', systemId: 1 })).toBeNull();
     expect(s.carrier.energy).toBe(50);
     expect(s.carrier.h2).toBe(40);
   });
@@ -104,7 +104,7 @@ describe('warp payment', () => {
     const { s, c } = cost();
     s.carrier.energy = c - 100;
     s.carrier.h2 = 40;
-    expect(apply(s, { type: 'warp', systemId: 1 })).toBeNull();
+    expect(order(s, { type: 'warp', systemId: 1 })).toBeNull();
     expect(s.carrier.energy).toBe(0);
     expect(s.carrier.h2).toBe(40 - Math.ceil(100 * WARP_H2_PER_ENERGY));
   });
@@ -113,7 +113,7 @@ describe('warp payment', () => {
     const { s, c } = cost();
     s.carrier.energy = c - 100;
     s.carrier.h2 = 5;
-    expect(apply(s, { type: 'warp', systemId: 1 })).toMatch(/Needs/);
+    expect(order(s, { type: 'warp', systemId: 1 })).toMatch(/Needs/);
     expect(s.warp).toBeNull();
     expect(s.carrier.energy).toBe(c - 100);
     expect(s.carrier.h2).toBe(5);

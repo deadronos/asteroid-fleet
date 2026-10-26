@@ -19,7 +19,7 @@ import { firing } from './cards';
 import { dist, dist2, moveToward, rand } from './math';
 import { lvl } from './research';
 import { clusterCenters, emit, gasGiantPos, h2Storm, maxHull } from './state';
-import type { Asteroid, Container, GameState, Ship, Vec3 } from './types';
+import type { Asteroid, Container, Sim, Ship, Vec3 } from './types';
 
 /** Drones a barge's drone bay holds per `bargeBay` level. */
 export const BARGE_BAY_SLOTS = 1;
@@ -28,18 +28,18 @@ export const CONTAINER_SHARE = 0.5;
 /** Seconds a salvage container lasts before it decays. */
 export const CONTAINER_TTL = 90;
 
-export function bargeBaySlots(s: GameState): number {
+export function bargeBaySlots(s: Sim): number {
   return BARGE_BAY_SLOTS * lvl(s, 'bargeBay');
 }
 
-function bayFree(s: GameState, b: Ship): number {
+function bayFree(s: Sim, b: Ship): number {
   let aboard = 0;
   for (const x of s.ships) if (x.cls === 'drone' && x.bargeId === b.id) aboard++;
   return bargeBaySlots(s) - aboard;
 }
 
 /** Board docked drones onto a barge that is launching, while its bay has room. */
-export function boardBargeBay(s: GameState, b: Ship) {
+export function boardBargeBay(s: Sim, b: Ship) {
   let free = bayFree(s, b);
   for (const d of s.ships) {
     if (free <= 0) return;
@@ -52,7 +52,7 @@ export function boardBargeBay(s: GameState, b: Ship) {
 }
 
 /** A drone launching from the carrier makes a parked barge with a free bay its base. */
-export function assignBargeBay(s: GameState, d: Ship, ctx: Ctx) {
+export function assignBargeBay(s: Sim, d: Ship, ctx: Ctx) {
   if (d.cls !== 'drone' || bargeBaySlots(s) <= 0) return;
   for (const b of ctx.byClass.barge) {
     if (b.mode === 'station' && bayFree(s, b) > 0) {
@@ -66,7 +66,7 @@ export function assignBargeBay(s: GameState, d: Ship, ctx: Ctx) {
  * A drone in a barge's bay rides along, repairs, launches once the barge is
  * on station and docks at the carrier with it.
  */
-export function carried(s: GameState, ship: Ship, dt: number, ctx: Ctx) {
+export function carried(s: Sim, ship: Ship, dt: number, ctx: Ctx) {
   const b = ctx.ships.get(ship.bargeId);
   if (!b || b.hull <= 0) {
     ship.bargeId = -1;
@@ -99,7 +99,7 @@ function bayBarge(ship: Ship, ctx: Ctx): Ship | null {
 }
 
 /** Drop part of a destroyed barge's cargo as a salvage container. */
-export function dropContainer(s: GameState, b: Ship) {
+export function dropContainer(s: Sim, b: Ship) {
   if (b.cargo <= 0) return;
   s.containers.push({
     id: s.nextId++,
@@ -111,7 +111,7 @@ export function dropContainer(s: GameState, b: Ship) {
   emit(s, 'BargeWrecked', {});
 }
 
-export function decayContainers(s: GameState, dt: number) {
+export function decayContainers(s: Sim, dt: number) {
   let live = 0;
   for (const c of s.containers) {
     c.ttl -= dt;
@@ -120,7 +120,7 @@ export function decayContainers(s: GameState, dt: number) {
   s.containers.length = live;
 }
 
-function salvageJob(s: GameState, ship: Ship): Container | null {
+function salvageJob(s: Sim, ship: Ship): Container | null {
   let best: Container | null = null;
   let bd = Infinity;
   for (const c of s.containers) {
@@ -142,12 +142,7 @@ function salvageJob(s: GameState, ship: Ship): Container | null {
  * and stops once no farther asteroid could beat the best score, so the result
  * (ties broken by array order) matches a full scan.
  */
-function pickAsteroid(
-  s: GameState,
-  ship: Ship,
-  ctx: Ctx,
-  mining: 'greedy' | 'safe',
-): Asteroid | null {
+function pickAsteroid(s: Sim, ship: Ship, ctx: Ctx, mining: 'greedy' | 'safe'): Asteroid | null {
   const list = s.asteroids;
   // A revealed vein can score up to VEIN_BONUS times its value; keep the prune bound safe.
   const maxV = ctx.maxValue * (ctx.veins.size > 0 ? VEIN_BONUS : 1);
@@ -185,7 +180,7 @@ function pickAsteroid(
   return best < 0 ? null : list[best];
 }
 
-function inChartedHazard(s: GameState, p: Vec3): boolean {
+function inChartedHazard(s: Sim, p: Vec3): boolean {
   for (const i of s.recon.hazards) {
     const h = s.hazards[i];
     if (h && dist2(h.pos, p) < h.radius * h.radius) return true;
@@ -193,7 +188,7 @@ function inChartedHazard(s: GameState, p: Vec3): boolean {
   return false;
 }
 
-function bestDropoff(s: GameState, ship: Ship, ctx: Ctx): Ship | null {
+function bestDropoff(s: Sim, ship: Ship, ctx: Ctx): Ship | null {
   const bay = bayBarge(ship, ctx);
   if (bay && bay.cargo < cargoCap(s, 'barge', bay) - 1) return bay;
   if (!card(s, ctx, 'unloadAtBarge', ship)) return null;
@@ -211,7 +206,7 @@ function bestDropoff(s: GameState, ship: Ship, ctx: Ctx): Ship | null {
   return best;
 }
 
-export function drone(s: GameState, ship: Ship, dt: number, ctx: Ctx, mining: 'greedy' | 'safe') {
+export function drone(s: Sim, ship: Ship, dt: number, ctx: Ctx, mining: 'greedy' | 'safe') {
   const cap = cargoCap(s, 'drone', ship);
   const v = speed(s, ship) * dt;
   if (ship.mode === 'toCarrier' || ship.mode === 'toDropoff' || ship.cargo >= cap - 1e-6) {
@@ -273,14 +268,14 @@ export function drone(s: GameState, ship: Ship, dt: number, ctx: Ctx, mining: 'g
   ship.mode = 'idle';
 }
 
-export function oreNear(s: GameState, p: Vec3, r: number): number {
+export function oreNear(s: Sim, p: Vec3, r: number): number {
   let v = 0;
   const r2 = r * r;
   for (const a of s.asteroids) if (dist2(a.pos, p) < r2) v += a.ore * a.value;
   return v;
 }
 
-export function barge(s: GameState, ship: Ship, dt: number, ctx: Ctx, mining: 'greedy' | 'safe') {
+export function barge(s: Sim, ship: Ship, dt: number, ctx: Ctx, mining: 'greedy' | 'safe') {
   const cap = cargoCap(s, 'barge', ship);
   const v = speed(s, ship) * dt;
   const haulersExist = ctx.byClass.hauler.length > 0;
@@ -312,7 +307,7 @@ export function barge(s: GameState, ship: Ship, dt: number, ctx: Ctx, mining: 'g
   }
 }
 
-function pickStation(s: GameState, ship: Ship, ctx: Ctx, mining: 'greedy' | 'safe'): Vec3 | null {
+function pickStation(s: Sim, ship: Ship, ctx: Ctx, mining: 'greedy' | 'safe'): Vec3 | null {
   let best: Vec3 | null = null;
   let bs = -Infinity;
   const others = ctx.byClass.barge.filter((x) => x.id !== ship.id && x.station);
@@ -333,7 +328,7 @@ function pickStation(s: GameState, ship: Ship, ctx: Ctx, mining: 'greedy' | 'saf
   return best;
 }
 
-export function haulerJob(s: GameState, ship: Ship, ctx: Ctx): Ship | null {
+export function haulerJob(s: Sim, ship: Ship, ctx: Ctx): Ship | null {
   const calls = ctx.cards.callHauler;
   let best: Ship | null = null;
   let bf = 0;
@@ -350,7 +345,7 @@ export function haulerJob(s: GameState, ship: Ship, ctx: Ctx): Ship | null {
   return best;
 }
 
-export function hauler(s: GameState, ship: Ship, dt: number, ctx: Ctx) {
+export function hauler(s: Sim, ship: Ship, dt: number, ctx: Ctx) {
   const cap = cargoCap(s, 'hauler', ship);
   const v = speed(s, ship) * dt;
   if (ship.mode === 'toCarrier') {
@@ -409,7 +404,7 @@ export function hauler(s: GameState, ship: Ship, dt: number, ctx: Ctx) {
   else moveToward(ship.pos, s.carrier.pos, v, 8);
 }
 
-export function harvester(s: GameState, ship: Ship, dt: number, ctx: Ctx) {
+export function harvester(s: Sim, ship: Ship, dt: number, ctx: Ctx) {
   const sys = s.systems[s.systemId];
   const v = speed(s, ship) * dt;
   if (!sys.gasGiant) {

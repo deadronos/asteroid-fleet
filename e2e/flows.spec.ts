@@ -1,14 +1,14 @@
 import { expect, test, type Page } from '@playwright/test';
 import { DOCK_RADIUS } from '../src/sim/config';
-import type { GameState } from '../src/sim/types';
+import type { Sim } from '../src/sim/types';
 import { makeGame, openApp, run, seedSave, simState } from './helpers';
 
 // Flows that rewrite saves or core state. They start from saves built with the real sim and
 // assert on structure (what resets, what persists), not on balance numbers or log strings.
 
-const shipIds = (s: GameState) => s.ships.map((x) => x.id).sort((a, b) => a - b);
+const shipIds = (s: Sim) => s.ships.map((x) => x.id).sort((a, b) => a - b);
 
-const levels = (g: GameState) => Object.values(g.researchLevels).reduce((a, b) => a + b, 0);
+const levels = (g: Sim) => Object.values(g.researchLevels).reduce((a, b) => a + b, 0);
 
 async function openSettingsSaves(page: Page) {
   await page.getByRole('button', { name: 'Settings', exact: true }).click();

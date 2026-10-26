@@ -1,22 +1,23 @@
 import { describe, expect, it } from 'vitest';
 import { settleOffline } from './actions';
-import { FIELD_REFILL_SECS, enterSystem, newGame, recordField } from './state';
-import type { GameState } from './types';
+import { FIELD_REFILL_SECS, enterSystem, recordField, focused, stateOf } from './state';
+import type { Sim } from './types';
 import { executeJump } from './warp';
+import { game } from './testing';
 
 /** Save budget for all depletion records together, serialized. */
 const FIELDS_BUDGET_BYTES = 16 * 1024;
 
-const warp = (s: GameState, to: number) => {
+const warp = (s: Sim, to: number) => {
   s.warp = { targetSystem: to, charge: 0 };
   executeJump(s);
 };
 
-const ores = (s: GameState) => s.asteroids.map((a) => a.ore);
+const ores = (s: Sim) => s.asteroids.map((a) => a.ore);
 
 /** Rock positions and sizes of system 1 at a given rare-ore research level. */
 const layout = (rare: number) => {
-  const s = newGame(5);
+  const s = game(5);
   s.researchLevels.rare = rare;
   enterSystem(s, 1);
   return s.asteroids.map((a) => [a.pos.x, a.pos.z, a.maxOre]);
@@ -28,7 +29,7 @@ describe('persistent fields', () => {
   });
 
   it('keeps ore levels across a warp out and back, plus refill for the time away', () => {
-    const s = newGame(5);
+    const s = game(5);
     const fresh = ores(s);
     s.asteroids[0].ore = 0;
     s.asteroids[0].respawn = 50;
@@ -53,15 +54,15 @@ describe('persistent fields', () => {
 
   it('is fully refilled after a long absence and is deterministic', () => {
     const run = () => {
-      const s = newGame(9);
+      const s = game(9);
       for (const a of s.asteroids) a.ore = a.maxOre / 2;
       warp(s, 1);
       s.time += 120;
       warp(s, 0);
-      return { ...s, savedAt: 0 };
+      return { ...stateOf(s), savedAt: 0 };
     };
     expect(JSON.stringify(run())).toBe(JSON.stringify(run()));
-    const s = newGame(9);
+    const s = game(9);
     for (const a of s.asteroids) a.ore = 0;
     warp(s, 1);
     s.time += FIELD_REFILL_SECS + 100;
@@ -70,7 +71,7 @@ describe('persistent fields', () => {
   });
 
   it(`keeps every system's depletion record under ${FIELDS_BUDGET_BYTES} bytes`, () => {
-    const s = newGame(3);
+    const s = game(3);
     // Worst case: every rock in every system half mined or depleted with a long timer.
     for (let id = 0; id < s.systems.length; id++) {
       enterSystem(s, id);
@@ -83,21 +84,21 @@ describe('persistent fields', () => {
     expect(Object.keys(s.fields)).toHaveLength(s.systems.length);
     expect(JSON.stringify(s.fields).length).toBeLessThanOrEqual(FIELDS_BUDGET_BYTES);
     // The whole save (automation included) grows by no more than the budget.
-    const without = JSON.stringify({ ...s, fields: {} }).length;
-    expect(JSON.stringify(s).length - without).toBeLessThanOrEqual(FIELDS_BUDGET_BYTES);
+    const without = JSON.stringify({ ...stateOf(s), fields: {} }).length;
+    expect(JSON.stringify(stateOf(s)).length - without).toBeLessThanOrEqual(FIELDS_BUDGET_BYTES);
     expect(s.automation).toBeDefined();
   });
 
   it('survives offline settlement and the worker snapshot', () => {
-    const s = newGame(4);
+    const s = game(4);
     s.asteroids[0].ore = 0;
     s.asteroids[0].respawn = 60;
     warp(s, 1);
     const before = JSON.stringify(s.fields);
     s.miningIncomeAvg = 5;
-    settleOffline(s, 3600);
+    settleOffline(stateOf(s), 3600);
     expect(JSON.stringify(s.fields)).toBe(before);
-    const copy = structuredClone(s);
+    const copy = focused(structuredClone(stateOf(s)));
     warp(copy, 0);
     expect(copy.asteroids[0].ore).toBe(0);
   });

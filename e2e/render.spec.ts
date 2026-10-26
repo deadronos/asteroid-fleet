@@ -6,7 +6,7 @@ const DRAW_CALL_BUDGET = 60;
 
 type Win = {
   __fleet: {
-    fullState(): Promise<{ nextId: number; ships: Record<string, unknown>[] }>;
+    fullState(): Promise<{ nextId: number; ops: { ships: Record<string, unknown>[] }[] }>;
     replace(s: unknown): void;
   };
   __render?: { calls: number; triangles: number };
@@ -18,8 +18,9 @@ async function spawnFleet(page: Page, count: number) {
     const f = (globalThis as unknown as Win).__fleet;
     const s = await f.fullState();
     const classes = ['drone', 'barge', 'hauler', 'fighter', 'scout', 'repair', 'harvester'];
-    const base = s.ships[0];
-    s.ships = Array.from({ length: count }, (_, i) => {
+    const op = s.ops[0];
+    const base = op.ships[0];
+    op.ships = Array.from({ length: count }, (_, i) => {
       const r = 20 + (i % 40) * 3;
       const a = i * 2.399;
       return {

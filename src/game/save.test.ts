@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PRESETS } from '../sim/config';
-import { SAVE_VERSION, newGame } from '../sim/state';
+import { OP_KEYS, SAVE_VERSION, newGame } from '../sim/state';
 import { step } from '../sim/tick';
 import saveV1 from './fixtures/save-v1.json';
 import saveV2 from './fixtures/save-v2.json';
@@ -10,6 +10,7 @@ import saveV5 from './fixtures/save-v5.json';
 import saveV6 from './fixtures/save-v6.json';
 import saveV7 from './fixtures/save-v7.json';
 import saveV8 from './fixtures/save-v8.json';
+import saveV9 from './fixtures/save-v9.json';
 import { applyMigrationSteps, migrate, type SaveBlob } from './migrate';
 import {
   SAVE_BACKUP_FAILED_NOTICE,
@@ -95,14 +96,14 @@ describe('migrate', () => {
     expect(result.state.version).toBe(SAVE_VERSION);
     expect(result.state.credits).toBe(420);
     expect(result.state.seed).toBe(1337);
-    expect(result.state.ships).toHaveLength(1);
-    expect(result.state.ships[0].cargo).toBe(6);
-    expect(result.state.carrier.hull).toBe(1800);
+    expect(result.state.ops[0].ships).toHaveLength(1);
+    expect(result.state.ops[0].ships[0].cargo).toBe(6);
+    expect(result.state.ops[0].carrier.hull).toBe(1800);
     expect(result.state.stats.oreValueDelivered).toBe(500);
     expect(result.state.researchLevels.yield).toBe(1);
     expect(result.state.powerMode).toBe('income');
-    expect(result.state.wave.timer).toBe(Infinity);
-    expect(result.state.storm.timer).toBe(Infinity);
+    expect(result.state.ops[0].wave.timer).toBe(Infinity);
+    expect(result.state.ops[0].storm.timer).toBe(Infinity);
     expect(result.state.automation).toEqual({
       autoBuy: false,
       autoRebuild: false,
@@ -110,7 +111,7 @@ describe('migrate', () => {
       rebuildQueue: [],
       timer: 0,
     });
-    for (const h of result.state.hangars) expect(h.target).toEqual({});
+    for (const h of result.state.ops[0].hangars) expect(h.target).toEqual({});
     // The fixture module itself stays a v1 document.
     expect(saveV1.version).toBe(1);
     expect(saveV1.wave.timer).toBeNull();
@@ -136,10 +137,10 @@ describe('migrate', () => {
     expect(fromV3.ok).toBe(true);
     if (!fromV3.ok) return;
     expect(fromV3.state.version).toBe(SAVE_VERSION);
-    expect(fromV3.state.containers).toEqual([]);
+    expect(fromV3.state.ops[0].containers).toEqual([]);
     // v7 drops depletion records (#40).
     expect(fromV3.state.fields).toEqual({});
-    for (const sh of fromV3.state.ships) expect(sh.bargeId).toBe(-1);
+    for (const sh of fromV3.state.ops[0].ships) expect(sh.bargeId).toBe(-1);
     expect(saveV3).not.toHaveProperty('containers');
   });
 
@@ -149,9 +150,9 @@ describe('migrate', () => {
     expect(fromV4.ok).toBe(true);
     if (!fromV4.ok) return;
     expect(fromV4.state.version).toBe(SAVE_VERSION);
-    expect(fromV4.state.recon).toEqual({ clusters: [], veins: [], hazards: [] });
-    expect(fromV4.state.containers).toHaveLength(1);
-    for (const sh of fromV4.state.ships) expect(sh.modules).toEqual([]);
+    expect(fromV4.state.ops[0].recon).toEqual({ clusters: [], veins: [], hazards: [] });
+    expect(fromV4.state.ops[0].containers).toHaveLength(1);
+    for (const sh of fromV4.state.ops[0].ships) expect(sh.modules).toEqual([]);
     expect(saveV4).not.toHaveProperty('recon');
   });
 
@@ -162,14 +163,14 @@ describe('migrate', () => {
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.state.version).toBe(SAVE_VERSION);
-    expect(r.state.miningIncomeAvg).toBe(0);
+    expect(r.state.ops[0].miningIncomeAvg).toBe(0);
   });
 
   it('repairs a non-finite miningIncomeAvg and keeps a finite one', () => {
     const bad = migrate({ ...structuredClone(saveV5), version: 6, miningIncomeAvg: null });
-    expect(bad.ok && bad.state.miningIncomeAvg).toBe(0);
+    expect(bad.ok && bad.state.ops[0].miningIncomeAvg).toBe(0);
     const good = migrate({ ...structuredClone(saveV5), version: 6, miningIncomeAvg: 7 });
-    expect(good.ok && good.state.miningIncomeAvg).toBe(7);
+    expect(good.ok && good.state.ops[0].miningIncomeAvg).toBe(7);
   });
 
   it('drops v6 depletion records, which the rare-roll change would misplace (#40)', () => {
@@ -179,7 +180,7 @@ describe('migrate', () => {
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.state.fields).toEqual({});
-    expect(r.state.miningIncomeAvg).toBe(3.5);
+    expect(r.state.ops[0].miningIncomeAvg).toBe(3.5);
   });
 
   it('turns v7 plain-text log lines into Legacy events (#72)', () => {
@@ -262,13 +263,51 @@ describe('migrate', () => {
     expect(none.ok && none.state.cards).toEqual([]);
   });
 
+  it('moves v9 per-carrier state into operation 0 (#75)', () => {
+    expect(saveV9.version).toBe(9);
+    const r = migrate(saveV9);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const g = r.state;
+    expect(g.version).toBe(SAVE_VERSION);
+    expect(g.ops).toHaveLength(1);
+    const op = g.ops[0];
+    expect(op.id).toBe(0);
+    for (const k of OP_KEYS) {
+      expect(g).not.toHaveProperty(k);
+      // Timers are compared below: JSON null comes back as Infinity.
+      if (k === 'id' || k === 'wave' || k === 'storm') continue;
+      expect.soft(op[k]).toEqual((saveV9 as SaveBlob)[k]);
+    }
+    expect(op.ships).toHaveLength(4);
+    expect(op.wave.timer).toBe(Infinity);
+    expect(op.storm.timer).toBe(Infinity);
+    // Run-wide state stays put.
+    expect(g.credits).toBe(saveV9.credits);
+    expect(g.cards).toEqual(saveV9.cards);
+    expect(g.log).toEqual(saveV9.log);
+    expect(g.time).toBe(saveV9.time);
+  });
+
+  it('rejects a save whose operations are missing or broken', () => {
+    const v10 = migrate(saveV9);
+    if (!v10.ok) throw new Error('fixture');
+    const corrupt = (patch: object) =>
+      migrate({ ...structuredClone(v10.state), ...patch }) as { ok: boolean };
+    expect(corrupt({ ops: [] }).ok).toBe(false);
+    expect(corrupt({ ops: undefined }).ok).toBe(false);
+    const op = v10.state.ops[0];
+    expect(corrupt({ ops: [{ ...op, ships: null }] }).ok).toBe(false);
+    expect(corrupt({ ops: [op, { ...op }] }).ok).toBe(false);
+  });
+
   it('rebuilds a missing systems map from the seed (#40)', () => {
     expect(saveV1.systems).toEqual([]);
     const r = migrate(saveV1);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.state.systems).toEqual(newGame(saveV1.seed).systems);
-    expect(r.state.systems[r.state.systemId]).toBeDefined();
+    expect(r.state.systems[r.state.ops[0].systemId]).toBeDefined();
     const noSeed = migrate({ ...structuredClone(saveV6), systems: [], seed: undefined });
     expect(noSeed).toEqual({ ok: false, reason: 'corrupt' });
     const badId = migrate({ ...structuredClone(saveV6), systemId: 999 });
@@ -284,11 +323,12 @@ describe('migrate', () => {
     ['v6', saveV6],
     ['v7', saveV7],
     ['v8', saveV8],
+    ['v9', saveV9],
   ])('a migrated %s fixture keeps running through step()', (_, fixture) => {
     const r = migrate(fixture);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    for (let i = 0; i < 50; i++) step(r.state);
+    for (let i = 0; i < 50; i++) step(r.state, r.state.ops[0]);
     expect(Number.isFinite(r.state.credits)).toBe(true);
     expect(r.state.time).toBeGreaterThan(0);
   });
@@ -558,25 +598,27 @@ describe('export / import', () => {
     expect(copy!.version).toBe(SAVE_VERSION);
     expect(copy!.credits).toBe(1234);
     expect(copy!.seed).toBe(42);
-    expect(copy!.ships.map((ship) => ship.id)).toEqual(state.ships.map((ship) => ship.id));
+    expect(copy!.ops[0].ships.map((ship) => ship.id)).toEqual(
+      state.ops[0].ships.map((ship) => ship.id),
+    );
     expect(copy!.stats.oreValueDelivered).toBe(50);
-    expect(copy!.wave.timer).toBe(state.wave.timer);
-    expect(copy!.storm.timer).toBe(state.storm.timer);
+    expect(copy!.ops[0].wave.timer).toBe(state.ops[0].wave.timer);
+    expect(copy!.ops[0].storm.timer).toBe(state.ops[0].storm.timer);
   });
 
   it('round-trips a numeric storm timer from a tier 2 system', () => {
     const state = newGame(8);
     const tier2 = state.systems.find((system) => system.tier >= 2);
     expect(tier2).toBeTruthy();
-    state.systemId = tier2!.id;
-    state.storm.timer = 27.5;
-    state.wave.timer = 12;
+    state.ops[0].systemId = tier2!.id;
+    state.ops[0].storm.timer = 27.5;
+    state.ops[0].wave.timer = 12;
     const copy = importSave(exportSave(state));
     expect(copy).not.toBeNull();
-    expect(copy!.systemId).toBe(tier2!.id);
-    expect(copy!.systems[copy!.systemId].tier).toBeGreaterThanOrEqual(2);
-    expect(copy!.storm.timer).toBe(27.5);
-    expect(copy!.wave.timer).toBe(12);
+    expect(copy!.ops[0].systemId).toBe(tier2!.id);
+    expect(copy!.systems[copy!.ops[0].systemId].tier).toBeGreaterThanOrEqual(2);
+    expect(copy!.ops[0].storm.timer).toBe(27.5);
+    expect(copy!.ops[0].wave.timer).toBe(12);
   });
 
   it('imports a v1 fixture through the same migrate path', () => {
@@ -584,8 +626,8 @@ describe('export / import', () => {
     expect(copy).not.toBeNull();
     expect(copy!.version).toBe(SAVE_VERSION);
     expect(copy!.credits).toBe(saveV1.credits);
-    expect(copy!.ships[0].cargo).toBe(saveV1.ships[0].cargo);
-    expect(copy!.wave.timer).toBe(Infinity);
+    expect(copy!.ops[0].ships[0].cargo).toBe(saveV1.ships[0].cargo);
+    expect(copy!.ops[0].wave.timer).toBe(Infinity);
   });
 
   it('rejects a corrupt or newer import without touching storage', async () => {
@@ -611,7 +653,7 @@ describe('loadGame', () => {
     if (!loaded.ok) return;
     expect(loaded.state.version).toBe(SAVE_VERSION);
     expect(loaded.state.credits).toBe(420);
-    expect(loaded.state.wave.timer).toBe(Infinity);
+    expect(loaded.state.ops[0].wave.timer).toBe(Infinity);
     expect(mem.idb.get(SAVE_KEY)).toBe(raw);
     expect(mem.idb.has(SAVE_BACKUP_KEY)).toBe(false);
     expect(local.has(SAVE_BACKUP_KEY)).toBe(false);
@@ -624,7 +666,7 @@ describe('loadGame', () => {
     if (!loaded.ok) return;
     expect(loaded.state.version).toBe(SAVE_VERSION);
     expect(loaded.state.credits).toBe(420);
-    expect(loaded.state.wave.timer).toBe(Infinity);
+    expect(loaded.state.ops[0].wave.timer).toBe(Infinity);
     expect(mem.idb.has(SAVE_BACKUP_KEY)).toBe(false);
     expect(local.has(SAVE_BACKUP_KEY)).toBe(false);
     expect(saveOverwriteBlocked()).toBe(false);
@@ -640,15 +682,15 @@ describe('decodeSave', () => {
   it('gives the same state from a text export and a file export', () => {
     const state = newGame(7);
     state.credits = 987;
-    state.storm.timer = 3;
+    state.ops[0].storm.timer = 3;
     const fromText = decodeSave(exportSave(state));
     const fromFile = decodeSave(exportSaveFile(state));
     expect(fromText.ok && fromFile.ok).toBe(true);
     if (!fromText.ok || !fromFile.ok) return;
     expect(fromFile.state).toEqual(fromText.state);
     expect(fromText.state.credits).toBe(987);
-    expect(fromText.state.storm.timer).toBe(3);
-    expect(fromText.state.wave.timer).toBe(state.wave.timer);
+    expect(fromText.state.ops[0].storm.timer).toBe(3);
+    expect(fromText.state.ops[0].wave.timer).toBe(state.ops[0].wave.timer);
     expect(JSON.parse(exportSaveFile(fromFile.state))).toEqual(JSON.parse(exportSaveFile(state)));
   });
 

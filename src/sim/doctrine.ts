@@ -1,8 +1,8 @@
 import { compileCards, firing } from './cards';
-import type { GameState, RuleCard, Ship, Stance, StanceSwitch } from './types';
+import type { Sim, RuleCard, Ship, Stance, StanceSwitch } from './types';
 
 /** Fleet doctrine < ship type < hangar < active card. The most specific scope wins. */
-function baseStance(s: GameState, ship: Ship): Stance {
+function baseStance(s: Sim, ship: Ship): Stance {
   const hangar = s.hangars.find((h) => h.id === ship.hangarId);
   return { ...s.doctrine.fleet, ...s.doctrine.byClass[ship.cls], ...hangar?.stance };
 }
@@ -17,7 +17,7 @@ function applySwitch(st: Stance, to: StanceSwitch) {
  * resolves it, holds included); when omitted it is looked up without holds' side effects.
  */
 export function effectiveStance(
-  s: GameState,
+  s: Sim,
   ship: Ship,
   card: RuleCard | null = stanceCard(s, ship),
 ): Stance {
@@ -31,7 +31,7 @@ export function effectiveStance(
 }
 
 /** The stance card in force for `ship`, read-only (for the UI). */
-export function stanceCard(s: GameState, ship: Ship): RuleCard | null {
+export function stanceCard(s: Sim, ship: Ship): RuleCard | null {
   const list = compileCards(s, {}).stance;
   const h = ship.hold;
   return (
@@ -42,7 +42,7 @@ export function stanceCard(s: GameState, ship: Ship): RuleCard | null {
 
 /** Which scope set the value shown for a stance axis (for the UI). */
 export function stanceSource(
-  s: GameState,
+  s: Sim,
   ship: Ship,
   key: keyof Stance,
 ): 'fleet' | 'class' | 'hangar' | 'rule' {

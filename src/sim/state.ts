@@ -21,18 +21,127 @@ import type {
   GameState,
   Hangar,
   Hazard,
+  Operation,
   RuleId,
   Ship,
   ShipClass,
   Severity,
   SimEvent,
   SimEventKind,
+  Sim,
   StarSystem,
   Vec3,
 } from './types';
 
 /** Bump together with a `migrations[n]` step and a fixture. See README "Save migrations". */
-export const SAVE_VERSION = 9;
+export const SAVE_VERSION = 10;
+
+/** Every `Operation` field. The `satisfies` below fails to compile when one is missing. */
+export const OP_KEYS = [
+  'id',
+  'rng',
+  'carrier',
+  'hangars',
+  'ships',
+  'pirates',
+  'asteroids',
+  'containers',
+  'hazards',
+  'recon',
+  'systemId',
+  'warp',
+  'wave',
+  'storm',
+  'reserveTimers',
+  'incomeAvg',
+  'miningIncomeAvg',
+  'fx',
+] as const satisfies readonly (keyof Operation)[];
+
+const GLOBAL_KEYS = [
+  'version',
+  'seed',
+  'time',
+  'nextId',
+  'credits',
+  'research',
+  'researchLevels',
+  'unlocked',
+  'unlockedRules',
+  'systems',
+  'fields',
+  'doctrine',
+  'cards',
+  'automation',
+  'stats',
+  'lifetime',
+  'powerMode',
+  'log',
+  'events',
+  'savedAt',
+] as const satisfies readonly (keyof GameState)[];
+
+type Missing<K, Listed> = Exclude<K, Listed> extends never ? true : Exclude<K, Listed>;
+const opKeysComplete: Missing<keyof Operation, (typeof OP_KEYS)[number]> = true;
+const globalKeysComplete: Missing<
+  Exclude<keyof GameState, 'ops'>,
+  (typeof GLOBAL_KEYS)[number]
+> = true;
+void opKeysComplete;
+void globalKeysComplete;
+
+/** Accessors on a shared prototype keep views monomorphic and cheap in the hot loop. */
+class SimView {
+  constructor(
+    readonly g: GameState,
+    readonly op: Operation,
+  ) {}
+}
+for (const k of GLOBAL_KEYS)
+  Object.defineProperty(SimView.prototype, k, {
+    get(this: SimView) {
+      return this.g[k];
+    },
+    set(this: SimView, v: unknown) {
+      (this.g as unknown as Record<string, unknown>)[k] = v;
+    },
+  });
+for (const k of OP_KEYS)
+  Object.defineProperty(SimView.prototype, k, {
+    get(this: SimView) {
+      return this.op[k];
+    },
+    set(this: SimView, v: unknown) {
+      (this.op as unknown as Record<string, unknown>)[k] = v;
+    },
+  });
+
+const views = new WeakMap<Operation, SimView>();
+
+/** `g` and `op` as one `Sim`. Not serialisable: save `g` itself. */
+export function bind(g: GameState, op: Operation): Sim {
+  let v = views.get(op);
+  if (!v || v.g !== g) {
+    v = new SimView(g, op);
+    views.set(op, v);
+  }
+  return v as unknown as Sim;
+}
+
+/** The run-wide state behind a bound `Sim`. */
+export function stateOf(s: Sim): GameState {
+  return (s as unknown as SimView).g;
+}
+
+/** The operation the player is looking at. Always the first until carrier switching (#77). */
+export function focusOp(g: GameState): Operation {
+  return g.ops[0];
+}
+
+/** `bind` for the focused operation. */
+export function focused(g: GameState): Sim {
+  return bind(g, focusOp(g));
+}
 
 const NAMES = [
   'Kestrel',
@@ -75,7 +184,7 @@ export function makeSystems(seed: number): StarSystem[] {
 }
 
 /** Storms in gas giant systems are H2 storms around the planet, not solar storms. */
-export function h2Storm(s: GameState): boolean {
+export function h2Storm(s: Sim): boolean {
   return s.storm.active > 0 && s.systems[s.systemId].gasGiant;
 }
 
@@ -97,7 +206,7 @@ function pickOre(r: () => number, tier: number) {
 }
 
 export function spawnAsteroid(
-  s: GameState,
+  s: Sim,
   r: () => number,
   center: Vec3,
   sys: StarSystem,
@@ -144,7 +253,7 @@ export function clusterCenters(sys: StarSystem): Vec3[] {
 export const FIELD_REFILL_SECS = 300;
 
 /** Snapshot the current field's depletion so a later visit can restore it. */
-export function recordField(s: GameState): FieldRecord {
+export function recordField(s: Sim): FieldRecord {
   const rocks: [number, number, number][] = [];
   for (let i = 0; i < s.asteroids.length; i++) {
     const a = s.asteroids[i];
@@ -156,7 +265,7 @@ export function recordField(s: GameState): FieldRecord {
 }
 
 /** Apply a depletion record to a freshly seeded field, refilling for the time away. */
-export function applyField(s: GameState, rec: FieldRecord) {
+export function applyField(s: Sim, rec: FieldRecord) {
   const away = Math.max(0, s.time - rec.left);
   for (const [i, frac, respawn] of rec.rocks) {
     const a = s.asteroids[i];
@@ -170,7 +279,7 @@ export function applyField(s: GameState, rec: FieldRecord) {
   }
 }
 
-export function enterSystem(s: GameState, id: number) {
+export function enterSystem(s: Sim, id: number) {
   if (s.asteroids.length > 0 && s.systemId !== id) s.fields[s.systemId] = recordField(s);
   const sys = s.systems[id];
   s.systemId = id;
@@ -214,13 +323,13 @@ export function enterSystem(s: GameState, id: number) {
 }
 
 /** Unlock a preset: its action becomes usable, and its card is dealt once if a slot is free. */
-export function unlockRule(s: GameState, id: RuleId) {
+export function unlockRule(s: Sim, id: RuleId) {
   if (s.unlockedRules.includes(id)) return;
   s.unlockedRules.push(id);
   addPreset(s, id, STARTER_RULES.includes(id));
 }
 
-export function maxHull(s: GameState, cls: ShipClass): number {
+export function maxHull(s: Sim, cls: ShipClass): number {
   let h = SHIP_STATS[cls].hull * (1 + 0.15 * lvl(s, 'armor'));
   if (cls === 'barge' && lvl(s, 'bargeBay') > 0) h *= 1.5;
   if (cls === 'drone') h *= 1 + 0.3 * lvl(s, 'droneHull');
@@ -230,12 +339,12 @@ export function maxHull(s: GameState, cls: ShipClass): number {
   return h;
 }
 
-export function maxEnergy(s: GameState): number {
+export function maxEnergy(s: Sim): number {
   return ENERGY_MAX * (1 + 0.25 * lvl(s, 'energyCap'));
 }
 
 /** Solar recharge in the current system, energy/s, before storm boosts. */
-export function solarRate(s: GameState): number {
+export function solarRate(s: Sim): number {
   return SOLAR_RATE * s.systems[s.systemId].brightness * (1 + 0.2 * lvl(s, 'solar'));
 }
 
@@ -247,7 +356,7 @@ export function hangarUpkeep(count: number): number {
 }
 
 /** Energy/s the hangars and launched ships draw right now (#60). Docked ships are free. */
-export function upkeepRate(s: GameState): number {
+export function upkeepRate(s: Sim): number {
   let total = hangarUpkeep(s.hangars.length);
   for (const x of s.ships) if (x.mode !== 'docked') total += SHIP_UPKEEP[x.cls];
   return total;
@@ -264,7 +373,7 @@ export interface Upkeep {
 }
 
 /** `upkeepRate` broken down for the Power panel. */
-export function upkeep(s: GameState): Upkeep {
+export function upkeep(s: Sim): Upkeep {
   const launched = Object.fromEntries(Object.keys(SHIP_UPKEEP).map((c) => [c, 0])) as Record<
     ShipClass,
     number
@@ -280,7 +389,7 @@ export function upkeep(s: GameState): Upkeep {
 }
 
 export function createShip(
-  s: GameState,
+  s: Sim,
   cls: ShipClass,
   preferredHangar?: number,
   start?: number,
@@ -348,10 +457,10 @@ const LOG_CAP = 40;
 const OUTBOX_CAP = 256;
 
 /** Report an event to the player. Write-only: the sim never reads events back. */
-export function emit<K extends SimEventKind>(s: GameState, kind: K, data: EventData[K]) {
+export function emit<K extends SimEventKind>(s: Sim, kind: K, data: EventData[K]) {
   const ev = {
     kind,
-    carrierId: 0,
+    carrierId: s.id,
     systemId: s.systemId,
     severity: SEVERITY[kind],
     t: s.time,
@@ -378,17 +487,9 @@ interface Carry {
 
 export function newGame(seed = 1337, carry?: Carry): GameState {
   const slotsBonus = carry?.researchLevels.slots ?? 0;
-  const s: GameState = {
-    version: SAVE_VERSION,
-    seed,
+  const op: Operation = {
+    id: 0,
     rng: seed,
-    time: 0,
-    nextId: 1,
-    credits: 150 + 250 * (carry?.researchLevels.startCredits ?? 0),
-    research: carry?.research ?? 0,
-    researchLevels: carry?.researchLevels ?? {},
-    unlocked: carry?.unlocked ?? [],
-    unlockedRules: [],
     carrier: {
       pos: v3(),
       target: null,
@@ -429,19 +530,33 @@ export function newGame(seed = 1337, carry?: Carry): GameState {
     asteroids: [],
     hazards: [],
     recon: { clusters: [], veins: [], hazards: [] },
-    systems: makeSystems(seed),
     systemId: 0,
-    fields: {},
     containers: [],
+    warp: null,
+    wave: { timer: Infinity, warning: false, active: false, size: 0 },
+    storm: { timer: Infinity, active: 0 },
+    reserveTimers: {},
+    incomeAvg: 0,
+    miningIncomeAvg: 0,
+    fx: [],
+  };
+  const g: GameState = {
+    version: SAVE_VERSION,
+    seed,
+    time: 0,
+    nextId: 1,
+    credits: 150 + 250 * (carry?.researchLevels.startCredits ?? 0),
+    research: carry?.research ?? 0,
+    researchLevels: carry?.researchLevels ?? {},
+    unlocked: carry?.unlocked ?? [],
+    unlockedRules: [],
+    systems: makeSystems(seed),
+    fields: {},
     doctrine: carry?.doctrine ?? {
       fleet: { ...DEFAULT_STANCE },
       byClass: { drone: { mining: 'safe' } },
     },
     cards: carry?.cards ?? [],
-    warp: null,
-    wave: { timer: Infinity, warning: false, active: false, size: 0 },
-    storm: { timer: Infinity, active: 0 },
-    reserveTimers: {},
     automation: carry?.automation
       ? { ...carry.automation, rebuildQueue: [], timer: 0 }
       : { autoBuy: false, autoRebuild: false, creditFloor: 0, rebuildQueue: [], timer: 0 },
@@ -453,14 +568,13 @@ export function newGame(seed = 1337, carry?: Carry): GameState {
       furthestTier: 1,
     },
     lifetime: carry?.lifetime ?? { prestiges: 0, researchEarned: 0 },
-    incomeAvg: 0,
-    miningIncomeAvg: 0,
     powerMode: 'balanced',
-    fx: [],
     log: [],
     events: [],
     savedAt: Date.now(),
+    ops: [op],
   };
+  const s = bind(g, op);
   // Carried presets stay unlocked without dealing their cards again.
   s.unlockedRules = [...(carry?.unlockedRules ?? [])];
   if (carry) for (const id of carry.discovered) if (s.systems[id]) s.systems[id].discovered = true;
@@ -468,5 +582,5 @@ export function newGame(seed = 1337, carry?: Carry): GameState {
   enterSystem(s, 0);
   for (let i = 0; i < 4; i++) createShip(s, 'drone', 1);
   emit(s, 'CarrierOnline', { system: s.systems[0].name });
-  return s;
+  return g;
 }

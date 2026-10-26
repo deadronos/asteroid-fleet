@@ -1,22 +1,22 @@
 import { describe, expect, it } from 'vitest';
-import { apply } from './actions';
+import { order } from './actions';
 import { cargoCap } from './ctx';
 import { CONTAINER_TTL } from './mining';
-import { newGame } from './state';
-import { step } from './tick';
-import type { GameState, Ship } from './types';
+import { stepSim } from './tick';
+import type { Sim, Ship } from './types';
+import { game } from './testing';
 
-const run = (s: GameState, seconds: number) => {
-  for (let i = 0; i < seconds * 10; i++) step(s);
+const run = (s: Sim, seconds: number) => {
+  for (let i = 0; i < seconds * 10; i++) stepSim(s);
 };
 
 function bargeGame(seed: number, bay: boolean) {
-  const s = newGame(seed);
+  const s = game(seed);
   s.credits = 10000;
   if (bay) s.researchLevels.bargeBay = 1;
-  expect(apply(s, { type: 'buyShip', cls: 'barge', hangarId: 2 })).toBeNull();
+  expect(order(s, { type: 'buyShip', cls: 'barge', hangarId: 2 })).toBeNull();
   // Launch the barge before the hangar's drones, so one boards its bay.
-  expect(apply(s, { type: 'buyShip', cls: 'drone', hangarId: 2 })).toBeNull();
+  expect(order(s, { type: 'buyShip', cls: 'drone', hangarId: 2 })).toBeNull();
   s.hangars[1].launchOrder = ['barge', 'drone'];
   return s;
 }
@@ -28,7 +28,7 @@ describe('barge drone bay', () => {
     let boarded: Ship | undefined;
     let launchedAt: { x: number; z: number } | null = null;
     for (let i = 0; i < 2000 && !launchedAt; i++) {
-      step(s);
+      stepSim(s);
       boarded ??= s.ships.find((x) => x.mode === 'carried');
       if (boarded && boarded.mode !== 'carried' && barge.mode === 'station')
         launchedAt = { x: boarded.pos.x, z: boarded.pos.z };
@@ -51,14 +51,14 @@ describe('barge drone bay', () => {
     expect(barge.cargo).toBeGreaterThan(0);
     // No rocks left: the drone docks in the bay instead of flying to the carrier.
     for (const a of s.asteroids) a.ore = 0;
-    for (let i = 0; i < 600 && bayDrone.mode !== 'carried'; i++) step(s);
+    for (let i = 0; i < 600 && bayDrone.mode !== 'carried'; i++) stepSim(s);
     expect(bayDrone.mode).toBe('carried');
     // Sent home, the barge carries the drone back and docks with it.
     barge.mode = 'retreat';
-    for (let i = 0; i < 1200 && (barge.mode as string) !== 'docked'; i++) step(s);
+    for (let i = 0; i < 1200 && (barge.mode as string) !== 'docked'; i++) stepSim(s);
     expect(barge.mode).toBe('docked');
     // The drone notices on its next update, which can be a tick or two later.
-    for (let i = 0; i < 5 && bayDrone.mode === 'carried'; i++) step(s);
+    for (let i = 0; i < 5 && bayDrone.mode === 'carried'; i++) stepSim(s);
     expect(bayDrone.mode).toBe('docked');
     expect(bayDrone.bargeId).toBe(-1);
   });
@@ -71,9 +71,9 @@ describe('barge drone bay', () => {
 });
 
 function wreck(seed: number) {
-  const s = newGame(seed);
+  const s = game(seed);
   s.credits = 10000;
-  apply(s, { type: 'buyShip', cls: 'barge', hangarId: 2 });
+  order(s, { type: 'buyShip', cls: 'barge', hangarId: 2 });
   const barge = s.ships.find((x) => x.cls === 'barge')!;
   barge.mode = 'station';
   barge.pos = { x: 30, y: 0, z: 30 };
@@ -81,7 +81,7 @@ function wreck(seed: number) {
   barge.cargo = 200;
   barge.cargoValue = 1000;
   barge.hull = 0;
-  step(s);
+  stepSim(s);
   return s;
 }
 
@@ -104,11 +104,11 @@ describe('salvage containers', () => {
 
   it('haulers salvage it and deliver the ore to the carrier', () => {
     const s = wreck(23);
-    apply(s, { type: 'buyShip', cls: 'hauler' });
+    order(s, { type: 'buyShip', cls: 'hauler' });
     const before = s.stats.oreValueDelivered;
     let picked = false;
     for (let i = 0; i < 900 && s.containers.length; i++) {
-      step(s);
+      stepSim(s);
       picked ||= s.ships.some((x) => x.cls === 'hauler' && x.mode === 'toDropoff');
     }
     expect(picked).toBe(true);
@@ -120,12 +120,12 @@ describe('salvage containers', () => {
 
 describe('pirate targeting', () => {
   it('still goes for the fullest barge first', () => {
-    const s = newGame(31);
+    const s = game(31);
     s.credits = 10000;
     s.researchLevels.bargeBay = 1;
     s.hangars[0].slots = 12;
-    expect(apply(s, { type: 'buyShip', cls: 'barge', hangarId: 2 })).toBeNull();
-    expect(apply(s, { type: 'buyShip', cls: 'barge', hangarId: 1 })).toBeNull();
+    expect(order(s, { type: 'buyShip', cls: 'barge', hangarId: 2 })).toBeNull();
+    expect(order(s, { type: 'buyShip', cls: 'barge', hangarId: 1 })).toBeNull();
     const [empty, full] = s.ships.filter((x) => x.cls === 'barge');
     for (const [b, x] of [
       [empty, 20],
@@ -147,7 +147,7 @@ describe('pirate targeting', () => {
       targetId: -1,
       fireCooldown: 0,
     });
-    step(s);
+    stepSim(s);
     expect(s.pirates[0].targetId).toBe(full.id);
   });
 });

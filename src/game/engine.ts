@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react';
-import type { Command, OfflineReport } from '../sim/actions';
-import { newGame } from '../sim/state';
-import type { GameState, Pirate, Ship, Vec3 } from '../sim/types';
+import type { OfflineReport, Order } from '../sim/actions';
+import { focused, focusOp, newGame } from '../sim/state';
+import type { GameState, Pirate, Ship, Sim, Vec3 } from '../sim/types';
 import type { BusEvent } from './events';
 import { createSimHost, type SimHost } from './host';
 import { MODES, type Frame, type OutMsg } from './protocol';
@@ -77,6 +77,11 @@ class Engine {
     this.emit();
   }
 
+  /** The focused operation bound to the run-wide state; what the UI reads. */
+  get view(): Sim {
+    return focused(this.state);
+  }
+
   get simKind(): SimHost['kind'] | null {
     return this.host?.kind ?? null;
   }
@@ -119,16 +124,18 @@ class Engine {
     this.state = state;
     this.ships.clear();
     this.pirates.clear();
-    for (const sh of state.ships) this.ships.set(sh.id, sh);
-    for (const p of state.pirates) this.pirates.set(p.id, p);
+    const op = focusOp(state);
+    for (const sh of op.ships) this.ships.set(sh.id, sh);
+    for (const p of op.pirates) this.pirates.set(p.id, p);
     if (first) this.snapshot();
   }
 
   private snapshot() {
     this.prev.clear();
-    for (const s of this.state.ships) this.prev.set(s.id, { ...s.pos });
-    for (const p of this.state.pirates) this.prev.set(p.id, { ...p.pos });
-    this.prevCarrier = { ...this.state.carrier.pos };
+    const op = focusOp(this.state);
+    for (const s of op.ships) this.prev.set(s.id, { ...s.pos });
+    for (const p of op.pirates) this.prev.set(p.id, { ...p.pos });
+    this.prevCarrier = { ...op.carrier.pos };
   }
 
   private keepPrev(id: number, pos: Vec3) {
@@ -141,7 +148,7 @@ class Engine {
   }
 
   private applyFrame(f: Frame) {
-    const s = this.state;
+    const s = focusOp(this.state);
     const ships: Ship[] = [];
     const pirates: Pirate[] = [];
     const n = f.ids.length;
@@ -184,9 +191,9 @@ class Engine {
     return a < 0 ? 0 : a > 1 ? 1 : a;
   }
 
-  /** Errors come back from the sim as a toast. */
-  dispatch(cmd: Command) {
-    this.host?.post({ t: 'cmd', cmd });
+  /** An order for the focused carrier. Errors come back from the sim as a toast. */
+  dispatch(order: Order) {
+    this.host?.post({ t: 'cmd', cmd: { ...order, carrierId: focusOp(this.state).id } });
   }
 
   /** The sim's current state, exact (unlike the mirror, which is up to one UI tick behind). */
@@ -297,10 +304,10 @@ export const engine = new Engine();
 // Handy for debugging and balancing from the browser console.
 (globalThis as unknown as { __fleet: Engine }).__fleet = engine;
 
-/** Re-render on UI ticks; read `engine.state` directly inside the component. */
-export function useGame(): GameState {
+/** Re-render on UI ticks; read `engine.view` directly inside the component. */
+export function useGame(): Sim {
   useSyncExternalStore(engine.subscribe, engine.getVersion);
-  return engine.state;
+  return engine.view;
 }
 
 export function lerpPos(id: number, cur: Vec3, a: number, out: Vec3): Vec3 {

@@ -19,11 +19,21 @@ import { cardSlots, checkCard, nextCardId } from './cards';
 import { autoBuyUnlocked, autoRebuildUnlocked, engagementUnlocked } from './automation';
 import { moveShip as moveOnBoard } from './hangar';
 import { buyResearch as buyNode, lvl, reserveDefs } from './research';
-import { createShip, emit, maxEnergy, newGame, solarRate, upkeepRate } from './state';
+import {
+  bind,
+  createShip,
+  emit,
+  focused,
+  maxEnergy,
+  newGame,
+  solarRate,
+  upkeepRate,
+} from './state';
 import { executeJump } from './tick';
 import type {
-  CarrierStance,
   GameState,
+  CarrierStance,
+  Sim,
   HangarType,
   ModuleId,
   RuleCard,
@@ -31,7 +41,8 @@ import type {
   Stance,
 } from './types';
 
-export type Command =
+/** A player order without its carrier; `Command` adds which carrier it is for. */
+export type Order =
   | { type: 'buyShip'; cls: ShipClass; hangarId?: number; start?: number }
   | { type: 'scrapShip'; shipId: number }
   | { type: 'moveShip'; shipId: number; hangarId: number; start: number }
@@ -52,25 +63,35 @@ export type Command =
   | { type: 'warp'; systemId: number }
   | { type: 'cancelWarp' }
   | { type: 'jumpNow' }
-  | { type: 'setPower'; mode: GameState['powerMode'] }
+  | { type: 'setPower'; mode: Sim['powerMode'] }
   | { type: 'setCarrierStance'; stance: CarrierStance }
   | { type: 'buyResearch'; id: string }
   | {
       type: 'setAutomation';
-      patch: Partial<Pick<GameState['automation'], 'autoBuy' | 'autoRebuild' | 'creditFloor'>>;
+      patch: Partial<Pick<Sim['automation'], 'autoBuy' | 'autoRebuild' | 'creditFloor'>>;
     }
   | { type: 'setHangarTarget'; hangarId: number; cls: ShipClass; count: number }
   | { type: 'upgradeRefinery' }
   | { type: 'fitModule'; shipId: number; slot: number; module: ModuleId | null };
 
+/** Every command names the carrier (operation) it is for. */
+export type Command = Order & { carrierId: number };
+
 export const RETROFIT_COST = 800;
 
-export function shipCost(s: GameState, cls: ShipClass): number {
+export function shipCost(s: Sim, cls: ShipClass): number {
   const n = s.ships.filter((x) => x.cls === cls).length;
   return Math.round(SHIP_STATS[cls].cost * Math.pow(1.07, n));
 }
 
-export function apply(s: GameState, c: Command): string | null {
+export function apply(g: GameState, c: Command): string | null {
+  const op = g.ops.find((o) => o.id === c.carrierId);
+  if (!op) return 'No such carrier';
+  return order(bind(g, op), c);
+}
+
+/** `apply` for an already bound operation: headless runs and tests. */
+export function order(s: Sim, c: Order): string | null {
   switch (c.type) {
     case 'buyShip': {
       if (!s.unlocked.includes(c.cls)) return 'Not unlocked yet';
@@ -286,7 +307,7 @@ export function apply(s: GameState, c: Command): string | null {
 
 // ---------- prestige ----------
 
-export function researchPayout(s: GameState): number {
+export function researchPayout(s: Pick<GameState, 'stats'>): number {
   return Math.floor(Math.sqrt(s.stats.oreValueDelivered / RP_DIVISOR)) * s.stats.furthestTier;
 }
 
@@ -306,7 +327,7 @@ export function prestige(s: GameState): GameState {
     cards: structuredClone(s.cards),
     automation: structuredClone(s.automation),
   });
-  emit(next, 'Prestiged', { research: rp });
+  emit(focused(next), 'Prestiged', { research: rp });
   return next;
 }
 
@@ -324,9 +345,19 @@ export interface OfflineReport {
  * prestige research. Energy recharges from solar minus fleet upkeep over the elapsed time (never
  * below zero; mining income is already net of upkeep). Reserves keep rebuilding.
  */
-export function settleOffline(s: GameState, elapsedS: number): OfflineReport | null {
+export function settleOffline(g: GameState, elapsedS: number): OfflineReport | null {
   const t = Math.min(OFFLINE_CAP_S, Math.max(0, elapsedS));
   if (t < 30) return null;
+  const report: OfflineReport = { seconds: t, credits: 0, rebuilt: 0 };
+  for (const op of g.ops) {
+    const r = settleOp(bind(g, op), t);
+    report.credits += r.credits;
+    report.rebuilt += r.rebuilt;
+  }
+  return report;
+}
+
+function settleOp(s: Sim, t: number): { credits: number; rebuilt: number } {
   // `|| 0` covers saves written before miningIncomeAvg existed.
   const credits = Math.max(0, s.miningIncomeAvg || 0) * t * OFFLINE_EFFICIENCY;
   s.credits += credits;
@@ -346,5 +377,5 @@ export function settleOffline(s: GameState, elapsedS: number): OfflineReport | n
     for (let i = 0; i < n; i++) if (createShip(s, cls)) rebuilt++;
   }
   emit(s, 'WelcomeBack', { credits: Math.round(credits) });
-  return { seconds: t, credits, rebuilt };
+  return { credits, rebuilt };
 }

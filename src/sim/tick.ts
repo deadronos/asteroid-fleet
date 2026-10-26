@@ -30,10 +30,10 @@ import {
 } from './mining';
 import { copy, moveAway, onSphere, rand } from './math';
 import { lvl } from './research';
-import { emit, maxHull } from './state';
+import { bind, emit, maxHull } from './state';
 import { carrierDisabled, executeJump, warpStep } from './warp';
 import { drift, field, hazards, power, refine, reserves } from './world';
-import type { GameState, Ship, ShipClass } from './types';
+import type { GameState, Operation, Sim, Ship, ShipClass } from './types';
 
 export { cargoCap, damageShip, SHIELD_HP } from './ctx';
 export { cargoHeat, heatFactor, waveWarning } from './combat';
@@ -41,8 +41,23 @@ export { executeJump };
 
 // ---------- main step ----------
 
-export function step(s: GameState, dt = DT) {
+/**
+ * Advance the run clock by one step and play `op` through it. Only call this once per step:
+ * with several carriers (#76) the clock moves here and the others go through `stepOp`.
+ */
+export function step(g: GameState, op: Operation, dt = DT) {
+  g.time += dt;
+  stepOp(bind(g, op), dt);
+}
+
+/** `step` for a single bound operation: headless runs, tests and benchmarks. */
+export function stepSim(s: Sim, dt = DT) {
   s.time += dt;
+  stepOp(s, dt);
+}
+
+/** One operation's share of a step. The run clock has already moved. */
+export function stepOp(s: Sim, dt = DT) {
   const ctx = buildCtx(s);
 
   let live = 0;
@@ -118,7 +133,7 @@ export function step(s: GameState, dt = DT) {
 
 // ---------- launching ----------
 
-function wantsLaunch(s: GameState, ship: Ship, ctx: Ctx): boolean {
+function wantsLaunch(s: Sim, ship: Ship, ctx: Ctx): boolean {
   if (recalled(ctx, ship)) return false;
   const mh = maxHull(s, ship.cls);
   if (ship.hull < mh * 0.9) return false;
@@ -140,7 +155,7 @@ function wantsLaunch(s: GameState, ship: Ship, ctx: Ctx): boolean {
   }
 }
 
-function launch(s: GameState, dt: number, ctx: Ctx) {
+function launch(s: Sim, dt: number, ctx: Ctx) {
   // Launches wait while the pool cannot pay upkeep; the timers keep running.
   const hold = ctx.powerShort;
   for (const h of s.hangars) {
@@ -170,7 +185,7 @@ function launch(s: GameState, dt: number, ctx: Ctx) {
   }
 }
 
-function behave(s: GameState, ship: Ship, dt: number, ctx: Ctx) {
+function behave(s: Sim, ship: Ship, dt: number, ctx: Ctx) {
   const st = stanceOf(s, ctx, ship);
   const mh = maxHull(s, ship.cls);
 

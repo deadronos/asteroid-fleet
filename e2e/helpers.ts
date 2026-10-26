@@ -1,12 +1,12 @@
 import type { Page } from '@playwright/test';
-import { apply, type Command } from '../src/sim/actions';
+import { order, type Order } from '../src/sim/actions';
 import { SAVE_KEY } from '../src/game/save';
-import { newGame } from '../src/sim/state';
-import { SHIP_CLASSES, type GameState } from '../src/sim/types';
+import { focused, newGame, stateOf } from '../src/sim/state';
+import { SHIP_CLASSES, type GameState, type Sim } from '../src/sim/types';
 
 /** A fresh game built with the real sim, with every ship class unlocked and plenty of credits. */
-export function makeGame(seed = 11): GameState {
-  const s = newGame(seed);
+export function makeGame(seed = 11): Sim {
+  const s = focused(newGame(seed));
   s.unlocked = [...SHIP_CLASSES];
   s.credits = 100_000;
   s.savedAt = Date.now();
@@ -14,8 +14,8 @@ export function makeGame(seed = 11): GameState {
 }
 
 /** Run a sim command on a state built outside the page; throws if the sim refuses it. */
-export function run(s: GameState, cmd: Command): void {
-  const err = apply(s, cmd);
+export function run(s: Sim, cmd: Order): void {
+  const err = order(s, cmd);
   if (err) throw new Error(`${cmd.type}: ${err}`);
 }
 
@@ -24,7 +24,7 @@ export function run(s: GameState, cmd: Command): void {
  * through the normal load and migrate path. Seeds once per tab, so a later reload keeps
  * whatever the game saved since. Call before `page.goto`.
  */
-export async function seedSave(page: Page, state: GameState): Promise<void> {
+export async function seedSave(page: Page, state: Sim): Promise<void> {
   await page.addInitScript(
     ({ key, json }) => {
       try {
@@ -35,7 +35,7 @@ export async function seedSave(page: Page, state: GameState): Promise<void> {
         /* storage blocked: the test will fail on its own assertions */
       }
     },
-    { key: SAVE_KEY, json: JSON.stringify(state) },
+    { key: SAVE_KEY, json: JSON.stringify(stateOf(state)) },
   );
 }
 
@@ -45,9 +45,10 @@ export async function openApp(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Take command' }).click();
 }
 
-/** The worker's exact state, through the engine's debug handle. */
-export function simState(page: Page): Promise<GameState> {
-  return page.evaluate(() =>
+/** The worker's exact state, through the engine's debug handle, flattened to its one operation. */
+export async function simState(page: Page): Promise<Sim> {
+  const g = await page.evaluate(() =>
     (globalThis as unknown as { __fleet: { fullState(): Promise<GameState> } }).__fleet.fullState(),
   );
+  return { ...g, ...g.ops[0] };
 }

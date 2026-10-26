@@ -1,19 +1,19 @@
 // Scripted players for the balance harness. A policy only issues the same
-// commands the UI can (`apply`), so a run measures the game, not the script.
+// commands the UI can (`order`), so a run measures the game, not the script.
 
-import { apply, shipCost } from '../actions';
+import { order, shipCost } from '../actions';
 import { autoRebuildUnlocked } from '../automation';
 import { SOFT_HANGAR_SLOTS, SOFT_HANGARS, REFINERY_COST, MAX_REFINERY, warpCost } from '../config';
-import { SHIP_CLASSES, type GameState, type HangarType, type ShipClass } from '../types';
+import { SHIP_CLASSES, type Sim, type HangarType, type ShipClass } from '../types';
 
 export interface Policy {
   name: string;
   /** One line for the report header. */
   describe: string;
   /** Called once before the first tick (doctrine, rules). */
-  setup?(s: GameState): void;
+  setup?(s: Sim): void;
   /** Called every `ACT_INTERVAL_TICKS`; spends credits and decides warps. */
-  act(s: GameState): void;
+  act(s: Sim): void;
 }
 
 /** Ticks between policy passes: once a game second, like the automation pass. */
@@ -21,7 +21,7 @@ export const ACT_INTERVAL_TICKS = 10;
 
 export type Counts = Record<ShipClass, number>;
 
-export function shipCounts(s: GameState): Counts {
+export function shipCounts(s: Sim): Counts {
   const n = Object.fromEntries(SHIP_CLASSES.map((c) => [c, 0])) as Counts;
   for (const x of s.ships) n[x.cls]++;
   return n;
@@ -32,32 +32,32 @@ export function shipCounts(s: GameState): Counts {
  * hangar first, then a new hangar once every hangar is at its maximum size.
  * Returns true if something was bought.
  */
-export function buyShipOrRoom(s: GameState, cls: ShipClass, newHangar: HangarType): boolean {
+export function buyShipOrRoom(s: Sim, cls: ShipClass, newHangar: HangarType): boolean {
   if (s.credits < shipCost(s, cls)) return false;
-  const err = apply(s, { type: 'buyShip', cls });
+  const err = order(s, { type: 'buyShip', cls });
   if (err === null) return true;
   if (err !== 'No free hangar slots') return false;
   const smallest = [...s.hangars].sort((a, b) => a.slots - b.slots)[0];
   if (smallest && (smallest.slots < SOFT_HANGAR_SLOTS || s.hangars.length >= SOFT_HANGARS))
-    return apply(s, { type: 'buySlot', hangarId: smallest.id }) === null;
-  return apply(s, { type: 'buyHangar', hangarType: newHangar }) === null;
+    return order(s, { type: 'buySlot', hangarId: smallest.id }) === null;
+  return order(s, { type: 'buyHangar', hangarType: newHangar }) === null;
 }
 
 /** A discovered system one jump further out (`step` 1) or back (-1), or null. Plain systems before gas giants. */
-export function neighbour(s: GameState, dir: 1 | -1) {
+export function neighbour(s: Sim, dir: 1 | -1) {
   const here = s.systems[s.systemId];
   const out = s.systems.filter((x) => x.discovered && x.distance === here.distance + dir);
   return out.sort((a, b) => Number(a.gasGiant) - Number(b.gasGiant) || a.id - b.id)[0] ?? null;
 }
 
 /** Warp to `to`, switching to defense power to bank energy while the jump is not yet affordable. */
-export function jump(s: GameState, to: number): boolean {
+export function jump(s: Sim, to: number): boolean {
   const from = s.systems[s.systemId].distance;
   const cost = warpCost(from, s.systems[to].distance);
   // 'defense' power holds half the pool back from refining, enough for any one jump.
   const mode = s.carrier.energy >= cost ? 'balanced' : 'defense';
-  if (s.powerMode !== mode) apply(s, { type: 'setPower', mode });
-  return apply(s, { type: 'warp', systemId: to }) === null;
+  if (s.powerMode !== mode) order(s, { type: 'setPower', mode });
+  return order(s, { type: 'warp', systemId: to }) === null;
 }
 
 export interface SteadyParams {
@@ -97,7 +97,7 @@ export const STEADY_DEFAULTS: SteadyParams = {
 export function steadyPolicy(p: Partial<SteadyParams> = {}): Policy {
   const k = { ...STEADY_DEFAULTS, ...p };
 
-  function want(s: GameState, n: Counts): ShipClass {
+  function want(s: Sim, n: Counts): ShipClass {
     if (n.drone < 6) return 'drone';
     if (n.barge * k.dronesPerBarge < n.drone - 4) return 'barge';
     if (n.hauler < n.barge) return 'hauler';
@@ -120,11 +120,11 @@ export function steadyPolicy(p: Partial<SteadyParams> = {}): Policy {
       'drones, a barge+hauler per 8 drones, 1 scout, fighters 1:4 once unlocked; warps out when big and calm, back when mauled',
     setup(s) {
       // 'safe' drones stall once the carrier parks away from covered rocks (see balance.test.ts).
-      apply(s, { type: 'setStance', scope: 'drone', patch: { mining: 'greedy' } });
+      order(s, { type: 'setStance', scope: 'drone', patch: { mining: 'greedy' } });
     },
     act(s) {
       if (autoRebuildUnlocked(s) && !s.automation.autoRebuild)
-        apply(s, { type: 'setAutomation', patch: { autoRebuild: true } });
+        order(s, { type: 'setAutomation', patch: { autoRebuild: true } });
       if (s.stats.shipsLost > lost) {
         lost = s.stats.shipsLost;
         lastLoss = s.time;
@@ -153,7 +153,7 @@ export function steadyPolicy(p: Partial<SteadyParams> = {}): Policy {
         jump(s, target.id)
       )
         return;
-      if (s.powerMode !== 'balanced') apply(s, { type: 'setPower', mode: 'balanced' });
+      if (s.powerMode !== 'balanced') order(s, { type: 'setPower', mode: 'balanced' });
 
       // Refinery first while ore waits on the carrier, then up to five ship buys a pass.
       if (
@@ -161,7 +161,7 @@ export function steadyPolicy(p: Partial<SteadyParams> = {}): Policy {
         s.carrier.ore > 300 &&
         s.credits >= REFINERY_COST(s.carrier.refinery)
       )
-        apply(s, { type: 'upgradeRefinery' });
+        order(s, { type: 'upgradeRefinery' });
       for (let i = 0; i < 5; i++) {
         const cls = want(s, shipCounts(s));
         if (!buyShipOrRoom(s, cls, s.hangars.length % 2 ? 'cargo' : 'launch')) break;

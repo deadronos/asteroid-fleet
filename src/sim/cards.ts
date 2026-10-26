@@ -18,7 +18,7 @@ import {
   type ActionKind,
   type CardScope,
   type Condition,
-  type GameState,
+  type Sim,
   type RuleCard,
   type RuleId,
   type Ship,
@@ -27,14 +27,14 @@ import {
 /** Active cards per action, most specific scope first, then card order. */
 export type CompiledCards = Record<ActionKind, RuleCard[]>;
 
-export function cardActive(s: GameState, card: RuleCard): boolean {
+export function cardActive(s: Sim, card: RuleCard): boolean {
   return card.enabled && s.unlockedRules.includes(ACTION_DEFS[card.then.kind].unlock);
 }
 
 const LEVELS: CardScope['kind'][] = ['hangar', 'class', 'fleet'];
 
 /** Refill `out` from `s.cards`, reusing its arrays so a tick allocates nothing here. */
-export function compileCards(s: GameState, out: Partial<CompiledCards>): CompiledCards {
+export function compileCards(s: Sim, out: Partial<CompiledCards>): CompiledCards {
   for (const a in ACTION_DEFS) (out[a as ActionKind] ??= []).length = 0;
   for (const level of LEVELS)
     for (const card of s.cards)
@@ -59,7 +59,7 @@ function near<T extends { pos: { x: number; y: number; z: number } }>(
   return false;
 }
 
-export function conditionHolds(s: GameState, c: Condition, ship: Ship | null): boolean {
+export function conditionHolds(s: Sim, c: Condition, ship: Ship | null): boolean {
   const v = c.value ?? 0;
   switch (c.kind) {
     case 'always':
@@ -90,11 +90,7 @@ export function conditionHolds(s: GameState, c: Condition, ship: Ship | null): b
 }
 
 /** The first card in `list` that covers `ship` (the carrier when null) and whose conditions all hold. */
-export function firing(
-  s: GameState,
-  list: readonly RuleCard[],
-  ship: Ship | null,
-): RuleCard | null {
+export function firing(s: Sim, list: readonly RuleCard[], ship: Ship | null): RuleCard | null {
   for (const card of list)
     if (inScope(card.scope, ship) && card.when.every((c) => conditionHolds(s, c, ship)))
       return card;
@@ -103,13 +99,13 @@ export function firing(
 
 // ---------- editing ----------
 
-export function nextCardId(s: GameState): number {
+export function nextCardId(s: Sim): number {
   let id = 0;
   for (const c of s.cards) if (c.id > id) id = c.id;
   return id + 1;
 }
 
-export function cardSlots(_s: GameState): number {
+export function cardSlots(_s: Sim): number {
   return CARD_SLOTS;
 }
 
@@ -121,7 +117,7 @@ export function presetCard(id: RuleId, cardId: number, enabled: boolean, param?:
 }
 
 /** Add a preset's card if there is a free slot. */
-export function addPreset(s: GameState, id: RuleId, enabled: boolean): RuleCard | null {
+export function addPreset(s: Sim, id: RuleId, enabled: boolean): RuleCard | null {
   if (s.cards.length >= cardSlots(s)) return null;
   const card = presetCard(id, nextCardId(s), enabled);
   s.cards.push(card);
@@ -134,7 +130,7 @@ const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v
  * Check and normalise a card from the UI or a save. Returns an error message,
  * or null with `card` cleaned in place (values clamped, stray fields dropped).
  */
-export function checkCard(s: GameState, card: Omit<RuleCard, 'id'>): string | null {
+export function checkCard(s: Sim, card: Omit<RuleCard, 'id'>): string | null {
   const then = card.then;
   const action = ACTION_DEFS[then?.kind];
   if (!action) return 'Pick an action';

@@ -1,6 +1,6 @@
 import { queueRebuild } from './automation';
 // Per-tick lookup context and the small helpers every behaviour module shares.
-// The context is derived from GameState at the start of each step and never
+// The context is derived from Sim at the start of each step and never
 // saved; its containers are reused between ticks to keep the hot path free of
 // allocations.
 
@@ -27,7 +27,7 @@ import {
   SHIP_CLASSES,
   type ActionKind,
   type Asteroid,
-  type GameState,
+  type Sim,
   type Hangar,
   type LossCause,
   type ModuleId,
@@ -119,7 +119,7 @@ const ctx: Ctx = {
   mining: 0,
 };
 
-export function buildCtx(s: GameState): Ctx {
+export function buildCtx(s: Sim): Ctx {
   ctx.ships.clear();
   ctx.pirates.clear();
   ctx.asteroids.clear();
@@ -203,7 +203,7 @@ function adjacentClass(c: Ctx, occ: number[], shipId: number, cls: ShipClass): b
 }
 
 /** Same as `dockRepairRate` in hangar.ts, using the tick's cached boards. */
-export function dockRepair(s: GameState, c: Ctx, ship: Ship): number {
+export function dockRepair(s: Sim, c: Ctx, ship: Ship): number {
   const h = c.hangarOf.get(ship.id);
   if (!h) return 0;
   let rate = HANGAR_TYPES[h.type].repairRate;
@@ -221,13 +221,13 @@ export function recalled(c: Ctx, ship: Ship): boolean {
 }
 
 /** The first `action` card that fires for `ship` (or for the carrier when null). */
-export function card(s: GameState, c: Ctx, action: ActionKind, ship: Ship | null) {
+export function card(s: Sim, c: Ctx, action: ActionKind, ship: Ship | null) {
   const list = c.cards[action];
   return list.length > 0 ? firing(s, list, ship) : null;
 }
 
 /** The stance card in force for `ship`; a timed card stays in force through `ship.hold`. */
-function stanceCardOf(s: GameState, c: Ctx, ship: Ship): RuleCard | null {
+function stanceCardOf(s: Sim, c: Ctx, ship: Ship): RuleCard | null {
   const list = c.cards.stance;
   if (list.length === 0) return null;
   const hit = firing(s, list, ship);
@@ -246,7 +246,7 @@ function stanceCardOf(s: GameState, c: Ctx, ship: Ship): RuleCard | null {
 }
 
 /** `effectiveStance`, shared per hangar, class and stance card within a tick (callers only read it). */
-export function stanceOf(s: GameState, c: Ctx, ship: Ship): Stance {
+export function stanceOf(s: Sim, c: Ctx, ship: Ship): Stance {
   const rc = stanceCardOf(s, c, ship);
   // Card positions are stable within a tick and below CARD_SLOTS (< 32).
   const key = (ship.hangarId * 8 + CLASS_INDEX[ship.cls]) * 32 + (rc ? s.cards.indexOf(rc) + 1 : 0);
@@ -268,7 +268,7 @@ export function modCount(ship: Ship, id: ModuleId): number {
 }
 
 /** Cargo capacity of a class, including `ship`'s compressors when given. */
-export function cargoCap(s: GameState, cls: ShipClass, ship?: Ship): number {
+export function cargoCap(s: Sim, cls: ShipClass, ship?: Ship): number {
   const base =
     SHIP_STATS[cls].cargo * (ship ? COMPRESSOR_CARGO ** modCount(ship, 'compressor') : 1);
   if (cls === 'barge') return base * (1 + 0.2 * lvl(s, 'bargeCap'));
@@ -278,7 +278,7 @@ export function cargoCap(s: GameState, cls: ShipClass, ship?: Ship): number {
   return base;
 }
 
-export function speed(s: GameState, ship: Ship): number {
+export function speed(s: Sim, ship: Ship): number {
   let v = SHIP_STATS[ship.cls].speed;
   if (ship.cls === 'hauler') v *= 1 + 0.12 * lvl(s, 'haulSpeed');
   else if (ship.cls === 'drone') v *= 1 + 0.15 * lvl(s, 'droneSpeed');
@@ -289,7 +289,7 @@ export function speed(s: GameState, ship: Ship): number {
   return v * TRACTOR_SPEED ** modCount(ship, 'tractor');
 }
 
-export function fighterDamage(s: GameState, c: Ctx, ship: Ship): number {
+export function fighterDamage(s: Sim, c: Ctx, ship: Ship): number {
   let d = SHIP_STATS.fighter.damage * (1 + 0.15 * lvl(s, 'damage'));
   if (lvl(s, 'fighterAce') > 0) {
     const h = c.hangarOf.get(ship.id);
@@ -298,7 +298,7 @@ export function fighterDamage(s: GameState, c: Ctx, ship: Ship): number {
   return d * LASER_DAMAGE ** modCount(ship, 'laser');
 }
 
-export function miningRate(s: GameState, c: Ctx, ship: Ship): number {
+export function miningRate(s: Sim, c: Ctx, ship: Ship): number {
   let r = MINING_RATE * (1 + 0.15 * lvl(s, 'yield'));
   if (lvl(s, 'droneSwarm') > 0) {
     const h = c.hangarOf.get(ship.id);
@@ -308,12 +308,12 @@ export function miningRate(s: GameState, c: Ctx, ship: Ship): number {
   return r * LASER_RATE ** modCount(ship, 'laser');
 }
 
-export function inHazard(s: GameState, p: Vec3): boolean {
+export function inHazard(s: Sim, p: Vec3): boolean {
   for (const h of s.hazards) if (dist2(h.pos, p) < h.radius * h.radius) return true;
   return false;
 }
 
-export function covered(s: GameState, p: Vec3, c: Ctx): boolean {
+export function covered(s: Sim, p: Vec3, c: Ctx): boolean {
   if (dist(p, s.carrier.pos) < COVER_RADIUS) return true;
   for (const sh of c.byClass.barge)
     if (sh.mode === 'station' && dist(p, sh.pos) < COVER_RADIUS * 0.6) return true;
@@ -322,7 +322,7 @@ export function covered(s: GameState, p: Vec3, c: Ctx): boolean {
   return false;
 }
 
-export function nearestPirate(s: GameState, p: Vec3, within: number): Pirate | null {
+export function nearestPirate(s: Sim, p: Vec3, within: number): Pirate | null {
   let best: Pirate | null = null;
   let bd = within * within;
   for (const pi of s.pirates) {
@@ -337,14 +337,14 @@ export function nearestPirate(s: GameState, p: Vec3, within: number): Pirate | n
 
 // ---------- damage ----------
 
-export function damageShip(s: GameState, ship: Ship, dmg: number) {
+export function damageShip(s: Sim, ship: Ship, dmg: number) {
   if (ship.cls === 'hauler' && lvl(s, 'haulerArmor') > 0) dmg *= 0.6;
   if (ship.cls === 'barge') dmg *= 1 - 0.25 * lvl(s, 'bargeShell');
   dmg *= SHIELD_TAKEN ** modCount(ship, 'shield');
   ship.hull -= dmg;
 }
 
-export function damageCarrier(s: GameState, dmg: number) {
+export function damageCarrier(s: Sim, dmg: number) {
   const c = s.carrier;
   if (c.shield > 0) {
     const absorbed = Math.min(dmg, c.shield * SHIELD_HP);
@@ -354,7 +354,7 @@ export function damageCarrier(s: GameState, dmg: number) {
   c.hull -= dmg;
 }
 
-export function destroyShip(s: GameState, ship: Ship, cause: LossCause) {
+export function destroyShip(s: Sim, ship: Ship, cause: LossCause) {
   s.fx.push({ kind: 'explosion', a: copy(ship.pos), b: copy(ship.pos), ttl: 0.8 });
   for (const h of s.hangars) h.items = h.items.filter((it) => it.shipId !== ship.id);
   s.stats.shipsLost++;
@@ -365,7 +365,7 @@ export function destroyShip(s: GameState, ship: Ship, cause: LossCause) {
 // ---------- cargo ----------
 
 /** Unload cargo at the carrier, capped by storage. Returns true when the hold is empty. */
-export function unloadAtCarrier(s: GameState, ship: Ship): boolean {
+export function unloadAtCarrier(s: Sim, ship: Ship): boolean {
   const c = s.carrier;
   if (ship.h2 > 0) {
     c.h2 += ship.h2;
@@ -403,7 +403,7 @@ export function transfer(from: Ship, to: Ship, cap: number) {
   }
 }
 
-export function dock(s: GameState, ship: Ship) {
+export function dock(s: Sim, ship: Ship) {
   unloadAtCarrier(s, ship);
   ship.mode = 'docked';
   ship.targetId = -1;
@@ -412,7 +412,7 @@ export function dock(s: GameState, ship: Ship) {
   ship.bargeId = -1;
 }
 
-export function goHome(s: GameState, ship: Ship, dt: number): boolean {
+export function goHome(s: Sim, ship: Ship, dt: number): boolean {
   if (moveToward(ship.pos, s.carrier.pos, speed(s, ship) * dt, DOCK_RADIUS * 0.5)) {
     dock(s, ship);
     return true;

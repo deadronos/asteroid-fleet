@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { apply } from './actions';
+import { order } from './actions';
 import {
   COMPRESSOR_CARGO,
   DRILL_VALUE,
@@ -12,22 +12,23 @@ import {
   VEIN_BONUS,
 } from './config';
 import { buildCtx, cargoCap, damageShip, fighterDamage, miningRate, speed } from './ctx';
-import { clusterCenters, createShip, enterSystem, newGame } from './state';
-import { step } from './tick';
-import type { GameState, ModuleId, Ship, ShipClass } from './types';
+import { clusterCenters, createShip, enterSystem } from './state';
+import { stepSim } from './tick';
+import type { Sim, ModuleId, Ship, ShipClass } from './types';
+import { game } from './testing';
 
-const run = (s: GameState, seconds: number) => {
-  for (let i = 0; i < seconds * 10; i++) step(s);
+const run = (s: Sim, seconds: number) => {
+  for (let i = 0; i < seconds * 10; i++) stepSim(s);
 };
 
-function shipWith(cls: ShipClass, modules: ModuleId[] = []): { s: GameState; ship: Ship } {
-  const s = newGame(5);
+function shipWith(cls: ShipClass, modules: ModuleId[] = []): { s: Sim; ship: Ship } {
+  const s = game(5);
   s.stats.furthestTier = 2;
   s.unlocked.push('fighter', 'repair', 'harvester');
   s.credits = 100_000;
   const ship = createShip(s, cls, 2)!;
   modules.forEach((m, slot) => {
-    expect(apply(s, { type: 'fitModule', shipId: ship.id, slot, module: m })).toBeNull();
+    expect(order(s, { type: 'fitModule', shipId: ship.id, slot, module: m })).toBeNull();
   });
   return { s, ship };
 }
@@ -39,23 +40,23 @@ function mineOnce(mods: ModuleId[]) {
   ship.targetId = a.id;
   ship.pos = { ...a.pos };
   for (const o of s.ships) if (o !== ship) o.mode = 'docked';
-  step(s);
+  stepSim(s);
   return { ore: ship.cargo, value: ship.cargoValue, unit: a.value };
 }
 
 function scoutGame(systemTier: 1 | 2) {
-  const s = newGame(7);
+  const s = game(7);
   s.credits = 10_000;
   if (systemTier === 2) {
     const id = s.systems.findIndex((x) => x.tier === 2);
     enterSystem(s, id);
   }
-  expect(apply(s, { type: 'buyShip', cls: 'scout', hangarId: 1 })).toBeNull();
+  expect(order(s, { type: 'buyShip', cls: 'scout', hangarId: 1 })).toBeNull();
   return s;
 }
 
 function greedySetup(charted: boolean) {
-  const s = newGame(3);
+  const s = game(3);
   s.doctrine.byClass.drone = { mining: 'greedy' };
   for (const o of s.ships) o.mode = 'docked';
   const drone = s.ships[0];
@@ -70,7 +71,7 @@ function greedySetup(charted: boolean) {
   rich.ore = poor.ore = 50;
   s.hazards = [{ pos: { ...rich.pos }, radius: 5, dps: 1, kind: 'debris' }];
   s.recon.hazards = charted ? [0] : [];
-  step(s);
+  stepSim(s);
   return { drone, rich, poor };
 }
 
@@ -78,31 +79,31 @@ describe('fitting modules', () => {
   it('charges the module cost and respects slot counts', () => {
     const { s, ship } = shipWith('drone');
     const before = s.credits;
-    expect(apply(s, { type: 'fitModule', shipId: ship.id, slot: 0, module: 'laser' })).toBeNull();
+    expect(order(s, { type: 'fitModule', shipId: ship.id, slot: 0, module: 'laser' })).toBeNull();
     expect(s.credits).toBe(before - MODULES.laser.cost);
     expect(ship.modules).toEqual(['laser']);
     // Drones have one slot.
-    expect(apply(s, { type: 'fitModule', shipId: ship.id, slot: 1, module: 'drill' })).toBe(
+    expect(order(s, { type: 'fitModule', shipId: ship.id, slot: 1, module: 'drill' })).toBe(
       'No such module slot',
     );
     // Swapping replaces; unfitting clears.
-    expect(apply(s, { type: 'fitModule', shipId: ship.id, slot: 0, module: 'drill' })).toBeNull();
+    expect(order(s, { type: 'fitModule', shipId: ship.id, slot: 0, module: 'drill' })).toBeNull();
     expect(ship.modules).toEqual(['drill']);
-    expect(apply(s, { type: 'fitModule', shipId: ship.id, slot: 0, module: null })).toBeNull();
+    expect(order(s, { type: 'fitModule', shipId: ship.id, slot: 0, module: null })).toBeNull();
     expect(ship.modules).toEqual([]);
   });
 
   it('rejects modules that do not fit the class, are locked, or for ships in space', () => {
     const { s, ship } = shipWith('scout');
-    expect(apply(s, { type: 'fitModule', shipId: ship.id, slot: 0, module: 'drill' })).toMatch(
+    expect(order(s, { type: 'fitModule', shipId: ship.id, slot: 0, module: 'drill' })).toMatch(
       /does not fit/,
     );
     s.stats.furthestTier = 1;
-    expect(apply(s, { type: 'fitModule', shipId: ship.id, slot: 0, module: 'shield' })).toMatch(
+    expect(order(s, { type: 'fitModule', shipId: ship.id, slot: 0, module: 'shield' })).toMatch(
       /frontier/,
     );
     ship.mode = 'idle';
-    expect(apply(s, { type: 'fitModule', shipId: ship.id, slot: 0, module: 'tractor' })).toBe(
+    expect(order(s, { type: 'fitModule', shipId: ship.id, slot: 0, module: 'tractor' })).toBe(
       'Ship must be docked',
     );
   });
@@ -183,7 +184,7 @@ describe('scout reconnaissance', () => {
 
   it('drones prefer revealed veins', () => {
     // Two equally distant rocks; the vein wins.
-    const s = newGame(3);
+    const s = game(3);
     for (const o of s.ships) o.mode = 'docked';
     const drone = s.ships[0];
     drone.mode = 'idle';
@@ -195,7 +196,7 @@ describe('scout reconnaissance', () => {
     a.value = b.value = 2;
     a.ore = b.ore = 50;
     s.recon.veins = [b.id];
-    step(s);
+    stepSim(s);
     expect(drone.targetId).toBe(b.id);
     expect(VEIN_BONUS).toBeGreaterThan(1);
   });

@@ -16,11 +16,11 @@ import {
 import { lvl } from '../sim/research';
 import { solarRate, upkeep } from '../sim/state';
 import { cargoCap } from '../sim/tick';
-import { SHIP_CLASSES, type GameState } from '../sim/types';
+import { SHIP_CLASSES, type Sim } from '../sim/types';
 import { fmt } from './format';
 
 /** Rough per-link rates for the throughput = min(...) readout. Ore units per second. */
-function throughput(s: GameState) {
+function throughput(s: Sim) {
   const drones = s.ships.filter((x) => x.cls === 'drone').length;
   const barges = s.ships.filter((x) => x.cls === 'barge').length;
   const haulers = s.ships.filter((x) => x.cls === 'hauler').length;

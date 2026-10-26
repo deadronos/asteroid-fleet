@@ -323,7 +323,7 @@ export type SimEventKind = keyof EventData;
 
 interface SimEventOf<K extends SimEventKind> {
   kind: K;
-  /** Always 0 until there are several carriers (#75). */
+  /** The operation (carrier) it happened to. */
   carrierId: number;
   systemId: number;
   severity: Severity;
@@ -343,18 +343,14 @@ export interface Stats {
   furthestTier: number;
 }
 
-export interface GameState {
-  version: number;
-  seed: number;
+/**
+ * One actively played carrier: its fleet, the system it sits in and everything local to it.
+ * Several of these share one `GameState` (#53); for now there is exactly one.
+ */
+export interface Operation {
+  /** Carrier id; stamped on events and named by every Command. */
+  id: number;
   rng: number;
-  time: number; // sim seconds this run
-  nextId: number;
-  credits: number;
-  research: number; // unspent research points
-  researchLevels: Record<string, number>;
-  unlocked: ShipClass[];
-  /** Presets unlocked so far; each unlocks its card's action for every card. */
-  unlockedRules: RuleId[];
   carrier: Carrier;
   hangars: Hangar[];
   ships: Ship[];
@@ -363,27 +359,49 @@ export interface GameState {
   containers: Container[];
   hazards: Hazard[];
   recon: Recon;
-  systems: StarSystem[];
   systemId: number;
+  warp: Warp | null;
+  wave: { timer: number; warning: boolean; active: boolean; size: number };
+  storm: { timer: number; active: number };
+  reserveTimers: Partial<Record<ShipClass, number>>;
+  incomeAvg: number; // rolling credits/s, all sources (salvage included)
+  miningIncomeAvg: number; // rolling credits/s from refined ore only, used for offline settlement
+  fx: Fx[];
+}
+
+/** Run-wide state. The whole GameState is what gets saved. */
+export interface GameState {
+  version: number;
+  seed: number;
+  time: number; // sim seconds this run
+  nextId: number;
+  credits: number;
+  research: number; // unspent research points
+  researchLevels: Record<string, number>;
+  unlocked: ShipClass[];
+  /** Presets unlocked so far; each unlocks its card's action for every card. */
+  unlockedRules: RuleId[];
+  systems: StarSystem[];
   /** Depletion records of systems left behind, keyed by system id. */
   fields: Record<number, FieldRecord>;
   doctrine: Doctrine;
   /** Rule cards in priority order (within a scope level). */
   cards: RuleCard[];
-  warp: Warp | null;
-  wave: { timer: number; warning: boolean; active: boolean; size: number };
-  storm: { timer: number; active: number };
-  reserveTimers: Partial<Record<ShipClass, number>>;
   automation: Automation;
   stats: Stats;
   lifetime: { prestiges: number; researchEarned: number };
-  incomeAvg: number; // rolling credits/s, all sources (salvage included)
-  miningIncomeAvg: number; // rolling credits/s from refined ore only, used for offline settlement
   powerMode: 'balanced' | 'income' | 'defense';
-  fx: Fx[];
   /** The last few events, newest first, for the Log tab. Saved. */
   log: SimEvent[];
   /** Outbox of events since the host last drained it, oldest first. */
   events: SimEvent[];
   savedAt: number; // wall-clock ms
+  /** Actively played carriers. Always exactly one until #78. */
+  ops: Operation[];
 }
+
+/**
+ * What the sim works on: the run-wide state and one operation seen as a single object.
+ * Reads and writes go straight through to the `GameState` or the `Operation` (see `bind`).
+ */
+export type Sim = Omit<GameState, 'ops'> & Operation;

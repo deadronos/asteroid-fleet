@@ -1,5 +1,5 @@
 import type { Command, OfflineReport } from '../sim/actions';
-import type { Carrier, Fx, GameState, ShipMode, Warp } from '../sim/types';
+import type { Carrier, Fx, GameState, Operation, ShipMode, Warp } from '../sim/types';
 import type { BusEvent } from './events';
 import type { UiSnapshot } from './snapshot';
 
@@ -58,7 +58,7 @@ export type OutMsg =
   | { t: 'error'; text: string }
   | { t: 'snapshot'; id: number; state: GameState };
 
-export function encodeFrame(s: GameState): { frame: Frame; transfer: ArrayBuffer[] } {
+export function encodeFrame(s: Operation): { frame: Frame; transfer: ArrayBuffer[] } {
   const n = s.ships.length + s.pirates.length;
   const ids = new Int32Array(n);
   const pos = new Float64Array(n * 3);

@@ -6,17 +6,12 @@ import {
   clusterCenters,
   createShip,
   enterSystem,
+  focused,
   newGame,
   spawnAsteroid,
   unlockRule,
 } from './state';
-import {
-  SHIP_CLASSES,
-  type GameState,
-  type HangarType,
-  type RuleId,
-  type ShipClass,
-} from './types';
+import { SHIP_CLASSES, type Sim, type HangarType, type RuleId, type ShipClass } from './types';
 
 const MIX: [ShipClass, number][] = [
   ['drone', 0.5],
@@ -31,8 +26,8 @@ const HANGAR_SLOTS = 120;
 const HANGAR_KINDS: HangarType[] = ['launch', 'cargo', 'drydock'];
 
 /** A tier-3 game with `ships` ships (90% already out in the field), `asteroids` asteroids and `pirates` raiders. */
-export function stressGame(ships = 1000, asteroids = 600, pirates = 40, seed = 99): GameState {
-  const s = newGame(seed);
+export function stressGame(ships = 1000, asteroids = 600, pirates = 40, seed = 99): Sim {
+  const s = focused(newGame(seed));
   const r = seeded(seed ^ 0x5eed);
   for (const c of SHIP_CLASSES) if (!s.unlocked.includes(c)) s.unlocked.push(c);
   for (const id of Object.keys(PRESETS) as RuleId[]) unlockRule(s, id);

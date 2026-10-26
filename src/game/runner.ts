@@ -1,5 +1,6 @@
 import { apply, prestige, settleOffline, type OfflineReport } from '../sim/actions';
 import { DT } from '../sim/config';
+import { focusOp } from '../sim/state';
 import { step } from '../sim/tick';
 import type { GameState } from '../sim/types';
 import { EventAggregator } from './events';
@@ -114,7 +115,7 @@ export class SimRunner {
     }
     let ticks = 0;
     while (this.acc >= TICK_MS && ticks < MAX_CATCHUP_TICKS) {
-      step(s);
+      step(s, focusOp(s));
       this.acc -= TICK_MS;
       ticks++;
     }
@@ -144,7 +145,7 @@ export class SimRunner {
 
   private sendFrame() {
     if (!this.state) return;
-    const { frame, transfer } = encodeFrame(this.state);
+    const { frame, transfer } = encodeFrame(focusOp(this.state));
     this.post(frame, transfer);
   }
 
@@ -153,8 +154,9 @@ export class SimRunner {
     this.lastUi = now;
     this.dirty = false;
     const s = this.state;
-    const { snap, transfer } = encodeSnapshot(s, this.fieldsAt !== s.systemId);
-    this.fieldsAt = s.systemId;
+    const systemId = focusOp(s).systemId;
+    const { snap, transfer } = encodeSnapshot(s, this.fieldsAt !== systemId);
+    this.fieldsAt = systemId;
     this.post({ t: 'state', snap, offline: this.offline }, transfer);
     this.offline = null;
   }
