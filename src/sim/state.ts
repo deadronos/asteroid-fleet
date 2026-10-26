@@ -1,9 +1,12 @@
 import {
   DEFAULT_STANCE,
   ENERGY_MAX,
+  HANGAR_UPKEEP,
   ORE_BY_TIER,
   RULE_DEFS,
   SHIP_STATS,
+  SHIP_UPKEEP,
+  SOLAR_RATE,
   STARTER_RULES,
   ZONE_RULE_UNLOCKS,
   ZONE_UNLOCKS,
@@ -225,6 +228,51 @@ export function maxHull(s: GameState, cls: ShipClass): number {
 
 export function maxEnergy(s: GameState): number {
   return ENERGY_MAX * (1 + 0.25 * lvl(s, 'energyCap'));
+}
+
+/** Solar recharge in the current system, energy/s, before storm boosts. */
+export function solarRate(s: GameState): number {
+  return SOLAR_RATE * s.systems[s.systemId].brightness * (1 + 0.2 * lvl(s, 'solar'));
+}
+
+/** Energy/s drawn by `count` hangars. */
+export function hangarUpkeep(count: number): number {
+  let e = 0;
+  for (let i = 0; i < count; i++) e += HANGAR_UPKEEP(i);
+  return e;
+}
+
+/** Energy/s the hangars and launched ships draw right now (#60). Docked ships are free. */
+export function upkeepRate(s: GameState): number {
+  let total = hangarUpkeep(s.hangars.length);
+  for (const x of s.ships) if (x.mode !== 'docked') total += SHIP_UPKEEP[x.cls];
+  return total;
+}
+
+export interface Upkeep {
+  hangars: number;
+  /** Energy/s for the hangars alone. */
+  hangarRate: number;
+  /** Launched (not docked) ships per class. */
+  launched: Record<ShipClass, number>;
+  /** Energy/s for all hangars and launched ships. */
+  total: number;
+}
+
+/** `upkeepRate` broken down for the Power panel. */
+export function upkeep(s: GameState): Upkeep {
+  const launched = Object.fromEntries(Object.keys(SHIP_UPKEEP).map((c) => [c, 0])) as Record<
+    ShipClass,
+    number
+  >;
+  const hangarRate = hangarUpkeep(s.hangars.length);
+  let total = hangarRate;
+  for (const x of s.ships) {
+    if (x.mode === 'docked') continue;
+    launched[x.cls]++;
+    total += SHIP_UPKEEP[x.cls];
+  }
+  return { hangars: s.hangars.length, hangarRate, launched, total };
 }
 
 export function createShip(

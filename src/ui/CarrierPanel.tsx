@@ -5,14 +5,17 @@ import {
   REFINE_ENERGY,
   REFINERY_COST,
   refineRate,
+  FUSION_RATE,
+  HANGAR_UPKEEP,
   SHIP_STATS,
-  SOLAR_RATE,
+  SHIP_UPKEEP,
   TIER_NAMES,
   warpCost,
 } from '../sim/config';
 import { lvl } from '../sim/research';
+import { solarRate, upkeep } from '../sim/state';
 import { cargoCap } from '../sim/tick';
-import type { GameState } from '../sim/types';
+import { SHIP_CLASSES, type GameState } from '../sim/types';
 import { fmt } from './Hud';
 
 /** Rough per-link rates for the throughput = min(...) readout. Ore units per second. */
@@ -28,9 +31,8 @@ function throughput(s: GameState) {
   const haulerTransport = barges
     ? (haulers * cargoCap(s, 'hauler')) / ((2 * avgTrip) / SHIP_STATS.hauler.speed + 3)
     : Infinity;
-  const sys = s.systems[s.systemId];
-  const solar = SOLAR_RATE * sys.brightness * (1 + 0.2 * lvl(s, 'solar'));
-  const refinery = Math.min(refineRate(s.carrier.refinery), solar / REFINE_ENERGY);
+  const spare = Math.max(0, solarRate(s) - upkeep(s).total);
+  const refinery = Math.min(refineRate(s.carrier.refinery), spare / REFINE_ENERGY);
   const links = [
     { name: 'Mining', v: mining },
     { name: 'Drone transport', v: droneTransport },
@@ -46,6 +48,9 @@ export function CarrierPanel() {
   const sys = s.systems[s.systemId];
   const t = throughput(s);
   const refCost = REFINERY_COST(s.carrier.refinery);
+  const solar = solarRate(s);
+  const up = upkeep(s);
+  const net = solar - up.total;
   return (
     <>
       <h3>Throughput</h3>
@@ -65,11 +70,45 @@ export function CarrierPanel() {
 
       <h3>Power</h3>
       <p className="hint">
-        One energy pool for refinery, shields, warp and drift. Solar recharges it slowly (
-        {(SOLAR_RATE * sys.brightness * (1 + 0.2 * lvl(s, 'solar'))).toFixed(1)}/s here)
-        {lvl(s, 'fusion') > 0 ? '; fusion burns H2 for much more.' : '.'} At zero, shields stay down
-        and refining stops until it recharges.
+        One energy pool for upkeep, refinery, shields, warp and drift. Every hangar and every
+        launched ship draws upkeep first; docked ships are free. At zero, shields stay down,
+        refining stops, hangars hold launches and ships between jobs dock until it recharges.
       </p>
+      <table className="doc">
+        <tbody>
+          <tr>
+            <td>Solar</td>
+            <td style={{ textAlign: 'right' }}>+{solar.toFixed(2)}/s</td>
+          </tr>
+          {lvl(s, 'fusion') > 0 && (
+            <tr>
+              <td>Fusion (while H2 lasts)</td>
+              <td style={{ textAlign: 'right' }}>up to +{FUSION_RATE}/s</td>
+            </tr>
+          )}
+          <tr title={`The next hangar adds ${HANGAR_UPKEEP(up.hangars).toFixed(2)}/s`}>
+            <td>Hangars × {up.hangars}</td>
+            <td style={{ textAlign: 'right' }}>−{up.hangarRate.toFixed(2)}/s</td>
+          </tr>
+          {SHIP_CLASSES.filter((c) => up.launched[c] > 0).map((c) => (
+            <tr key={c}>
+              <td>
+                {SHIP_STATS[c].short} × {up.launched[c]} launched
+              </td>
+              <td style={{ textAlign: 'right' }}>
+                −{(up.launched[c] * SHIP_UPKEEP[c]).toFixed(2)}/s
+              </td>
+            </tr>
+          ))}
+          <tr>
+            <td>Left for refinery and shields</td>
+            <td style={{ textAlign: 'right', color: net < 0 ? 'var(--warn)' : undefined }}>
+              {net >= 0 ? '+' : '−'}
+              {Math.abs(net).toFixed(2)}/s
+            </td>
+          </tr>
+        </tbody>
+      </table>
       <div className="row">
         {(
           [

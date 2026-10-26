@@ -1,5 +1,4 @@
 import {
-  SOLAR_RATE,
   HANGAR_SLOT_COST,
   HANGAR_TYPES,
   hangarLocked,
@@ -21,7 +20,7 @@ import {
 import { autoBuyUnlocked, autoRebuildUnlocked, engagementUnlocked } from './automation';
 import { moveShip as moveOnBoard } from './hangar';
 import { buyResearch as buyNode, lvl, reserveDefs } from './research';
-import { createShip, log, maxEnergy, newGame } from './state';
+import { createShip, log, maxEnergy, newGame, solarRate, upkeepRate } from './state';
 import { executeJump } from './tick';
 import type {
   CarrierStance,
@@ -296,7 +295,8 @@ export interface OfflineReport {
 /**
  * Offline is mostly safe: no pirate waves. The fleet earns only what safe mining yielded
  * recently (salvage excluded), at reduced efficiency. Offline credits do not count toward
- * prestige research. Energy recharges from solar over the elapsed time. Reserves keep rebuilding.
+ * prestige research. Energy recharges from solar minus fleet upkeep over the elapsed time (never
+ * below zero; mining income is already net of upkeep). Reserves keep rebuilding.
  */
 export function settleOffline(s: GameState, elapsedS: number): OfflineReport | null {
   const t = Math.min(OFFLINE_CAP_S, Math.max(0, elapsedS));
@@ -305,9 +305,8 @@ export function settleOffline(s: GameState, elapsedS: number): OfflineReport | n
   const credits = Math.max(0, s.miningIncomeAvg || 0) * t * OFFLINE_EFFICIENCY;
   s.credits += credits;
   s.stats.creditsEarned += credits;
-  const sys = s.systems[s.systemId];
-  const solar = SOLAR_RATE * sys.brightness * (1 + 0.2 * lvl(s, 'solar'));
-  s.carrier.energy = Math.min(maxEnergy(s), s.carrier.energy + solar * t);
+  const net = solarRate(s) - upkeepRate(s);
+  s.carrier.energy = Math.min(maxEnergy(s), Math.max(0, s.carrier.energy + net * t));
   s.carrier.shield = 1;
   s.pirates = [];
   s.wave.active = false;

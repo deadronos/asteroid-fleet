@@ -51,7 +51,7 @@ export function step(s: GameState, dt = DT) {
   }
   s.fx.length = live;
 
-  power(s, dt);
+  power(s, dt, ctx);
   threats(s, dt);
   launch(s, dt, ctx);
   for (const ship of s.ships) {
@@ -138,9 +138,11 @@ function wantsLaunch(s: GameState, ship: Ship, ctx: Ctx): boolean {
 }
 
 function launch(s: GameState, dt: number, ctx: Ctx) {
+  // Launches wait while the pool cannot pay upkeep; the timers keep running.
+  const hold = ctx.powerShort;
   for (const h of s.hangars) {
     h.launchTimer -= dt;
-    if (h.launchTimer > 0) continue;
+    if (h.launchTimer > 0 || hold) continue;
     const docked = h.items
       .map((it) => ctx.ships.get(it.shipId))
       .filter((x): x is Ship => !!x && x.mode === 'docked');
@@ -176,6 +178,13 @@ function behave(s: GameState, ship: Ship, dt: number, ctx: Ctx) {
       goHome(s, ship, dt);
       return;
     }
+  }
+  // Power short (#60): ships between jobs stand down and dock, so upkeep shrinks
+  // until the pool can pay it. Launches resume once it can.
+  if (ctx.powerShort && ship.mode === 'idle' && ship.cargo === 0 && ship.h2 === 0) {
+    ship.mode = 'retreat';
+    goHome(s, ship, dt);
+    return;
   }
   // Under-fire stances.
   if (st.underFire === 'retreatHull' && ship.hull < mh * st.retreatAt) {

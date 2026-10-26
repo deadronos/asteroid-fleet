@@ -11,7 +11,6 @@ import {
   REFINE_ENERGY,
   refineRate,
   SHIP_STATS,
-  SOLAR_RATE,
   warpCost,
 } from './config';
 import { SHIELD_HP, damageShip, inHazard, type Ctx } from './ctx';
@@ -26,25 +25,27 @@ import {
   h2Storm,
   log,
   maxEnergy,
+  solarRate,
   spawnAsteroid,
+  upkeepRate,
 } from './state';
 import type { GameState, Vec3 } from './types';
 
-export function power(s: GameState, dt: number) {
+export function power(s: GameState, dt: number, ctx: Ctx) {
   const c = s.carrier;
-  const sys = s.systems[s.systemId];
   const max = maxEnergy(s);
-  let gain =
-    SOLAR_RATE *
-    sys.brightness *
-    (1 + 0.2 * lvl(s, 'solar')) *
-    (s.storm.active > 0 && !h2Storm(s) ? 1.6 : 1);
+  let gain = solarRate(s) * (s.storm.active > 0 && !h2Storm(s) ? 1.6 : 1);
   if (lvl(s, 'fusion') > 0 && c.h2 > 0 && c.energy < max) {
     const burn = Math.min(c.h2, FUSION_H2 * dt);
     c.h2 -= burn;
     gain += FUSION_RATE * (burn / (FUSION_H2 * dt));
   }
   c.energy = Math.min(max, c.energy + gain * dt);
+  // Upkeep is paid before shields and refining. Soft floor: what the pool cannot
+  // cover is waived, and `powerShort` holds launches and docks returning ships.
+  const due = upkeepRate(s) * dt;
+  ctx.powerShort = c.energy < due;
+  c.energy = Math.max(0, c.energy - due);
   // Shield regen costs energy; when the pool is empty the shields stay down.
   if (c.shield < 1 && c.energy > 0) {
     const mult = s.powerMode === 'defense' ? 2 : s.powerMode === 'income' ? 0.5 : 1;

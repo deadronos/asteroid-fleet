@@ -298,6 +298,25 @@ export const MAX_REFINERY = 8;
 export const REFINE_ENERGY = 0.35; // energy per ore unit
 export const FUSION_RATE = 25; // energy/s while burning H2
 export const FUSION_H2 = 0.5; // H2 per second burnt
+/**
+ * Power upkeep (#60), energy/s. Each hangar draws more than the one before it
+ * (`HANGAR_UPKEEP(i)` for the i-th, 0-based), and every ship that is out of the
+ * carrier (not docked) draws its class rate on top. Docked ships cost nothing.
+ * Upkeep is paid before shields and refining, so it eats into the refinery's
+ * share of the pool: energy, not a ship count, is what limits a fleet. At zero
+ * the carrier is never stranded: solar keeps trickling, unpaid upkeep is waived,
+ * hangars hold launches, and ships between jobs dock until the pool can pay.
+ */
+export const HANGAR_UPKEEP = (index: number) => 0.03 * Math.pow(1.9, index);
+export const SHIP_UPKEEP: Record<ShipClass, number> = {
+  drone: 0.006,
+  barge: 0.04,
+  hauler: 0.02,
+  fighter: 0.02,
+  scout: 0.01,
+  repair: 0.02,
+  harvester: 0.03,
+};
 export const SHIELD_ENERGY_PER_DMG = 1.2;
 export const SHIELD_REGEN = 0.03; // per second
 export const SHIELD_REGEN_ENERGY = 4; // energy/s while regenerating

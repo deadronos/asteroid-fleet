@@ -65,6 +65,8 @@ export interface Ctx {
   /** Upper bound on asteroid value this tick (for pruning grid searches). */
   maxValue: number;
   recall: boolean;
+  /** The energy pool could not cover this tick's upkeep (#60). */
+  powerShort: boolean;
   income: number;
   mining: number;
 }
@@ -100,6 +102,7 @@ const ctx: Ctx = {
   veins: new Set(),
   maxValue: 0,
   recall: false,
+  powerShort: false,
   income: 0,
   mining: 0,
 };
@@ -118,6 +121,7 @@ export function buildCtx(s: GameState): Ctx {
   ctx.stances.clear();
   ctx.income = 0;
   ctx.mining = 0;
+  ctx.powerShort = false;
 
   for (const sh of s.ships) {
     ctx.ships.set(sh.id, sh);

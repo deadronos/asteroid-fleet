@@ -3,7 +3,7 @@ import { apply, prestige, researchPayout, settleOffline, shipCost } from './acti
 import { fits, neighbours, occupancy } from './hangar';
 import { SOLAR_RATE } from './config';
 import { lvl } from './research';
-import { maxEnergy, newGame } from './state';
+import { maxEnergy, newGame, upkeepRate } from './state';
 import { step } from './tick';
 import type { GameState } from './types';
 
@@ -125,10 +125,10 @@ describe('simulation', () => {
     expect(researchPayout(s)).toBe(before);
   });
 
-  it('recharges energy from solar over the elapsed time, capped at max', () => {
+  it('recharges energy from solar minus upkeep over the elapsed time, capped at max', () => {
     const s = newGame(9);
     const sys = s.systems[s.systemId];
-    const rate = SOLAR_RATE * sys.brightness * (1 + 0.2 * lvl(s, 'solar'));
+    const rate = SOLAR_RATE * sys.brightness * (1 + 0.2 * lvl(s, 'solar')) - upkeepRate(s);
     s.carrier.energy = 0;
     settleOffline(s, 100);
     expect(s.carrier.energy).toBeCloseTo(Math.min(maxEnergy(s), rate * 100));

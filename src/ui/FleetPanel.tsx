@@ -7,6 +7,7 @@ import {
   HANGAR_TYPES,
   hangarLocked,
   MAX_HANGAR_SLOTS,
+  HANGAR_UPKEEP,
   MAX_HANGARS,
   MODULE_IDS,
   MODULE_SLOTS,
@@ -465,7 +466,10 @@ export function FleetPanel() {
       ))}
       {hangarCount < MAX_HANGARS && (
         <>
-          <h3>New hangar · {fmt(NEW_HANGAR_COST(hangarCount))} cr</h3>
+          <h3>
+            New hangar · {fmt(NEW_HANGAR_COST(hangarCount))} cr · upkeep{' '}
+            {HANGAR_UPKEEP(hangarCount).toFixed(2)} energy/s
+          </h3>
           <div className="row">
             {(Object.keys(HANGAR_TYPES) as HangarType[]).map((t) => (
               <button
