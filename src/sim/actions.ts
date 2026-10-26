@@ -17,6 +17,7 @@ import {
   warpCost,
   warpPayment,
 } from './config';
+import { cardSlots, checkCard, nextCardId } from './cards';
 import { autoBuyUnlocked, autoRebuildUnlocked, engagementUnlocked } from './automation';
 import { moveShip as moveOnBoard } from './hangar';
 import { buyResearch as buyNode, lvl, reserveDefs } from './research';
@@ -27,7 +28,7 @@ import type {
   GameState,
   HangarType,
   ModuleId,
-  RuleId,
+  RuleCard,
   ShipClass,
   Stance,
 } from './types';
@@ -46,7 +47,10 @@ export type Command =
       patch: Partial<Stance> | null;
       key?: keyof Stance;
     }
-  | { type: 'setRule'; id: RuleId; enabled?: boolean; param?: number }
+  | { type: 'addCard'; card: Omit<RuleCard, 'id'> }
+  | { type: 'updateCard'; id: number; card: Omit<RuleCard, 'id'> }
+  | { type: 'moveCard'; id: number; to: number }
+  | { type: 'deleteCard'; id: number }
   | { type: 'warp'; systemId: number }
   | { type: 'cancelWarp' }
   | { type: 'jumpNow' }
@@ -178,11 +182,35 @@ export function apply(s: GameState, c: Command): string | null {
       Object.assign(target, c.patch);
       return null;
     }
-    case 'setRule': {
-      const r = s.rules.find((x) => x.id === c.id);
-      if (!r || !s.unlockedRules.includes(c.id)) return 'Rule locked';
-      if (c.enabled !== undefined) r.enabled = c.enabled;
-      if (c.param !== undefined) r.param = c.param;
+    case 'addCard': {
+      if (s.cards.length >= cardSlots(s)) return 'All card slots are in use';
+      const card = structuredClone(c.card);
+      const err = checkCard(s, card);
+      if (err) return err;
+      s.cards.push({ ...card, id: nextCardId(s) });
+      return null;
+    }
+    case 'updateCard': {
+      const i = s.cards.findIndex((x) => x.id === c.id);
+      if (i < 0) return 'No such card';
+      const card = structuredClone(c.card);
+      const err = checkCard(s, card);
+      if (err) return err;
+      s.cards[i] = { ...card, id: c.id };
+      return null;
+    }
+    case 'moveCard': {
+      const i = s.cards.findIndex((x) => x.id === c.id);
+      if (i < 0) return 'No such card';
+      const to = Math.max(0, Math.min(s.cards.length - 1, Math.floor(c.to) || 0));
+      const [card] = s.cards.splice(i, 1);
+      s.cards.splice(to, 0, card);
+      return null;
+    }
+    case 'deleteCard': {
+      const i = s.cards.findIndex((x) => x.id === c.id);
+      if (i < 0) return 'No such card';
+      s.cards.splice(i, 1);
       return null;
     }
     case 'warp': {
@@ -279,7 +307,7 @@ export function prestige(s: GameState): GameState {
       researchEarned: s.lifetime.researchEarned + rp,
     },
     doctrine: structuredClone(s.doctrine),
-    rules: structuredClone(s.rules),
+    cards: structuredClone(s.cards),
     automation: structuredClone(s.automation),
   });
   emit(next, 'Prestiged', { research: rp });

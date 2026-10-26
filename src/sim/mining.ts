@@ -3,19 +3,19 @@
 import { DOCK_RADIUS, DRILL_VALUE, H2_STORM_YIELD, LASER_RATE, VEIN_BONUS } from './config';
 import {
   CARRIER,
+  card,
   cargoCap,
   covered,
   goHome,
   inHazard,
   miningRate,
   modCount,
-  nearestPirate,
   speed,
   transfer,
   unloadAtCarrier,
   type Ctx,
 } from './ctx';
-import { rule } from './doctrine';
+import { firing } from './cards';
 import { dist, dist2, moveToward, rand } from './math';
 import { lvl } from './research';
 import { clusterCenters, emit, gasGiantPos, h2Storm, maxHull } from './state';
@@ -196,9 +196,7 @@ function inChartedHazard(s: GameState, p: Vec3): boolean {
 function bestDropoff(s: GameState, ship: Ship, ctx: Ctx): Ship | null {
   const bay = bayBarge(ship, ctx);
   if (bay && bay.cargo < cargoCap(s, 'barge', bay) - 1) return bay;
-  const r = rule(s, 'droneUnloadAtBarge');
-  if (!r) return null;
-  if (dist(ship.pos, s.carrier.pos) <= r.param) return null;
+  if (!card(s, ctx, 'unloadAtBarge', ship)) return null;
   let best: Ship | null = null;
   let bd = dist(ship.pos, s.carrier.pos);
   for (const b of ctx.byClass.barge) {
@@ -285,11 +283,6 @@ export function oreNear(s: GameState, p: Vec3, r: number): number {
 export function barge(s: GameState, ship: Ship, dt: number, ctx: Ctx, mining: 'greedy' | 'safe') {
   const cap = cargoCap(s, 'barge', ship);
   const v = speed(s, ship) * dt;
-  if (rule(s, 'bargeFallBack') && nearestPirate(s, ship.pos, 28)) {
-    ship.mode = 'retreat';
-    emit(s, 'BargeFallback', {});
-    return;
-  }
   const haulersExist = ctx.byClass.hauler.length > 0;
   if (ship.mode === 'toCarrier' || (ship.cargo >= cap * 0.98 && !haulersExist)) {
     ship.mode = 'toCarrier';
@@ -341,15 +334,15 @@ function pickStation(s: GameState, ship: Ship, ctx: Ctx, mining: 'greedy' | 'saf
 }
 
 export function haulerJob(s: GameState, ship: Ship, ctx: Ctx): Ship | null {
-  const r = rule(s, 'bargeCallHauler');
-  const threshold = r ? r.param : 0.98;
+  const calls = ctx.cards.callHauler;
   let best: Ship | null = null;
   let bf = 0;
   for (const b of ctx.byClass.barge) {
     if (b.mode !== 'station') continue;
     if (ctx.haulerClaims.has(b.id) && ship.targetId !== b.id) continue;
     const fill = b.cargo / cargoCap(s, 'barge', b);
-    if (fill >= threshold && fill > bf) {
+    // A firing call-a-hauler card brings one early; otherwise haulers come at 98 %.
+    if (fill > bf && (fill >= 0.98 || (calls.length > 0 && firing(s, calls, b)))) {
       bf = fill;
       best = b;
     }
@@ -412,11 +405,11 @@ export function hauler(s: GameState, ship: Ship, dt: number, ctx: Ctx) {
     ship.mode = 'toCarrier';
     return;
   }
-  if (rule(s, 'haulerPark')) goHome(s, ship, dt);
+  if (card(s, ctx, 'park', ship)) goHome(s, ship, dt);
   else moveToward(ship.pos, s.carrier.pos, v, 8);
 }
 
-export function harvester(s: GameState, ship: Ship, dt: number) {
+export function harvester(s: GameState, ship: Ship, dt: number, ctx: Ctx) {
   const sys = s.systems[s.systemId];
   const v = speed(s, ship) * dt;
   if (!sys.gasGiant) {
@@ -425,7 +418,7 @@ export function harvester(s: GameState, ship: Ship, dt: number) {
   }
   const cap = cargoCap(s, 'harvester', ship);
   const storm = h2Storm(s);
-  if (storm && rule(s, 'harvesterStormShelter')) {
+  if (card(s, ctx, 'shelter', ship)) {
     if (ship.h2 > 0) ship.mode = 'toCarrier';
     else {
       goHome(s, ship, dt);

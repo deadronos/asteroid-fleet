@@ -12,8 +12,7 @@ import {
   refineRate,
   warpCost,
 } from './config';
-import { SHIELD_HP, damageShip, inHazard, type Ctx } from './ctx';
-import { rule } from './doctrine';
+import { SHIELD_HP, card, damageShip, inHazard, type Ctx } from './ctx';
 import { oreNear } from './mining';
 import { dist, dist2, moveToward, rand } from './math';
 import { lvl, reserveDefs } from './research';
@@ -62,7 +61,7 @@ export function refine(s: GameState, dt: number, ctx: Ctx) {
   if (c.ore <= 0) return;
   const max = maxEnergy(s);
   let floor = s.powerMode === 'defense' ? 0.5 * max : s.powerMode === 'balanced' ? 0.15 * max : 0;
-  if (rule(s, 'reserveWarpEnergy')) {
+  if (card(s, ctx, 'reserveWarp', null)) {
     const sys = s.systems[s.systemId];
     floor = Math.max(floor, warpCost(sys.distance, Math.max(0, sys.distance - 1)));
   }

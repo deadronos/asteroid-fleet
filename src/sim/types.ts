@@ -107,6 +107,8 @@ export interface Ship {
   fireCooldown: number;
   /** Fitted modules, at most `MODULE_SLOTS[cls]`. */
   modules: ModuleId[];
+  /** A timed stance card still in force after its conditions stopped holding. */
+  hold?: { card: number; until: number };
 }
 
 export interface Pirate {
@@ -182,6 +184,7 @@ export interface StarSystem {
   seed: number;
 }
 
+/** Built-in preset cards. These were the fixed rules before condition/action cards (#82). */
 export type RuleId =
   | 'fightersEscortOnWave'
   | 'bargeCallHauler'
@@ -192,11 +195,67 @@ export type RuleId =
   | 'reserveWarpEnergy'
   | 'harvesterStormShelter';
 
-export interface Rule {
-  id: RuleId;
+/**
+ * Which units a card speaks for. More specific scopes win: hangar > ship type > fleet.
+ * A per-carrier scope (#53) slots in between fleet and ship type.
+ */
+export type CardScope =
+  | { kind: 'fleet' }
+  | { kind: 'class'; cls: ShipClass }
+  | { kind: 'hangar'; id: number };
+
+export type ConditionKind =
+  | 'cargoAbove'
+  | 'hullBelow'
+  | 'pirateWithin'
+  | 'wave'
+  | 'energyBelow'
+  | 'shieldBelow'
+  | 'storm'
+  | 'asteroidFarther'
+  | 'carrierFarther'
+  | 'always';
+
+export interface Condition {
+  kind: ConditionKind;
+  /** Threshold; fractions are 0..1, distances km. Unused by some kinds (see CONDITION_DEFS). */
+  value?: number;
+}
+
+export type ActionKind =
+  | 'stance'
+  | 'fallBack'
+  | 'unloadAtBarge'
+  | 'callHauler'
+  | 'park'
+  | 'recall'
+  | 'shelter'
+  | 'reserveWarp';
+
+/** A stance a card can switch to, as `axis:value`. */
+export type StanceSwitch =
+  | `engagement:${Engagement}`
+  | `underFire:${UnderFire}`
+  | `mining:${MiningStance}`;
+
+export interface CardAction {
+  kind: ActionKind;
+  /** For `stance`: what to switch to. */
+  to?: StanceSwitch;
+  /** For `stance`: keep it this many seconds after the conditions last held. */
+  seconds?: number;
+}
+
+/** A Gladiabots-lite rule: when every condition holds, the action overrides the stance. */
+export interface RuleCard {
+  id: number;
   enabled: boolean;
-  /** Rule parameter (meaning depends on the rule, see RULE_DEFS). */
-  param: number;
+  /** The preset this card started from, if any. */
+  preset?: RuleId;
+  scope: CardScope;
+  /** 1..MAX_CONDITIONS conditions, joined by AND. */
+  when: Condition[];
+  then: CardAction;
 }
 
 export type CarrierStance = 'hold' | 'followRich';
@@ -294,6 +353,7 @@ export interface GameState {
   research: number; // unspent research points
   researchLevels: Record<string, number>;
   unlocked: ShipClass[];
+  /** Presets unlocked so far; each unlocks its card's action for every card. */
   unlockedRules: RuleId[];
   carrier: Carrier;
   hangars: Hangar[];
@@ -308,7 +368,8 @@ export interface GameState {
   /** Depletion records of systems left behind, keyed by system id. */
   fields: Record<number, FieldRecord>;
   doctrine: Doctrine;
-  rules: Rule[];
+  /** Rule cards in priority order (within a scope level). */
+  cards: RuleCard[];
   warp: Warp | null;
   wave: { timer: number; warning: boolean; active: boolean; size: number };
   storm: { timer: number; active: number };

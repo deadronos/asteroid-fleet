@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { PRESETS } from '../sim/config';
 import { SAVE_VERSION, newGame } from '../sim/state';
 import { step } from '../sim/tick';
 import saveV1 from './fixtures/save-v1.json';
@@ -8,6 +9,7 @@ import saveV4 from './fixtures/save-v4.json';
 import saveV5 from './fixtures/save-v5.json';
 import saveV6 from './fixtures/save-v6.json';
 import saveV7 from './fixtures/save-v7.json';
+import saveV8 from './fixtures/save-v8.json';
 import { applyMigrationSteps, migrate, type SaveBlob } from './migrate';
 import {
   SAVE_BACKUP_FAILED_NOTICE,
@@ -206,6 +208,60 @@ describe('migrate', () => {
     expect(noLog.ok && noLog.state.log).toEqual([]);
   });
 
+  it('turns v8 rules into their preset cards (#82)', () => {
+    expect(saveV8.version).toBe(8);
+    const r = migrate(saveV8);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect('rules' in r.state).toBe(false);
+    expect(r.state.unlockedRules).toEqual(saveV8.unlockedRules);
+    expect(r.state.cards.map((c) => [c.id, c.preset, c.enabled])).toEqual([
+      [1, 'droneUnloadAtBarge', true],
+      [2, 'bargeCallHauler', true],
+      [3, 'haulerPark', false],
+      [4, 'fightersEscortOnWave', true],
+      [5, 'bargeFallBack', false],
+      [6, 'recallOnLowShields', true],
+      [7, 'reserveWarpEnergy', false],
+    ]);
+    // The old param lands on the preset's parameter condition; the rest is the preset as is.
+    const byPreset = Object.fromEntries(r.state.cards.map((c) => [c.preset, c]));
+    expect(byPreset.droneUnloadAtBarge.when).toEqual([{ kind: 'carrierFarther', value: 25 }]);
+    expect(byPreset.bargeCallHauler.when).toEqual([{ kind: 'cargoAbove', value: 0.6 }]);
+    expect(byPreset.recallOnLowShields.when).toEqual([
+      { kind: 'shieldBelow', value: 0.35 },
+      { kind: 'pirateWithin' },
+    ]);
+    for (const c of r.state.cards) {
+      expect(c.scope).toEqual(PRESETS[c.preset!].card.scope);
+      expect(c.then).toEqual(PRESETS[c.preset!].card.then);
+    }
+    // The preset table itself is not touched by migrating.
+    expect(PRESETS.bargeCallHauler.card.when[0].value).toBe(0.8);
+  });
+
+  it('drops unknown, duplicate and malformed v8 rules', () => {
+    const r = migrate({
+      ...structuredClone(saveV8),
+      rules: [
+        { id: 'haulerPark', enabled: true, param: 0 },
+        { id: 'haulerPark', enabled: false, param: 0 },
+        { id: 'noSuchRule', enabled: true, param: 1 },
+        'junk',
+        { id: 'bargeCallHauler', enabled: true, param: 'high' },
+      ],
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.state.cards.map((c) => [c.preset, c.enabled])).toEqual([
+      ['haulerPark', true],
+      ['bargeCallHauler', true],
+    ]);
+    expect(r.state.cards[1].when[0].value).toBe(0.8);
+    const none = migrate({ ...structuredClone(saveV8), rules: undefined });
+    expect(none.ok && none.state.cards).toEqual([]);
+  });
+
   it('rebuilds a missing systems map from the seed (#40)', () => {
     expect(saveV1.systems).toEqual([]);
     const r = migrate(saveV1);
@@ -227,6 +283,7 @@ describe('migrate', () => {
     ['v5', saveV5],
     ['v6', saveV6],
     ['v7', saveV7],
+    ['v8', saveV8],
   ])('a migrated %s fixture keeps running through step()', (_, fixture) => {
     const r = migrate(fixture);
     expect(r.ok).toBe(true);

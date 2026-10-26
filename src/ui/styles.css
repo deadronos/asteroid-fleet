@@ -447,6 +447,41 @@ select.inherit {
   color: var(--muted);
 }
 
+.rule .card-tools {
+  grid-column: 2;
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+}
+.card-tools button,
+.cond button {
+  padding: 0 6px;
+}
+.card-edit {
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 8px 9px;
+  margin-bottom: 6px;
+  display: grid;
+  justify-items: start;
+  gap: 6px;
+  font-size: 12px;
+}
+.card-edit label,
+.cond,
+.val {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.val {
+  color: var(--muted);
+}
+.val input[type='number'] {
+  width: 4.5em;
+}
+
 /* systems */
 .sys {
   border: 1px solid var(--line);

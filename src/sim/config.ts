@@ -1,4 +1,15 @@
-import type { HangarType, ModuleId, RuleId, ShipClass, Stance } from './types';
+import {
+  SHIP_CLASSES,
+  type ActionKind,
+  type ConditionKind,
+  type HangarType,
+  type ModuleId,
+  type RuleCard,
+  type RuleId,
+  type ShipClass,
+  type Stance,
+  type StanceSwitch,
+} from './types';
 
 export const TICK_HZ = 10;
 export const DT = 1 / TICK_HZ;
@@ -192,63 +203,131 @@ export const DEFAULT_STANCE: Stance = {
   mining: 'safe',
 };
 
-export interface RuleDef {
-  unit: string;
-  when: string;
-  then: string;
-  param?: { label: string; min: number; max: number; step: number; fmt: (v: number) => string };
-  defaultParam: number;
+// ---------- Rule cards (#82) ----------
+// Player-facing text for the vocabulary lives in ui/cardText.ts, out of the worker bundle.
+
+/** Card slots on the Doctrine panel. A research/automation unlock can raise this later. */
+export const CARD_SLOTS = 12;
+export const MAX_CONDITIONS = 3;
+
+export interface ValueDef {
+  min: number;
+  max: number;
+  step: number;
+  /** Fractions show as percent, otherwise km. */
+  pct: boolean;
+  def: number;
 }
 
-const pct = (v: number) => `${Math.round(v * 100)} %`;
+export interface ConditionDef {
+  value?: ValueDef;
+  /** Reads the unit itself (cargo, hull, position), so it cannot gate a carrier action. */
+  ship: boolean;
+}
 
-export const RULE_DEFS: Record<RuleId, RuleDef> = {
-  fightersEscortOnWave: {
-    unit: 'All fighters',
-    when: 'Pirate wave announced',
-    then: 'Switch to Escort',
-    defaultParam: 0,
-  },
-  bargeCallHauler: {
-    unit: 'Barge',
-    when: 'Cargo above',
-    then: 'Call a hauler',
-    param: { label: 'cargo', min: 0.2, max: 1, step: 0.05, fmt: pct },
-    defaultParam: 0.8,
-  },
-  bargeFallBack: {
-    unit: 'Barge',
-    when: 'Pirate in range',
-    then: 'Fall back to the carrier',
-    defaultParam: 0,
-  },
-  droneUnloadAtBarge: {
-    unit: 'Drone',
-    when: 'Asteroid farther than',
-    then: 'Unload at the nearest barge instead of the carrier',
-    param: { label: 'distance', min: 0, max: 60, step: 5, fmt: (v) => `${v} km` },
-    defaultParam: 15,
-  },
-  haulerPark: { unit: 'Hauler', when: 'No job', then: 'Park at the carrier', defaultParam: 0 },
-  recallOnLowShields: {
-    unit: 'All ships',
-    when: 'Carrier shields below',
-    then: 'Recall to the hangars',
-    param: { label: 'shields', min: 0.05, max: 0.9, step: 0.05, fmt: pct },
-    defaultParam: 0.2,
-  },
-  reserveWarpEnergy: {
-    unit: 'Carrier',
-    when: 'Energy below warp cost',
-    then: 'Pause refining to keep a jump in reserve',
-    defaultParam: 0,
-  },
-  harvesterStormShelter: {
-    unit: 'Gas harvester',
-    when: 'H2 storm',
-    then: 'Shelter at the carrier until it passes',
-    defaultParam: 0,
-  },
+const frac = (min: number, max: number, def: number): ValueDef => ({
+  min,
+  max,
+  step: 0.05,
+  pct: true,
+  def,
+});
+const kms = (min: number, max: number, step: number, def: number): ValueDef => ({
+  min,
+  max,
+  step,
+  pct: false,
+  def,
+});
+
+export const CONDITION_DEFS: Record<ConditionKind, ConditionDef> = {
+  cargoAbove: { value: frac(0.05, 1, 0.8), ship: true },
+  hullBelow: { value: frac(0.05, 0.95, 0.3), ship: true },
+  // 0 means anywhere in the system. Without a unit it measures from the carrier.
+  pirateWithin: { value: kms(0, 100, 2, 28), ship: false },
+  wave: { ship: false },
+  energyBelow: { value: frac(0.05, 0.95, 0.25), ship: false },
+  shieldBelow: { value: frac(0.05, 0.9, 0.2), ship: false },
+  storm: { ship: false },
+  asteroidFarther: { value: kms(5, 100, 5, 30), ship: true },
+  carrierFarther: { value: kms(0, 60, 5, 15), ship: true },
+  always: { ship: false },
+};
+
+export interface ActionDef {
+  /** Unlocking this preset unlocks the action for every card. */
+  unlock: RuleId;
+  /** Ship types the action affects; null for carrier actions (fleet scope only). */
+  classes: ShipClass[] | null;
+}
+
+export const ACTION_DEFS: Record<ActionKind, ActionDef> = {
+  stance: { unlock: 'fightersEscortOnWave', classes: SHIP_CLASSES },
+  fallBack: { unlock: 'bargeFallBack', classes: SHIP_CLASSES },
+  unloadAtBarge: { unlock: 'droneUnloadAtBarge', classes: ['drone'] },
+  callHauler: { unlock: 'bargeCallHauler', classes: ['barge'] },
+  park: { unlock: 'haulerPark', classes: ['hauler'] },
+  recall: { unlock: 'recallOnLowShields', classes: SHIP_CLASSES },
+  shelter: { unlock: 'harvesterStormShelter', classes: ['harvester'] },
+  reserveWarp: { unlock: 'reserveWarpEnergy', classes: null },
+};
+
+export const STANCE_SWITCHES: StanceSwitch[] = [
+  'engagement:aggressive',
+  'engagement:defensive',
+  'engagement:escort',
+  'engagement:passive',
+  'underFire:stand',
+  'underFire:retreatHull',
+  'underFire:retreatCargo',
+  'mining:greedy',
+  'mining:safe',
+];
+
+export interface PresetDef {
+  card: Pick<RuleCard, 'scope' | 'when' | 'then'>;
+  /** Index of the condition whose value the old rule's `param` set. */
+  param?: number;
+}
+
+const preset = (
+  scope: RuleCard['scope'],
+  when: RuleCard['when'],
+  then: RuleCard['then'],
+  param?: number,
+): PresetDef => ({ card: { scope, when, then }, param });
+const cls = (c: ShipClass): RuleCard['scope'] => ({ kind: 'class', cls: c });
+const FLEET: RuleCard['scope'] = { kind: 'fleet' };
+const ALWAYS = [{ kind: 'always' as const }];
+
+/** The fixed rules from before #82, as cards. Behaviour is identical (cards.golden.test.ts). */
+export const PRESETS: Record<RuleId, PresetDef> = {
+  fightersEscortOnWave: preset(cls('fighter'), [{ kind: 'wave' }], {
+    kind: 'stance',
+    to: 'engagement:escort',
+  }),
+  bargeCallHauler: preset(
+    cls('barge'),
+    [{ kind: 'cargoAbove', value: 0.8 }],
+    { kind: 'callHauler' },
+    0,
+  ),
+  bargeFallBack: preset(cls('barge'), [{ kind: 'pirateWithin', value: 28 }], { kind: 'fallBack' }),
+  droneUnloadAtBarge: preset(
+    cls('drone'),
+    [{ kind: 'carrierFarther', value: 15 }],
+    { kind: 'unloadAtBarge' },
+    0,
+  ),
+  haulerPark: preset(cls('hauler'), ALWAYS, { kind: 'park' }),
+  recallOnLowShields: preset(
+    FLEET,
+    [{ kind: 'shieldBelow', value: 0.2 }, { kind: 'pirateWithin' }],
+    { kind: 'recall' },
+    0,
+  ),
+  reserveWarpEnergy: preset(FLEET, ALWAYS, { kind: 'reserveWarp' }),
+  harvesterStormShelter: preset(cls('harvester'), [{ kind: 'storm' }], { kind: 'shelter' }),
 };
 
 export const STARTER_RULES: RuleId[] = ['droneUnloadAtBarge', 'bargeCallHauler', 'haulerPark'];

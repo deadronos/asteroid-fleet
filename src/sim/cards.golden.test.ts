@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { RULE_DEFS } from './config';
+import { PRESETS } from './config';
 import { createShip, enterSystem, newGame, unlockRule } from './state';
 import { stressGame } from './stress';
 import { step } from './tick';
@@ -10,23 +10,43 @@ import { SHIP_CLASSES, type GameState, type RuleId, type ShipClass } from './typ
 // `Rule` system (before condition/action cards). Each scenario now runs with the
 // equivalent preset cards and must land on exactly the same state.
 
-const IDS = Object.keys(RULE_DEFS) as RuleId[];
+const IDS = Object.keys(PRESETS) as RuleId[];
+/** The old rules' default params. */
+const DEFAULT_PARAM: Record<RuleId, number> = {
+  fightersEscortOnWave: 0,
+  bargeCallHauler: 0.8,
+  bargeFallBack: 0,
+  droneUnloadAtBarge: 15,
+  haulerPark: 0,
+  recallOnLowShields: 0.2,
+  reserveWarpEnergy: 0,
+  harvesterStormShelter: 0,
+};
 const TICKS = 2000;
 
-/** Rule id -> param, or false for disabled. Missing ids are disabled. */
+/** Rule id -> the old rule's param, or false for disabled. Missing ids are disabled. */
 type Spec = Partial<Record<RuleId, number | false>>;
 
+/** Set each preset card the way the old `Rule { enabled, param }` was set. */
 function configure(s: GameState, spec: Spec) {
-  for (const r of s.rules) {
-    const v = spec[r.id];
-    r.enabled = v !== undefined && v !== false;
-    if (typeof v === 'number') r.param = v;
+  expect(new Set(s.cards.map((c) => c.preset))).toEqual(new Set(IDS));
+  expect(s.cards).toHaveLength(IDS.length);
+  for (const card of s.cards) {
+    const v = spec[card.preset!];
+    card.enabled = v !== undefined && v !== false;
+    const at = PRESETS[card.preset!].param;
+    if (typeof v === 'number' && at !== undefined) card.when[at].value = v;
   }
 }
 
 function digest(s: GameState): string {
-  const { rules: _r, unlockedRules: _u, version: _v, savedAt: _s, ...rest } = s as GameState &
-    Record<string, unknown>;
+  const {
+    cards: _c,
+    unlockedRules: _u,
+    version: _v,
+    savedAt: _s,
+    ...rest
+  } = s as GameState & Record<string, unknown>;
   return createHash('sha256').update(JSON.stringify(rest)).digest('hex').slice(0, 16);
 }
 
@@ -71,7 +91,7 @@ function run(make: (seed: number) => GameState, seed: number, spec: Spec): strin
   return digest(s);
 }
 
-const ALL: Spec = Object.fromEntries(IDS.map((id) => [id, RULE_DEFS[id].defaultParam]));
+const ALL: Spec = { ...DEFAULT_PARAM };
 const VARIANT: Spec = {
   ...ALL,
   bargeCallHauler: 0.4,
@@ -97,24 +117,27 @@ const CASES: [name: string, make: (seed: number) => GameState, seed: number, spe
 ];
 
 const GOLDEN: Record<string, string> = {
-  "stress, all rules": 'c537dbd047105bae',
-  "stress, tuned params": 'ae35e31c398bbf2a',
-  "stress, no rules": '72c5907330c4b5b9',
-  "stress, all but fightersEscortOnWave": 'b97174a935d136d6',
-  "stress, all but bargeCallHauler": '8fea1adfff7b9b53',
-  "stress, all but bargeFallBack": '6bf8288673cad2ab',
-  "stress, all but droneUnloadAtBarge": '632e085f228de596',
-  "stress, all but haulerPark": 'd8679767bd4dda99',
-  "stress, all but recallOnLowShields": '5021227d1fb57a61',
-  "stress, all but reserveWarpEnergy": '3e153385ad6e2a61',
-  "stress, all but harvesterStormShelter": 'aed994e1a0ef56c1',
-  "campaign, all rules": '66d70b7c16dbe425',
-  "campaign, tuned params": '056f469f8e865ec8',
+  'stress, all rules': 'c537dbd047105bae',
+  'stress, tuned params': 'ae35e31c398bbf2a',
+  'stress, no rules': '72c5907330c4b5b9',
+  'stress, all but fightersEscortOnWave': 'b97174a935d136d6',
+  'stress, all but bargeCallHauler': '8fea1adfff7b9b53',
+  'stress, all but bargeFallBack': '6bf8288673cad2ab',
+  'stress, all but droneUnloadAtBarge': '632e085f228de596',
+  'stress, all but haulerPark': 'd8679767bd4dda99',
+  'stress, all but recallOnLowShields': '5021227d1fb57a61',
+  'stress, all but reserveWarpEnergy': '3e153385ad6e2a61',
+  'stress, all but harvesterStormShelter': 'aed994e1a0ef56c1',
+  'campaign, all rules': '66d70b7c16dbe425',
+  'campaign, tuned params': '056f469f8e865ec8',
 };
 
 describe('preset cards match the fixed rules (#82)', () => {
-  for (const [name, make, seed, spec] of CASES)
-    it(name, { timeout: 30_000 }, () => {
+  it.each(CASES)(
+    '%s',
+    (name, make, seed, spec) => {
       expect(run(make, seed, spec)).toBe(GOLDEN[name]);
-    });
+    },
+    30_000,
+  );
 });

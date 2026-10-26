@@ -16,7 +16,8 @@ import {
   SHIP_STATS,
   TRACTOR_SPEED,
 } from './config';
-import { effectiveStance, rule } from './doctrine';
+import { compileCards, firing, type CompiledCards } from './cards';
+import { effectiveStance } from './doctrine';
 import { carrierStorage } from './hangar';
 import { copy, dist, dist2, moveToward } from './math';
 import { lvl } from './research';
@@ -24,12 +25,14 @@ import { emit } from './state';
 import { PointGrid } from './spatial';
 import {
   SHIP_CLASSES,
+  type ActionKind,
   type Asteroid,
   type GameState,
   type Hangar,
   type LossCause,
   type ModuleId,
   type Pirate,
+  type RuleCard,
   type Ship,
   type ShipClass,
   type Stance,
@@ -65,7 +68,12 @@ export interface Ctx {
   veins: Set<number>;
   /** Upper bound on asteroid value this tick (for pruning grid searches). */
   maxValue: number;
+  /** Everyone docks: a jump is charging, or a fleet-wide recall card fired. */
   recall: boolean;
+  /** Ships a narrower recall card sent home this tick. */
+  recalled: Set<number>;
+  /** Active rule cards by action, in priority order. */
+  cards: CompiledCards;
   /** The energy pool could not cover this tick's upkeep (#60). */
   powerShort: boolean;
   income: number;
@@ -103,6 +111,9 @@ const ctx: Ctx = {
   veins: new Set(),
   maxValue: 0,
   recall: false,
+  recalled: new Set(),
+  // Filled by compileCards; cards.ts imports this module, so nothing from it runs at load.
+  cards: {} as CompiledCards,
   powerShort: false,
   income: 0,
   mining: 0,
@@ -152,9 +163,13 @@ export function buildCtx(s: GameState): Ctx {
   for (const h of s.hangars)
     for (const it of h.items) if (!ctx.hangarOf.has(it.shipId)) ctx.hangarOf.set(it.shipId, h);
 
-  const lowShields = rule(s, 'recallOnLowShields');
-  ctx.recall =
-    !!s.warp || (!!lowShields && s.carrier.shield < lowShields.param && s.pirates.length > 0);
+  compileCards(s, ctx.cards);
+  // Recall is decided once, at the start of the tick.
+  const recall = ctx.cards.recall;
+  ctx.recall = !!s.warp || !!firing(s, recall, null);
+  ctx.recalled.clear();
+  if (!ctx.recall && recall.length > 0)
+    for (const sh of s.ships) if (firing(s, recall, sh)) ctx.recalled.add(sh.id);
   return ctx;
 }
 
@@ -201,12 +216,43 @@ export function dockRepair(s: GameState, c: Ctx, ship: Ship): number {
   return rate * (1 + 0.3 * lvl(s, 'repair'));
 }
 
-/** `effectiveStance`, shared per hangar and class within a tick (callers only read it). */
+export function recalled(c: Ctx, ship: Ship): boolean {
+  return c.recall || c.recalled.has(ship.id);
+}
+
+/** The first `action` card that fires for `ship` (or for the carrier when null). */
+export function card(s: GameState, c: Ctx, action: ActionKind, ship: Ship | null) {
+  const list = c.cards[action];
+  return list.length > 0 ? firing(s, list, ship) : null;
+}
+
+/** The stance card in force for `ship`; a timed card stays in force through `ship.hold`. */
+function stanceCardOf(s: GameState, c: Ctx, ship: Ship): RuleCard | null {
+  const list = c.cards.stance;
+  if (list.length === 0) return null;
+  const hit = firing(s, list, ship);
+  if (hit) {
+    if (hit.then.seconds) ship.hold = { card: hit.id, until: s.time + hit.then.seconds };
+    return hit;
+  }
+  const h = ship.hold;
+  if (!h) return null;
+  if (h.until > s.time) {
+    const held = list.find((x) => x.id === h.card);
+    if (held) return held;
+  }
+  delete ship.hold;
+  return null;
+}
+
+/** `effectiveStance`, shared per hangar, class and stance card within a tick (callers only read it). */
 export function stanceOf(s: GameState, c: Ctx, ship: Ship): Stance {
-  const key = ship.hangarId * 8 + CLASS_INDEX[ship.cls];
+  const rc = stanceCardOf(s, c, ship);
+  // Card positions are stable within a tick and below CARD_SLOTS (< 32).
+  const key = (ship.hangarId * 8 + CLASS_INDEX[ship.cls]) * 32 + (rc ? s.cards.indexOf(rc) + 1 : 0);
   let st = c.stances.get(key);
   if (!st) {
-    st = effectiveStance(s, ship);
+    st = effectiveStance(s, ship, rc);
     c.stances.set(key, st);
   }
   return st;

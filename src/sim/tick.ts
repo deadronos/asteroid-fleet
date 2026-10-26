@@ -9,12 +9,13 @@ import {
   destroyShip,
   dockRepair,
   goHome,
+  card,
   nearestPirate,
+  recalled,
   speed,
   stanceOf,
   type Ctx,
 } from './ctx';
-import { rule } from './doctrine';
 import {
   assignBargeBay,
   barge,
@@ -118,7 +119,7 @@ export function step(s: GameState, dt = DT) {
 // ---------- launching ----------
 
 function wantsLaunch(s: GameState, ship: Ship, ctx: Ctx): boolean {
-  if (ctx.recall) return false;
+  if (recalled(ctx, ship)) return false;
   const mh = maxHull(s, ship.cls);
   if (ship.hull < mh * 0.9) return false;
   const sys = s.systems[s.systemId];
@@ -127,7 +128,9 @@ function wantsLaunch(s: GameState, ship: Ship, ctx: Ctx): boolean {
       // Barges launch only once the zone is secured.
       return s.pirates.length === 0;
     case 'hauler':
-      return !rule(s, 'haulerPark') || haulerJob(s, ship, ctx) !== null || s.containers.length > 0;
+      return (
+        !card(s, ctx, 'park', ship) || haulerJob(s, ship, ctx) !== null || s.containers.length > 0
+      );
     case 'harvester':
       return sys.gasGiant && lvl(s, 'fusion') > 0 && s.pirates.length === 0;
     case 'repair':
@@ -171,9 +174,10 @@ function behave(s: GameState, ship: Ship, dt: number, ctx: Ctx) {
   const st = stanceOf(s, ctx, ship);
   const mh = maxHull(s, ship.cls);
 
-  if (ctx.recall) ship.mode = 'recall';
+  const recall = recalled(ctx, ship);
+  if (recall) ship.mode = 'recall';
   if (ship.mode === 'recall' || ship.mode === 'retreat') {
-    if (!ctx.recall && ship.mode === 'recall') ship.mode = 'idle';
+    if (!recall && ship.mode === 'recall') ship.mode = 'idle';
     else {
       goHome(s, ship, dt);
       return;
@@ -201,6 +205,12 @@ function behave(s: GameState, ship: Ship, dt: number, ctx: Ctx) {
     return;
   }
 
+  if (card(s, ctx, 'fallBack', ship)) {
+    ship.mode = 'retreat';
+    if (ship.cls === 'barge') emit(s, 'BargeFallback', {});
+    else emit(s, 'ShipRetreating', { cls: ship.cls });
+    return;
+  }
   switch (ship.cls) {
     case 'drone':
       return drone(s, ship, dt, ctx, st.mining);
@@ -215,6 +225,6 @@ function behave(s: GameState, ship: Ship, dt: number, ctx: Ctx) {
     case 'repair':
       return repairDrone(s, ship, dt, ctx);
     case 'harvester':
-      return harvester(s, ship, dt);
+      return harvester(s, ship, dt, ctx);
   }
 }

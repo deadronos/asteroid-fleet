@@ -1,5 +1,7 @@
+import { presetCard } from '../sim/cards';
+import { PRESETS } from '../sim/config';
 import { SAVE_VERSION, makeSystems } from '../sim/state';
-import type { GameState, Severity } from '../sim/types';
+import type { GameState, RuleCard, RuleId, Severity } from '../sim/types';
 
 export type SaveFailure = 'corrupt' | 'newer' | 'unknown';
 
@@ -73,6 +75,20 @@ export const migrations: Record<number, Migration> = {
       data: { text: typeof l.text === 'string' ? l.text : '' },
     }));
     save.events = [];
+    return save;
+  },
+  // v9: condition/action cards replace the fixed rules (#82). Each rule becomes its preset card.
+  8: (save) => {
+    const cards: RuleCard[] = [];
+    for (const r of Array.isArray(save.rules) ? save.rules.filter(isRecord) : []) {
+      const id = r.id as RuleId;
+      if (typeof id !== 'string' || !Object.hasOwn(PRESETS, id)) continue;
+      if (cards.some((c) => c.preset === id)) continue;
+      const param = typeof r.param === 'number' && Number.isFinite(r.param) ? r.param : undefined;
+      cards.push(presetCard(id, cards.length + 1, r.enabled === true, param));
+    }
+    save.cards = cards;
+    delete save.rules;
     return save;
   },
 };
@@ -154,6 +170,8 @@ function validateSave(save: SaveBlob): MigrateResult {
   if (!isRecord(save.storm) || !isTimer(save.storm.timer)) return { ok: false, reason: 'corrupt' };
 
   if (!Array.isArray(save.log)) save.log = [];
+  if (!Array.isArray(save.cards)) save.cards = [];
+  if (!Array.isArray(save.unlockedRules)) save.unlockedRules = [];
   if (!Array.isArray(save.events)) save.events = [];
 
   // NaN is stored as null; a non-finite income would poison the rolling average.

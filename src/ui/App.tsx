@@ -89,8 +89,8 @@ function Help({ onClose }: { onClose: () => void }) {
             Neighbours can trigger synergies, and each hangar has a launch order.
           </li>
           <li>
-            <b>Doctrine</b>: stances for the whole fleet, per ship type and per hangar, plus simple
-            rules that fire on conditions.
+            <b>Doctrine</b>: stances for the whole fleet, per ship type and per hangar, plus rule
+            cards: when these conditions hold, do that.
           </li>
           <li>
             <b>Logistics</b>: drones mine, barges park at rich clusters as depots, haulers shuttle

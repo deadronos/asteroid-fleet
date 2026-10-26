@@ -1,6 +1,6 @@
 // Large deterministic fleets for the tick benchmark and the scaling tests.
 
-import { RULE_DEFS, SHIP_STATS } from './config';
+import { PRESETS, SHIP_STATS } from './config';
 import { onSphere, seeded } from './math';
 import {
   clusterCenters,
@@ -35,8 +35,8 @@ export function stressGame(ships = 1000, asteroids = 600, pirates = 40, seed = 9
   const s = newGame(seed);
   const r = seeded(seed ^ 0x5eed);
   for (const c of SHIP_CLASSES) if (!s.unlocked.includes(c)) s.unlocked.push(c);
-  for (const id of Object.keys(RULE_DEFS) as RuleId[]) unlockRule(s, id);
-  for (const rl of s.rules) rl.enabled = true;
+  for (const id of Object.keys(PRESETS) as RuleId[]) unlockRule(s, id);
+  for (const card of s.cards) card.enabled = true;
   s.researchLevels = { fighterAce: 1, droneSwarm: 1, bargeBay: 1, repairNano: 1, fusion: 1 };
   s.ships = [];
   s.hangars = [];

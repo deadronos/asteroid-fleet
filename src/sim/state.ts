@@ -3,7 +3,6 @@ import {
   ENERGY_MAX,
   HANGAR_UPKEEP,
   ORE_BY_TIER,
-  RULE_DEFS,
   SHIP_STATS,
   SHIP_UPKEEP,
   SOLAR_RATE,
@@ -11,6 +10,7 @@ import {
   ZONE_RULE_UNLOCKS,
   ZONE_UNLOCKS,
 } from './config';
+import { addPreset } from './cards';
 import { findSpace } from './hangar';
 import { onSphere, seeded, v3 } from './math';
 import { lvl } from './research';
@@ -32,7 +32,7 @@ import type {
 } from './types';
 
 /** Bump together with a `migrations[n]` step and a fixture. See README "Save migrations". */
-export const SAVE_VERSION = 8;
+export const SAVE_VERSION = 9;
 
 const NAMES = [
   'Kestrel',
@@ -213,11 +213,11 @@ export function enterSystem(s: GameState, id: number) {
   }
 }
 
+/** Unlock a preset: its action becomes usable, and its card is dealt once if a slot is free. */
 export function unlockRule(s: GameState, id: RuleId) {
-  if (!s.unlockedRules.includes(id)) s.unlockedRules.push(id);
-  if (!s.rules.some((r) => r.id === id)) {
-    s.rules.push({ id, enabled: STARTER_RULES.includes(id), param: RULE_DEFS[id].defaultParam });
-  }
+  if (s.unlockedRules.includes(id)) return;
+  s.unlockedRules.push(id);
+  addPreset(s, id, STARTER_RULES.includes(id));
 }
 
 export function maxHull(s: GameState, cls: ShipClass): number {
@@ -372,7 +372,7 @@ interface Carry {
   discovered: number[];
   lifetime: GameState['lifetime'];
   doctrine?: GameState['doctrine'];
-  rules?: GameState['rules'];
+  cards?: GameState['cards'];
   automation?: GameState['automation'];
 }
 
@@ -437,7 +437,7 @@ export function newGame(seed = 1337, carry?: Carry): GameState {
       fleet: { ...DEFAULT_STANCE },
       byClass: { drone: { mining: 'safe' } },
     },
-    rules: carry?.rules ?? [],
+    cards: carry?.cards ?? [],
     warp: null,
     wave: { timer: Infinity, warning: false, active: false, size: 0 },
     storm: { timer: Infinity, active: 0 },
@@ -461,8 +461,8 @@ export function newGame(seed = 1337, carry?: Carry): GameState {
     events: [],
     savedAt: Date.now(),
   };
-  s.unlockedRules = [];
-  for (const id of carry?.unlockedRules ?? []) unlockRule(s, id);
+  // Carried presets stay unlocked without dealing their cards again.
+  s.unlockedRules = [...(carry?.unlockedRules ?? [])];
   if (carry) for (const id of carry.discovered) if (s.systems[id]) s.systems[id].discovered = true;
   s.carrier.energy = maxEnergy(s) * 0.6;
   enterSystem(s, 0);

@@ -1,7 +1,8 @@
 import { engine, useGame } from '../game/engine';
 import { engagementUnlocked } from '../sim/automation';
-import { RULE_DEFS, SHIP_STATS, ZONE_RULE_UNLOCKS } from '../sim/config';
-import type { Engagement, MiningStance, RuleId, ShipClass, Stance, UnderFire } from '../sim/types';
+import { SHIP_STATS } from '../sim/config';
+import type { Engagement, MiningStance, ShipClass, Stance, UnderFire } from '../sim/types';
+import { RuleCards } from './RuleCards';
 
 const ENGAGE: [Engagement, string][] = [
   ['aggressive', 'Aggressive'],
@@ -85,8 +86,8 @@ export function DoctrinePanel() {
       <h3>Stances</h3>
       <p className="hint">
         You never give direct orders. Stances set default behaviour, from broad to specific: fleet
-        doctrine, then per ship type, then per hangar. The most specific setting wins; rules below
-        override stances while they are active.
+        doctrine, then per ship type, then per hangar. The most specific setting wins; rule cards
+        below override stances while they are active.
         {!s.unlocked.includes('fighter') && ' Engagement stances unlock in the frontier.'}
       </p>
       <table className="doc">
@@ -131,53 +132,7 @@ export function DoctrinePanel() {
           ))}
         </tbody>
       </table>
-      <h3>Rules</h3>
-      <p className="hint">Rules fire on a condition and win over the stance while active.</p>
-      {(Object.keys(RULE_DEFS) as RuleId[]).map((id) => {
-        const def = RULE_DEFS[id];
-        const r = s.rules.find((x) => x.id === id);
-        const unlocked = s.unlockedRules.includes(id) && r;
-        const tier = Number(
-          Object.entries(ZONE_RULE_UNLOCKS).find(([, ids]) => ids.includes(id))?.[0] ?? 1,
-        );
-        return (
-          <div key={id} className={`rule ${!unlocked ? 'locked' : !r.enabled ? 'off' : ''}`}>
-            <input
-              type="checkbox"
-              checked={!!r?.enabled}
-              disabled={!unlocked}
-              onChange={(e) => engine.dispatch({ type: 'setRule', id, enabled: e.target.checked })}
-            />
-            <div className="when">
-              <b>{def.unit}</b> · when {def.when.toLowerCase()}
-              {def.param && r ? ` ${def.param.fmt(r.param)}` : ''} → {def.then.toLowerCase()}
-              {!unlocked && (
-                <span className="hint">
-                  {' '}
-                  (unlocks in {tier === 2 ? 'the frontier or with tactical doctrine' : 'deep space'}
-                  )
-                </span>
-              )}
-            </div>
-            {def.param && unlocked && (
-              <div className="param">
-                {def.param.label}
-                <input
-                  type="range"
-                  min={def.param.min}
-                  max={def.param.max}
-                  step={def.param.step}
-                  value={r.param}
-                  onChange={(e) =>
-                    engine.dispatch({ type: 'setRule', id, param: Number(e.target.value) })
-                  }
-                />
-                {def.param.fmt(r.param)}
-              </div>
-            )}
-          </div>
-        );
-      })}
+      <RuleCards />
     </>
   );
 }
