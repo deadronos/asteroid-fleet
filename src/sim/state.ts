@@ -58,63 +58,248 @@ export const OP_KEYS = [
   'fx',
 ] as const satisfies readonly (keyof Operation)[];
 
-const GLOBAL_KEYS = [
-  'version',
-  'seed',
-  'time',
-  'nextId',
-  'credits',
-  'research',
-  'researchLevels',
-  'unlocked',
-  'unlockedRules',
-  'systems',
-  'fields',
-  'doctrine',
-  'cards',
-  'automation',
-  'stats',
-  'lifetime',
-  'powerMode',
-  'log',
-  'events',
-  'savedAt',
-] as const satisfies readonly (keyof GameState)[];
-
 type Missing<K, Listed> = Exclude<K, Listed> extends never ? true : Exclude<K, Listed>;
 const opKeysComplete: Missing<keyof Operation, (typeof OP_KEYS)[number]> = true;
-const globalKeysComplete: Missing<
-  Exclude<keyof GameState, 'ops'>,
-  (typeof GLOBAL_KEYS)[number]
-> = true;
 void opKeysComplete;
-void globalKeysComplete;
 
-/** Accessors on a shared prototype keep views monomorphic and cheap in the hot loop. */
-class SimView {
+/**
+ * A `Sim` over one GameState and one Operation. Plain accessors, one per field, keep every
+ * read monomorphic in the hot loop; `implements Sim` fails to compile when one is missing.
+ */
+class SimView implements Sim {
   constructor(
     readonly g: GameState,
     readonly op: Operation,
   ) {}
+  get version() {
+    return this.g.version;
+  }
+  set version(v) {
+    this.g.version = v;
+  }
+  get seed() {
+    return this.g.seed;
+  }
+  set seed(v) {
+    this.g.seed = v;
+  }
+  get time() {
+    return this.g.time;
+  }
+  set time(v) {
+    this.g.time = v;
+  }
+  get nextId() {
+    return this.g.nextId;
+  }
+  set nextId(v) {
+    this.g.nextId = v;
+  }
+  get credits() {
+    return this.g.credits;
+  }
+  set credits(v) {
+    this.g.credits = v;
+  }
+  get research() {
+    return this.g.research;
+  }
+  set research(v) {
+    this.g.research = v;
+  }
+  get researchLevels() {
+    return this.g.researchLevels;
+  }
+  set researchLevels(v) {
+    this.g.researchLevels = v;
+  }
+  get unlocked() {
+    return this.g.unlocked;
+  }
+  set unlocked(v) {
+    this.g.unlocked = v;
+  }
+  get unlockedRules() {
+    return this.g.unlockedRules;
+  }
+  set unlockedRules(v) {
+    this.g.unlockedRules = v;
+  }
+  get systems() {
+    return this.g.systems;
+  }
+  set systems(v) {
+    this.g.systems = v;
+  }
+  get fields() {
+    return this.g.fields;
+  }
+  set fields(v) {
+    this.g.fields = v;
+  }
+  get doctrine() {
+    return this.g.doctrine;
+  }
+  set doctrine(v) {
+    this.g.doctrine = v;
+  }
+  get cards() {
+    return this.g.cards;
+  }
+  set cards(v) {
+    this.g.cards = v;
+  }
+  get automation() {
+    return this.g.automation;
+  }
+  set automation(v) {
+    this.g.automation = v;
+  }
+  get stats() {
+    return this.g.stats;
+  }
+  set stats(v) {
+    this.g.stats = v;
+  }
+  get lifetime() {
+    return this.g.lifetime;
+  }
+  set lifetime(v) {
+    this.g.lifetime = v;
+  }
+  get powerMode() {
+    return this.g.powerMode;
+  }
+  set powerMode(v) {
+    this.g.powerMode = v;
+  }
+  get log() {
+    return this.g.log;
+  }
+  set log(v) {
+    this.g.log = v;
+  }
+  get events() {
+    return this.g.events;
+  }
+  set events(v) {
+    this.g.events = v;
+  }
+  get savedAt() {
+    return this.g.savedAt;
+  }
+  set savedAt(v) {
+    this.g.savedAt = v;
+  }
+  get id() {
+    return this.op.id;
+  }
+  set id(v) {
+    this.op.id = v;
+  }
+  get rng() {
+    return this.op.rng;
+  }
+  set rng(v) {
+    this.op.rng = v;
+  }
+  get carrier() {
+    return this.op.carrier;
+  }
+  set carrier(v) {
+    this.op.carrier = v;
+  }
+  get hangars() {
+    return this.op.hangars;
+  }
+  set hangars(v) {
+    this.op.hangars = v;
+  }
+  get ships() {
+    return this.op.ships;
+  }
+  set ships(v) {
+    this.op.ships = v;
+  }
+  get pirates() {
+    return this.op.pirates;
+  }
+  set pirates(v) {
+    this.op.pirates = v;
+  }
+  get asteroids() {
+    return this.op.asteroids;
+  }
+  set asteroids(v) {
+    this.op.asteroids = v;
+  }
+  get containers() {
+    return this.op.containers;
+  }
+  set containers(v) {
+    this.op.containers = v;
+  }
+  get hazards() {
+    return this.op.hazards;
+  }
+  set hazards(v) {
+    this.op.hazards = v;
+  }
+  get recon() {
+    return this.op.recon;
+  }
+  set recon(v) {
+    this.op.recon = v;
+  }
+  get systemId() {
+    return this.op.systemId;
+  }
+  set systemId(v) {
+    this.op.systemId = v;
+  }
+  get warp() {
+    return this.op.warp;
+  }
+  set warp(v) {
+    this.op.warp = v;
+  }
+  get wave() {
+    return this.op.wave;
+  }
+  set wave(v) {
+    this.op.wave = v;
+  }
+  get storm() {
+    return this.op.storm;
+  }
+  set storm(v) {
+    this.op.storm = v;
+  }
+  get reserveTimers() {
+    return this.op.reserveTimers;
+  }
+  set reserveTimers(v) {
+    this.op.reserveTimers = v;
+  }
+  get incomeAvg() {
+    return this.op.incomeAvg;
+  }
+  set incomeAvg(v) {
+    this.op.incomeAvg = v;
+  }
+  get miningIncomeAvg() {
+    return this.op.miningIncomeAvg;
+  }
+  set miningIncomeAvg(v) {
+    this.op.miningIncomeAvg = v;
+  }
+  get fx() {
+    return this.op.fx;
+  }
+  set fx(v) {
+    this.op.fx = v;
+  }
 }
-for (const k of GLOBAL_KEYS)
-  Object.defineProperty(SimView.prototype, k, {
-    get(this: SimView) {
-      return this.g[k];
-    },
-    set(this: SimView, v: unknown) {
-      (this.g as unknown as Record<string, unknown>)[k] = v;
-    },
-  });
-for (const k of OP_KEYS)
-  Object.defineProperty(SimView.prototype, k, {
-    get(this: SimView) {
-      return this.op[k];
-    },
-    set(this: SimView, v: unknown) {
-      (this.op as unknown as Record<string, unknown>)[k] = v;
-    },
-  });
 
 const views = new WeakMap<Operation, SimView>();
 
@@ -125,7 +310,7 @@ export function bind(g: GameState, op: Operation): Sim {
     v = new SimView(g, op);
     views.set(op, v);
   }
-  return v as unknown as Sim;
+  return v;
 }
 
 /** The run-wide state behind a bound `Sim`. */
