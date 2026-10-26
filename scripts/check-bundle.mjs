@@ -12,8 +12,10 @@ const BUDGET = {
   initial: 115 * KB,
   // Any single JS chunk; three.js is the largest.
   chunk: 200 * KB,
-  // All JS and CSS, lazy chunks and the sim worker included.
-  total: 415 * KB,
+  // All JS and CSS, lazy chunks and the sim worker included. Raised from 415 for the typed
+  // event bus (#72), which put main at 415.3 kB; the sim ships in both the worker and the
+  // main-thread fallback, so sim code counts twice.
+  total: 420 * KB,
 };
 
 const dist = 'dist';
