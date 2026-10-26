@@ -18,18 +18,10 @@ import {
 import { cardSlots, checkCard, nextCardId } from './cards';
 import { autoBuyUnlocked, autoRebuildUnlocked, engagementUnlocked } from './automation';
 import { moveShip as moveOnBoard } from './hangar';
-import { buyResearch as buyNode, lvl, reserveDefs } from './research';
-import {
-  bind,
-  createShip,
-  emit,
-  focused,
-  maxEnergy,
-  newGame,
-  solarRate,
-  upkeepRate,
-} from './state';
+import { buyResearch as buyNode, lvl } from './research';
+import { bind, createShip, emit, focused, maxEnergy, newGame } from './state';
 import { executeJump } from './tick';
+import { dematerialise, materialise, runBackground } from './background';
 import type {
   GameState,
   CarrierStance,
@@ -358,24 +350,11 @@ export function settleOffline(g: GameState, elapsedS: number): OfflineReport | n
 }
 
 function settleOp(s: Sim, t: number): { credits: number; rebuilt: number } {
-  // `|| 0` covers saves written before miningIncomeAvg existed.
-  const credits = Math.max(0, s.miningIncomeAvg || 0) * t * OFFLINE_EFFICIENCY;
-  s.credits += credits;
-  s.stats.creditsEarned += credits;
-  const net = solarRate(s) - upkeepRate(s);
-  s.carrier.energy = Math.min(maxEnergy(s), Math.max(0, s.carrier.energy + net * t));
+  // Tier C: the background model over the time away, at offline efficiency, quietly.
+  dematerialise(s);
+  const r = runBackground(s, t, { efficiency: OFFLINE_EFFICIENCY, events: false });
   s.carrier.shield = 1;
-  s.pirates = [];
-  s.wave.active = false;
-  s.wave.warning = false;
-  if (s.systems[s.systemId].tier > 1) s.wave.timer = 60;
-  let rebuilt = 0;
-  const defs = reserveDefs(s);
-  for (const [cls, min, cooldown] of defs) {
-    const have = s.ships.filter((x) => x.cls === cls).length;
-    const n = Math.min(Math.max(0, min - have), Math.floor(t / cooldown));
-    for (let i = 0; i < n; i++) if (createShip(s, cls)) rebuilt++;
-  }
-  emit(s, 'WelcomeBack', { credits: Math.round(credits) });
-  return { credits, rebuilt };
+  materialise(s);
+  emit(s, 'WelcomeBack', { credits: Math.round(r.credits) });
+  return { credits: r.credits, rebuilt: r.rebuilt };
 }
