@@ -14,8 +14,9 @@ const BUDGET = {
   chunk: 200 * KB,
   // All JS and CSS, lazy chunks and the sim worker included. Raised from 415 for the typed
   // event bus (#72), which put main at 415.3 kB; the sim ships in both the worker and the
-  // main-thread fallback, so sim code counts twice.
-  total: 420 * KB,
+  // main-thread fallback, so sim code counts twice. Raised to 425 for condition/action rule
+  // cards (#82), which put the total at 421.7 kB for the same reason.
+  total: 425 * KB,
 };
 
 const dist = 'dist';
