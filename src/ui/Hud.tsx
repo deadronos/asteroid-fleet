@@ -5,14 +5,7 @@ import { carrierStorage } from '../sim/hangar';
 import { refineRate, TIER_NAMES } from '../sim/config';
 import { heatFactor } from '../sim/tick';
 import { leftBehind } from '../sim/warp';
-
-export function fmt(n: number, digits = 1): string {
-  const a = Math.abs(n);
-  if (a >= 1e9) return (n / 1e9).toFixed(digits) + 'B';
-  if (a >= 1e6) return (n / 1e6).toFixed(digits) + 'M';
-  if (a >= 1e4) return (n / 1e3).toFixed(digits) + 'k';
-  return Math.floor(n).toLocaleString('en-US');
-}
+import { fmt } from './format';
 
 function Bar({ v, color }: { v: number; color: string }) {
   return (

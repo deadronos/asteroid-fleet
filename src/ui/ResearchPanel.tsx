@@ -4,7 +4,7 @@ import { researchPayout } from '../sim/actions';
 import { RP_DIVISOR, SHIP_STATS, TIER_NAMES } from '../sim/config';
 import { RESEARCH, canBuyResearch, lvl, type Branch } from '../sim/research';
 import { SHIP_CLASSES, type ShipClass } from '../sim/types';
-import { fmt } from './Hud';
+import { fmt } from './format';
 
 const GLOBAL: Branch[] = ['Logistics', 'Mining', 'Combat', 'Carrier', 'Reserves', 'Automation'];
 

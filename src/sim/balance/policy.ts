@@ -3,7 +3,7 @@
 
 import { apply, shipCost } from '../actions';
 import { autoRebuildUnlocked } from '../automation';
-import { MAX_HANGAR_SLOTS, REFINERY_COST, MAX_REFINERY, warpCost } from '../config';
+import { SOFT_HANGAR_SLOTS, SOFT_HANGARS, REFINERY_COST, MAX_REFINERY, warpCost } from '../config';
 import { SHIP_CLASSES, type GameState, type HangarType, type ShipClass } from '../types';
 
 export interface Policy {
@@ -37,10 +37,9 @@ export function buyShipOrRoom(s: GameState, cls: ShipClass, newHangar: HangarTyp
   const err = apply(s, { type: 'buyShip', cls });
   if (err === null) return true;
   if (err !== 'No free hangar slots') return false;
-  const small = s.hangars
-    .filter((h) => h.slots < MAX_HANGAR_SLOTS)
-    .sort((a, b) => a.slots - b.slots)[0];
-  if (small) return apply(s, { type: 'buySlot', hangarId: small.id }) === null;
+  const smallest = [...s.hangars].sort((a, b) => a.slots - b.slots)[0];
+  if (smallest && (smallest.slots < SOFT_HANGAR_SLOTS || s.hangars.length >= SOFT_HANGARS))
+    return apply(s, { type: 'buySlot', hangarId: smallest.id }) === null;
   return apply(s, { type: 'buyHangar', hangarType: newHangar }) === null;
 }
 

@@ -17,7 +17,7 @@ import { lvl } from '../sim/research';
 import { solarRate, upkeep } from '../sim/state';
 import { cargoCap } from '../sim/tick';
 import { SHIP_CLASSES, type GameState } from '../sim/types';
-import { fmt } from './Hud';
+import { fmt } from './format';
 
 /** Rough per-link rates for the throughput = min(...) readout. Ore units per second. */
 function throughput(s: GameState) {

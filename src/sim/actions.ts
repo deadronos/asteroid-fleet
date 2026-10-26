@@ -6,8 +6,6 @@ import {
   MODULES,
   moduleLocked,
   REFINERY_COST,
-  MAX_HANGAR_SLOTS,
-  MAX_HANGARS,
   NEW_HANGAR_COST,
   OFFLINE_CAP_S,
   OFFLINE_EFFICIENCY,
@@ -117,7 +115,6 @@ export function apply(s: GameState, c: Command): string | null {
     case 'buySlot': {
       const h = s.hangars.find((x) => x.id === c.hangarId);
       if (!h) return 'No such hangar';
-      if (h.slots >= MAX_HANGAR_SLOTS) return 'Hangar is at maximum size';
       const cost = HANGAR_SLOT_COST(h.slots);
       if (s.credits < cost) return 'Not enough credits';
       s.credits -= cost;
@@ -126,7 +123,6 @@ export function apply(s: GameState, c: Command): string | null {
     }
     case 'buyHangar': {
       const cost = NEW_HANGAR_COST(s.hangars.length);
-      if (s.hangars.length >= MAX_HANGARS) return 'The carrier has no room for more hangars';
       {
         const locked = hangarLocked(c.hangarType, s.stats.furthestTier);
         if (locked) return locked;
@@ -280,7 +276,7 @@ export function apply(s: GameState, c: Command): string | null {
       const h = s.hangars.find((x) => x.id === c.hangarId);
       if (!h) return 'No such hangar';
       if (!SHIP_STATS[c.cls]) return 'No such class';
-      const n = Math.max(0, Math.min(MAX_HANGAR_SLOTS, Math.floor(c.count) || 0));
+      const n = Math.max(0, Math.min(h.slots, Math.floor(c.count) || 0));
       if (n === 0) delete h.target[c.cls];
       else h.target[c.cls] = n;
       return null;

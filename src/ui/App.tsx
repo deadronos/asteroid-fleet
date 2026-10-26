@@ -10,7 +10,8 @@ import { downloadFile } from './download';
 import { formatEvent, toneClass } from './events';
 import { SceneBoundary } from './ErrorBoundary';
 import { FleetPanel } from './FleetPanel';
-import { Hud, fmt } from './Hud';
+import { Hud } from './Hud';
+import { fmt } from './format';
 import { GearButton } from './GearButton';
 
 // Not needed for the first frame: the scene (three.js + r3f), the research tree

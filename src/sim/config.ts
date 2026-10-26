@@ -191,10 +191,19 @@ export function hangarLocked(type: HangarType, furthestTier: number): string | n
 }
 
 export const BASE_STORAGE = 2000;
-export const HANGAR_SLOT_COST = (slots: number) => Math.round(120 * Math.pow(1.45, slots - 6));
-export const NEW_HANGAR_COST = (count: number) => Math.round(1500 * Math.pow(3, count - 2));
-export const MAX_HANGAR_SLOTS = 12;
-export const MAX_HANGARS = 5;
+/** Past these the cost ramps much harder; there is no hard cap (#61). */
+export const SOFT_HANGAR_SLOTS = 12;
+export const SOFT_HANGARS = 5;
+export const HANGAR_SLOT_COST = (slots: number) => {
+  const base = 120 * Math.pow(1.45, slots - 6);
+  const over = Math.max(0, slots - SOFT_HANGAR_SLOTS);
+  return Math.round(base * Math.pow(1.5, over));
+};
+export const NEW_HANGAR_COST = (count: number) => {
+  const base = 1500 * Math.pow(3, count - 2);
+  const over = Math.max(0, count - SOFT_HANGARS);
+  return Math.round(base * Math.pow(2, over));
+};
 
 export const DEFAULT_STANCE: Stance = {
   engagement: 'defensive',

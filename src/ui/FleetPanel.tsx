@@ -6,9 +6,7 @@ import {
   HANGAR_SLOT_COST,
   HANGAR_TYPES,
   hangarLocked,
-  MAX_HANGAR_SLOTS,
   HANGAR_UPKEEP,
-  MAX_HANGARS,
   MODULE_IDS,
   MODULE_SLOTS,
   MODULES,
@@ -29,7 +27,7 @@ import {
   type Ship,
   type ShipClass,
 } from '../sim/types';
-import { fmt } from './Hud';
+import { fmt } from './format';
 
 const MODE_LABEL: Record<string, string> = {
   docked: 'docked',
@@ -208,7 +206,7 @@ function HangarBoard({
           {used}/{h.slots}
         </span>
         <button
-          disabled={h.slots >= MAX_HANGAR_SLOTS || s.credits < HANGAR_SLOT_COST(h.slots)}
+          disabled={s.credits < HANGAR_SLOT_COST(h.slots)}
           onClick={() => engine.dispatch({ type: 'buySlot', hangarId: h.id })}
           title="Buy one more slot"
         >
@@ -229,7 +227,7 @@ function HangarBoard({
                 <input
                   type="number"
                   min={0}
-                  max={MAX_HANGAR_SLOTS}
+                  max={h.slots}
                   value={h.target[c] ?? 0}
                   aria-label={`Hangar ${h.id} ${SHIP_STATS[c].name} target`}
                   style={{ width: '3.2em' }}
@@ -464,7 +462,7 @@ export function FleetPanel() {
           )}
         </div>
       ))}
-      {hangarCount < MAX_HANGARS && (
+      {
         <>
           <h3>
             New hangar · {fmt(NEW_HANGAR_COST(hangarCount))} cr · upkeep{' '}
@@ -486,7 +484,7 @@ export function FleetPanel() {
             ))}
           </div>
         </>
-      )}
+      }
     </>
   );
 }
