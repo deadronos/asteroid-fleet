@@ -13,7 +13,7 @@ import {
   warpCost,
   warpPayment,
 } from '../sim/config';
-import { lvl } from '../sim/research';
+import { lvl, repeatEffect } from '../sim/research';
 import { solarRate, upkeep } from '../sim/state';
 import { cargoCap } from '../sim/tick';
 import { SHIP_CLASSES, type Sim } from '../sim/types';
@@ -24,7 +24,8 @@ function throughput(s: Sim) {
   const drones = s.ships.filter((x) => x.cls === 'drone').length;
   const barges = s.ships.filter((x) => x.cls === 'barge').length;
   const haulers = s.ships.filter((x) => x.cls === 'hauler').length;
-  const mining = drones * MINING_RATE * (1 + 0.15 * lvl(s, 'yield')) * 0.45; // ~45 % of a cycle spent drilling
+  const mining =
+    drones * MINING_RATE * (1 + 0.15 * lvl(s, 'yield')) * (1 + repeatEffect(s, 'deepYield')) * 0.45; // ~45 % of a cycle spent drilling
   const avgTrip = 30;
   const droneTransport =
     (drones * cargoCap(s, 'drone')) /

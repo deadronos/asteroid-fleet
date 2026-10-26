@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { SHIP_STATS } from './config';
 import { cargoCap, damageShip, speed } from './ctx';
-import { RESEARCH, canBuyResearch, buyResearch } from './research';
+import { RESEARCH, canBuyResearch, buyResearch, repeatEffect, softcap } from './research';
 import { SHIP_CLASSES } from './types';
-import { createShip, maxHull, spawnAsteroid } from './state';
+import { createShip, maxEnergy, maxHull, spawnAsteroid } from './state';
 import { stepSim } from './tick';
 import type { Sim } from './types';
 import { game } from './testing';
@@ -102,5 +102,48 @@ describe('research tree', () => {
       run(s, 600);
       expect(s.ships.some((x) => x.cls === cls)).toBe(true);
     }
+  });
+});
+
+describe('repeatable research (#64)', () => {
+  const REPEAT = RESEARCH.filter((n) => n.repeat);
+
+  it('has yield, energy and launch sinks with geometric cost', () => {
+    expect(REPEAT.map((n) => n.id).sort()).toEqual(['deepEnergy', 'deepLaunch', 'deepYield']);
+    for (const n of REPEAT) {
+      expect(n.maxLevel).toBe(Infinity);
+      expect(n.cost(20) / n.cost(10)).toBeGreaterThan(5);
+    }
+  });
+
+  it('effects diminish and never pass the cap', () => {
+    const gains = [1, 2, 10, 11, 100].map((l) => softcap(l, 1));
+    expect(gains[1] - gains[0]).toBeGreaterThan(gains[3] - gains[2]);
+    expect(softcap(1000, 1)).toBeLessThanOrEqual(1);
+    expect(softcap(0, 1)).toBe(0);
+  });
+
+  it('unlocks only once the base node is maxed, then buys past any old limit', () => {
+    const s = game(5);
+    s.research = 1e9;
+    expect(canBuyResearch(s, 'deepYield')).toBe(false);
+    s.researchLevels.yield = RESEARCH.find((n) => n.id === 'yield')!.maxLevel;
+    for (let i = 0; i < 30; i++) expect(buyResearch(s, 'deepYield')).toBe(true);
+    expect(s.researchLevels.deepYield).toBe(30);
+    expect(repeatEffect(s, 'deepYield')).toBeGreaterThan(0.8);
+  });
+
+  it('raises energy capacity and has a readable label', () => {
+    const s = game(5);
+    const before = maxEnergy(s);
+    s.researchLevels.deepEnergy = 10;
+    expect(maxEnergy(s)).toBeCloseTo(before * (1 + softcap(10, 1)));
+    const n = RESEARCH.find((r) => r.id === 'deepLaunch')!;
+    expect(n.repeat!.label(softcap(10, n.repeat!.cap))).toMatch(/^−\d+\.\d % launch interval$/);
+  });
+
+  it('round-trips through JSON (no save-shape change)', () => {
+    const s = withLevel('deepYield', 12);
+    expect(JSON.parse(JSON.stringify(s.researchLevels)).deepYield).toBe(12);
   });
 });

@@ -2,7 +2,14 @@ import { useState } from 'react';
 import { engine, useGame } from '../game/engine';
 import { researchPayout } from '../sim/actions';
 import { RP_DIVISOR, SHIP_STATS, TIER_NAMES } from '../sim/config';
-import { RESEARCH, canBuyResearch, lvl, type Branch } from '../sim/research';
+import {
+  RESEARCH,
+  canBuyResearch,
+  lvl,
+  repeatEffect,
+  researchLocked,
+  type Branch,
+} from '../sim/research';
 import { SHIP_CLASSES, type ShipClass } from '../sim/types';
 import { fmt } from './format';
 
@@ -22,32 +29,38 @@ export function ResearchPanel() {
         <h3>
           {label}{' '}
           <span className="hint">
-            {nodes.filter((n) => lvl(s, n.id) >= n.maxLevel).length}/{nodes.length} maxed
+            {nodes.filter((n) => lvl(s, n.id) >= n.maxLevel).length}/
+            {nodes.filter((n) => !n.repeat).length} maxed
           </span>
         </h3>
         <div className="nodes">
           {nodes.map((n) => {
             const l = lvl(s, n.id);
             const maxed = l >= n.maxLevel;
-            const locked = (n.requires && lvl(s, n.requires) === 0) || (n.tier && tier < n.tier);
+            const locked = researchLocked(s, n) || (n.tier && tier < n.tier);
             return (
               <div key={n.id} className={`node ${maxed ? 'maxed' : ''}`}>
                 <span className="nname">{n.name}</span>
                 <span className="ndesc">
                   {n.desc}
                   {n.tier && tier < n.tier && ` · needs ${TIER_NAMES[n.tier].toLowerCase()}`}
+                  {n.repeat &&
+                    (l > 0
+                      ? ` · level ${fmt(l)}: ${n.repeat.label(repeatEffect(s, n.id))}`
+                      : ` · after ${RESEARCH.find((r) => r.id === n.repeat?.base)?.name} is maxed`)}
                 </span>
                 <div className="row">
                   <div className="pips grow">
-                    {Array.from({ length: n.maxLevel }, (_, i) => (
-                      <i key={i} className={i < l ? 'f' : ''} />
-                    ))}
+                    {!n.repeat &&
+                      Array.from({ length: n.maxLevel }, (_, i) => (
+                        <i key={i} className={i < l ? 'f' : ''} />
+                      ))}
                   </div>
                   <button
                     disabled={!canBuyResearch(s, n.id)}
                     onClick={() => engine.dispatch({ type: 'buyResearch', id: n.id })}
                   >
-                    {maxed ? 'max' : locked ? 'locked' : `${n.cost(l)} RP`}
+                    {maxed ? 'max' : locked ? 'locked' : `${fmt(n.cost(l))} RP`}
                   </button>
                 </div>
               </div>

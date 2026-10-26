@@ -13,7 +13,7 @@ import {
 import { addPreset } from './cards';
 import { findSpace } from './hangar';
 import { onSphere, seeded, v3 } from './math';
-import { lvl } from './research';
+import { lvl, repeatEffect } from './research';
 import type {
   Asteroid,
   EventData,
@@ -525,7 +525,7 @@ export function maxHull(s: Sim, cls: ShipClass): number {
 }
 
 export function maxEnergy(s: Sim): number {
-  return ENERGY_MAX * (1 + 0.25 * lvl(s, 'energyCap'));
+  return ENERGY_MAX * (1 + 0.25 * lvl(s, 'energyCap')) * (1 + repeatEffect(s, 'deepEnergy'));
 }
 
 /** Solar recharge in the current system, energy/s, before storm boosts. */

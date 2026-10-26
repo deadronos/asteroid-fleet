@@ -21,7 +21,29 @@ export interface ResearchNode {
   requires?: string;
   /** Furthest zone tier this run must have reached before buying a level. */
   tier?: 2 | 3;
+  /** Repeatable sink (#64): no max level, needs `base` maxed, soft-capped effect. */
+  repeat?: Repeat;
 }
+
+export interface Repeat {
+  /** Finite node that must be maxed first. */
+  base: string;
+  /** Effect approached as the level grows (0.5 = +50 %). */
+  cap: number;
+  /** Text for the current effect, e.g. "+12 % mining yield". */
+  label: (effect: number) => string;
+}
+
+/** Each level closes this share of the remaining gap to the cap. */
+export const SOFTCAP_STEP = 0.08;
+
+/** Soft-capped effect of a repeatable node: cap × (1 − (1 − step)^level). */
+export function softcap(level: number, cap: number): number {
+  return cap * (1 - Math.pow(1 - SOFTCAP_STEP, level));
+}
+
+/** Geometric cost for repeatable nodes. */
+const geo = (base: number, ratio: number) => (lvl: number) => Math.ceil(base * ratio ** lvl);
 
 const lin = (base: number, step: number) => (lvl: number) => base + step * lvl;
 
@@ -425,7 +447,52 @@ export const RESEARCH: ResearchNode[] = [
     cost: lin(1, 2),
     requires: 'fusion',
   },
+  // Repeatable sinks (#64): unlimited levels, geometric cost, diminishing returns.
+  {
+    id: 'deepYield',
+    branch: 'Mining',
+    name: 'Deep-core drilling',
+    desc: 'Repeatable; mining yield, diminishing toward +100 %',
+    maxLevel: Infinity,
+    cost: geo(10, 1.25),
+    repeat: { base: 'yield', cap: 1, label: (e) => `+${pct(e)} % mining yield` },
+  },
+  {
+    id: 'deepEnergy',
+    branch: 'Carrier',
+    name: 'Superconducting banks',
+    desc: 'Repeatable; energy capacity, diminishing toward +100 %',
+    maxLevel: Infinity,
+    cost: geo(10, 1.25),
+    repeat: { base: 'energyCap', cap: 1, label: (e) => `+${pct(e)} % energy capacity` },
+  },
+  {
+    id: 'deepLaunch',
+    branch: 'Carrier',
+    name: 'Catapult rails',
+    desc: 'Repeatable; hangar launch interval, diminishing toward −50 %',
+    maxLevel: Infinity,
+    cost: geo(10, 1.25),
+    repeat: { base: 'warpCharge', cap: 0.5, label: (e) => `−${pct(e)} % launch interval` },
+  },
 ];
+
+function pct(e: number): string {
+  return (e * 100).toFixed(1);
+}
+
+/** Current effect of a repeatable node (0 for anything else). */
+export function repeatEffect(s: Sim, id: string): number {
+  const r = RESEARCH_BY_ID[id]?.repeat;
+  return r ? softcap(lvl(s, id), r.cap) : 0;
+}
+
+/** True when the node's prerequisites (requires, maxed base) are not met. */
+export function researchLocked(s: Sim, node: ResearchNode): boolean {
+  if (node.requires && lvl(s, node.requires) === 0) return true;
+  const base = node.repeat && RESEARCH_BY_ID[node.repeat.base];
+  return !!base && lvl(s, base.id) < base.maxLevel;
+}
 
 export const RESEARCH_BY_ID = Object.fromEntries(RESEARCH.map((r) => [r.id, r])) as Record<
   string,
@@ -454,7 +521,7 @@ export function canBuyResearch(s: Sim, id: string): boolean {
   if (!node) return false;
   const l = lvl(s, id);
   if (l >= node.maxLevel) return false;
-  if (node.requires && lvl(s, node.requires) === 0) return false;
+  if (researchLocked(s, node)) return false;
   if (node.tier && s.stats.furthestTier < node.tier) return false;
   return s.research >= node.cost(l);
 }

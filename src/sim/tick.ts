@@ -29,7 +29,7 @@ import {
   haulerJob,
 } from './mining';
 import { copy, moveAway, onSphere, rand } from './math';
-import { lvl } from './research';
+import { lvl, repeatEffect } from './research';
 import { bind, emit, maxHull } from './state';
 import { carrierDisabled, executeJump, warpStep } from './warp';
 import { drift, field, hazards, power, refine, reserves } from './world';
@@ -181,7 +181,7 @@ function launch(s: Sim, dt: number, ctx: Ctx) {
     };
     if (next.cls === 'barge') boardBargeBay(s, next);
     else assignBargeBay(s, next, ctx);
-    h.launchTimer = HANGAR_TYPES[h.type].launchInterval;
+    h.launchTimer = HANGAR_TYPES[h.type].launchInterval * (1 - repeatEffect(s, 'deepLaunch'));
   }
 }
 
