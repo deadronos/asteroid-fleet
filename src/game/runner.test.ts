@@ -57,8 +57,10 @@ describe('sim runner', () => {
     const { host, out } = local(newGame(3));
     const first = out.find((m) => m.t === 'state');
     if (first?.t !== 'state') throw new Error('no state');
-    first.state.credits = -1;
+    first.snap.global.credits = -1;
+    first.snap.focus.carrier.hull = -1;
     expect(host.runner.state?.credits).not.toBe(-1);
+    expect(host.runner.state?.carrier.hull).not.toBe(-1);
   });
 
   it('reports command errors', () => {

@@ -4,6 +4,7 @@ import { step } from '../sim/tick';
 import type { GameState } from '../sim/types';
 import { EventAggregator } from './events';
 import { encodeFrame, type InMsg, type OutMsg } from './protocol';
+import { encodeSnapshot } from './snapshot';
 
 const TICK_MS = DT * 1000;
 const MAX_CATCHUP_TICKS = 600; // a minute of sim; longer gaps go through offline settlement
@@ -25,6 +26,8 @@ export class SimRunner {
   private lastUi = 0;
   private dirty = false;
   private offline: OfflineReport | null = null;
+  /** System whose `fields` the UI last got; they only change on a jump. */
+  private fieldsAt: number | null = null;
   private timer: ReturnType<typeof setInterval> | null = null;
   private events = new EventAggregator();
 
@@ -126,6 +129,7 @@ export class SimRunner {
   /** A new state (a load, an import, a new run) starts with no open merges. */
   private adopt(state: GameState) {
     this.state = state;
+    this.fieldsAt = null;
     this.events.reset();
   }
 
@@ -148,7 +152,10 @@ export class SimRunner {
     if (!this.state) return;
     this.lastUi = now;
     this.dirty = false;
-    this.post({ t: 'state', state: this.state, offline: this.offline });
+    const s = this.state;
+    const { snap, transfer } = encodeSnapshot(s, this.fieldsAt !== s.systemId);
+    this.fieldsAt = s.systemId;
+    this.post({ t: 'state', snap, offline: this.offline }, transfer);
     this.offline = null;
   }
 }
