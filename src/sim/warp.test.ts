@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { apply } from './actions';
-import { DOCK_RADIUS } from './config';
+import { DOCK_RADIUS, WARP_H2_PER_ENERGY, warpCost } from './config';
 import { newGame } from './state';
 import { step } from './tick';
 import type { GameState, Ship } from './types';
@@ -82,5 +82,40 @@ describe('warp jump', () => {
     const before = { ...s.carrier.pos };
     for (let i = 0; i < 20; i++) step(s);
     expect(s.carrier.pos).toEqual(before);
+  });
+});
+
+const cost = () => {
+  const s = newGame(21);
+  return { s, c: warpCost(s.systems[s.systemId].distance, s.systems[1].distance) };
+};
+
+describe('warp payment', () => {
+  it('uses no H2 when energy covers the cost', () => {
+    const { s, c } = cost();
+    s.carrier.energy = c + 50;
+    s.carrier.h2 = 40;
+    expect(apply(s, { type: 'warp', systemId: 1 })).toBeNull();
+    expect(s.carrier.energy).toBe(50);
+    expect(s.carrier.h2).toBe(40);
+  });
+
+  it('covers an energy shortfall with H2 at the warp rate', () => {
+    const { s, c } = cost();
+    s.carrier.energy = c - 100;
+    s.carrier.h2 = 40;
+    expect(apply(s, { type: 'warp', systemId: 1 })).toBeNull();
+    expect(s.carrier.energy).toBe(0);
+    expect(s.carrier.h2).toBe(40 - Math.ceil(100 * WARP_H2_PER_ENERGY));
+  });
+
+  it('refuses when energy plus H2 cannot cover the cost', () => {
+    const { s, c } = cost();
+    s.carrier.energy = c - 100;
+    s.carrier.h2 = 5;
+    expect(apply(s, { type: 'warp', systemId: 1 })).toMatch(/Needs/);
+    expect(s.warp).toBeNull();
+    expect(s.carrier.energy).toBe(c - 100);
+    expect(s.carrier.h2).toBe(5);
   });
 });

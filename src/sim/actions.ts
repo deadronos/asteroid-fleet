@@ -17,6 +17,7 @@ import {
   SHIP_STATS,
   WARP_CHARGE,
   warpCost,
+  warpPayment,
 } from './config';
 import { autoBuyUnlocked, autoRebuildUnlocked, engagementUnlocked } from './automation';
 import { moveShip as moveOnBoard } from './hangar';
@@ -192,8 +193,10 @@ export function apply(s: GameState, c: Command): string | null {
       const to = s.systems[c.systemId];
       if (!to || !to.discovered || to.id === from.id) return 'Unknown system';
       const cost = warpCost(from.distance, to.distance);
-      if (s.carrier.energy < cost) return `Needs ${cost} energy`;
-      s.carrier.energy -= cost;
+      const pay = warpPayment(cost, s.carrier.energy, s.carrier.h2);
+      if (!pay) return `Needs ${cost} energy (or H2 to cover the gap)`;
+      s.carrier.energy -= pay.energy;
+      s.carrier.h2 -= pay.h2;
       s.warp = { targetSystem: to.id, charge: WARP_CHARGE * (1 - 0.15 * lvl(s, 'warpCharge')) };
       log(s, `Warp drive charging for ${to.name}. Recalling the fleet.`, 'warn');
       return null;

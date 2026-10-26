@@ -303,6 +303,16 @@ export const SHIELD_REGEN = 0.03; // per second
 export const SHIELD_REGEN_ENERGY = 4; // energy/s while regenerating
 export const WARP_CHARGE = 15;
 export const warpCost = (from: number, to: number) => 250 + 150 * Math.abs(from - to);
+// Emergency warp fuel: H2 per missing energy. Fusion yields 50 energy per H2 (0.02 H2/energy),
+// so burning H2 at the drive (0.1 H2/energy) is 5x worse and the reactor stays the efficient path.
+export const WARP_H2_PER_ENERGY = 0.1;
+/** Split a warp cost between energy and H2 (energy first); null if both together can't cover it. */
+export const warpPayment = (cost: number, energy: number, h2: number) => {
+  const e = Math.min(cost, Math.max(0, energy));
+  const gap = cost - e;
+  const need = Math.ceil(gap * WARP_H2_PER_ENERGY);
+  return h2 + 1e-9 < need ? null : { energy: e, h2: need };
+};
 
 // ---------- Pirates ----------
 
