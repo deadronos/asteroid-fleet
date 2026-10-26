@@ -11,6 +11,7 @@ import {
   SHIP_UPKEEP,
   TIER_NAMES,
   warpCost,
+  warpPayment,
 } from '../sim/config';
 import { lvl } from '../sim/research';
 import { solarRate, upkeep } from '../sim/state';
@@ -159,12 +160,14 @@ export function CarrierPanel() {
 
       <h3>Star map</h3>
       <p className="hint">
-        Warp costs energy and charges for a few seconds while the fleet is recalled. Ships still
-        outside at jump time are lost. Pirates scale with distance and cargo heat.
+        Warp costs energy (any shortfall is paid in stored H2, at a poor rate) and charges for a few
+        seconds while the fleet is recalled. Ships still outside at jump time are lost. Pirates
+        scale with distance and cargo heat.
       </p>
       {s.systems.map((o) => {
         const here = o.id === s.systemId;
         const cost = warpCost(sys.distance, o.distance);
+        const pay = warpPayment(cost, s.carrier.energy, s.carrier.h2);
         return (
           <div key={o.id} className={`sys ${here ? 'here' : ''} ${o.discovered ? '' : 'unknown'}`}>
             <span className={`tier t${o.tier}`}>{TIER_NAMES[o.tier]}</span>
@@ -183,11 +186,17 @@ export function CarrierPanel() {
               <span className="tone-good">here</span>
             ) : (
               <button
-                disabled={!o.discovered || !!s.warp || s.carrier.energy < cost}
+                disabled={!o.discovered || !!s.warp || !pay}
                 onClick={() => engine.dispatch({ type: 'warp', systemId: o.id })}
                 title={o.distance < sys.distance ? 'Warp back to a safer system' : 'Warp outward'}
               >
                 Warp · {cost} E
+                {pay && pay.h2 > 0 && (
+                  <span className="hint" title="Energy short: H2 covers the gap at a poor rate">
+                    {' '}
+                    ({Math.round(pay.energy)} E + {pay.h2} H2)
+                  </span>
+                )}
               </button>
             )}
           </div>
