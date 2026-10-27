@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { order } from './actions';
 import { HULLS, REFIT_COST } from './config';
-import { createShip } from './state';
+import { carrierMaxHull, createShip } from './state';
 import { game } from './testing';
 
 const yard = () => {
@@ -17,11 +17,13 @@ const yard = () => {
 describe('shipyard refit (#66)', () => {
   it('swaps hull stats, keeps hull fraction, and charges credits', () => {
     const s = yard();
+    s.researchLevels.frame = 2;
     s.carrier.hull = s.carrier.maxHull / 2;
     expect(order(s, { type: 'refit', hull: 'bastion' })).toBeNull();
     expect(s.carrier.hullClass).toBe('bastion');
-    expect(s.carrier.maxHull).toBe(HULLS.bastion.hull);
-    expect(s.carrier.hull).toBeCloseTo(HULLS.bastion.hull / 2);
+    expect(s.carrier.maxHull).toBe(carrierMaxHull(s));
+    expect(s.carrier.maxHull).toBeCloseTo(HULLS.bastion.hull * 1.24);
+    expect(s.carrier.hull).toBeCloseTo(carrierMaxHull(s) / 2);
     expect(s.credits).toBe(100_000 - REFIT_COST);
     expect(s.hangars[0].slots).toBe(HULLS.bastion.slots);
   });

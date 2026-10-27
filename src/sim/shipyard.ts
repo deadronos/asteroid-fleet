@@ -1,7 +1,7 @@
 import { HULLS, REFIT_COST, SHIP_STATS } from './config';
 import { firstFit } from './hangar';
 import { lvl } from './research';
-import { maxEnergy } from './state';
+import { carrierMaxHull, maxEnergy } from './state';
 import type { HullId, Sim } from './types';
 
 /** Starter systems (tier 1) have a shipyard. */
@@ -79,7 +79,7 @@ export function refit(s: Sim, to: HullId): string | null {
   const c = s.carrier;
   const frac = c.hull / c.maxHull;
   c.hullClass = to;
-  c.maxHull = HULLS[to].hull;
+  c.maxHull = carrierMaxHull(s);
   c.hull = frac * c.maxHull;
   c.energy = Math.min(c.energy, maxEnergy(s));
   return null;
