@@ -13,21 +13,24 @@ import {
   RP_DIVISOR,
   SHIP_STATS,
   WARP_CHARGE,
-  warpCost,
   warpPayment,
+  HULLS,
 } from './config';
 import { cardSlots, checkCard, nextCardId } from './cards';
 import { autoBuyUnlocked, autoRebuildUnlocked, engagementUnlocked } from './automation';
 import { moveShip as moveOnBoard } from './hangar';
 import { buyResearch as buyNode, lvl, RESEARCH_BY_ID } from './research';
-import { bind, createShip, emit, focused, maxEnergy, newGame } from './state';
+import { bind, createShip, emit, focused, jumpCost, maxEnergy, newGame } from './state';
 import { executeJump } from './tick';
 import { RETURN_GRACE_S, dematerialise, materialise, runBackground } from './background';
 import type {
+  AlertMode,
   GameState,
+  SimEventKind,
   CarrierStance,
   Sim,
   HangarType,
+  HullId,
   ModuleId,
   RuleCard,
   ShipClass,
@@ -49,6 +52,7 @@ export type Order =
       patch: Partial<Stance> | null;
       key?: keyof Stance;
     }
+  | { type: 'setAlert'; scope: 'fleet' | number; kind: SimEventKind; mode: AlertMode | null }
   | { type: 'addCard'; card: Omit<RuleCard, 'id'> }
   | { type: 'updateCard'; id: number; card: Omit<RuleCard, 'id'> }
   | { type: 'moveCard'; id: number; to: number }
@@ -147,7 +151,7 @@ export function order(s: Sim, c: Order): string | null {
       s.hangars.push({
         id,
         type: c.hangarType,
-        slots: 4 + lvl(s, 'slots'),
+        slots: HULLS[s.carrier.hullClass].newSlots + lvl(s, 'slots'),
         items: [],
         stance: {},
         launchOrder: ['fighter', 'scout', 'drone', 'repair', 'hauler', 'barge', 'harvester'],
@@ -192,6 +196,19 @@ export function order(s: Sim, c: Order): string | null {
       Object.assign(target, c.patch);
       return null;
     }
+    case 'setAlert': {
+      if (c.kind === 'Legacy') return 'No such event';
+      if (c.scope === 'fleet') {
+        if (c.mode === null) delete s.alerts.fleet[c.kind];
+        else s.alerts.fleet[c.kind] = c.mode;
+        return null;
+      }
+      const over = (s.alerts.byCarrier[c.scope] ??= {});
+      if (c.mode === null) delete over[c.kind];
+      else over[c.kind] = c.mode;
+      if (Object.keys(over).length === 0) delete s.alerts.byCarrier[c.scope];
+      return null;
+    }
     case 'addCard': {
       if (s.cards.length >= cardSlots(s)) return 'All card slots are in use';
       const card = structuredClone(c.card);
@@ -228,12 +245,16 @@ export function order(s: Sim, c: Order): string | null {
       const from = s.systems[s.systemId];
       const to = s.systems[c.systemId];
       if (!to || !to.discovered || to.id === from.id) return 'Unknown system';
-      const cost = warpCost(from.distance, to.distance);
+      const cost = jumpCost(s, from.distance, to.distance);
       const pay = warpPayment(cost, s.carrier.energy, s.carrier.h2);
       if (!pay) return `Needs ${cost} energy (or H2 to cover the gap)`;
       s.carrier.energy -= pay.energy;
       s.carrier.h2 -= pay.h2;
-      s.warp = { targetSystem: to.id, charge: WARP_CHARGE * (1 - 0.15 * lvl(s, 'warpCharge')) };
+      s.warp = {
+        targetSystem: to.id,
+        charge:
+          WARP_CHARGE * HULLS[s.carrier.hullClass].warpCharge * (1 - 0.15 * lvl(s, 'warpCharge')),
+      };
       emit(s, 'WarpCharging', { system: to.name });
       return null;
     }
@@ -243,7 +264,7 @@ export function order(s: Sim, c: Order): string | null {
       const to = s.systems[s.warp.targetSystem];
       s.carrier.energy = Math.min(
         maxEnergy(s),
-        s.carrier.energy + warpCost(from.distance, to.distance) * 0.75,
+        s.carrier.energy + jumpCost(s, from.distance, to.distance) * 0.75,
       );
       s.warp = null;
       emit(s, 'WarpCancelled', {});
@@ -304,13 +325,15 @@ export function researchPayout(s: Pick<GameState, 'stats'>): number {
   return Math.floor(Math.sqrt(s.stats.oreValueDelivered / RP_DIVISOR)) * s.stats.furthestTier;
 }
 
-export function prestige(s: GameState): GameState {
+export function prestige(s: GameState, hull?: HullId): GameState {
   const rp = researchPayout(s);
   const next = newGame(s.seed + s.lifetime.prestiges + 1, {
     research: s.research + rp,
     researchLevels: { ...s.researchLevels },
     unlocked: [...s.unlocked],
     unlockedRules: [...s.unlockedRules],
+    hulls: [...s.hulls],
+    hullClass: hull ?? focused(s).carrier.hullClass,
     discovered: s.systems.filter((x) => x.discovered).map((x) => x.id),
     lifetime: {
       ...s.lifetime,
@@ -319,6 +342,7 @@ export function prestige(s: GameState): GameState {
     },
     marks: s.marks,
     doctrine: structuredClone(s.doctrine),
+    alerts: structuredClone(s.alerts),
     cards: structuredClone(s.cards),
     automation: structuredClone(s.automation),
   });
@@ -361,6 +385,9 @@ export function admiralty(s: GameState): GameState {
       admiralties: s.lifetime.admiralties + 1,
       marksEarned: s.lifetime.marksEarned + marks,
     },
+    hulls: [...s.hulls],
+    hullClass: focused(s).carrier.hullClass,
+    alerts: structuredClone(s.alerts),
     marks: s.marks + marks,
     doctrine: structuredClone(s.doctrine),
     cards: structuredClone(s.cards),

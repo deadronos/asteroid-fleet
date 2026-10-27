@@ -7,6 +7,7 @@ import { SHIP_CLASSES } from '../sim/types';
 import { CarrierPanel } from './CarrierPanel';
 import { DoctrinePanel } from './DoctrinePanel';
 import { downloadFile } from './download';
+import { resolveAlert } from '../game/toasts';
 import { formatEvent, toneClass } from './events';
 import {
   activeCarrier,
@@ -19,6 +20,7 @@ import {
 } from './inbox';
 import { SceneBoundary } from './ErrorBoundary';
 import { FleetPanel } from './FleetPanel';
+import { CarrierBar } from './CarrierBar';
 import { Hud } from './Hud';
 import { fmt } from './format';
 import { GearButton } from './GearButton';
@@ -81,7 +83,9 @@ export function LogPanel({
     carrier,
     choices.map((c) => c.id),
   );
-  const rows = filterEvents(mergeForInbox(s.log), selected, severity);
+  const rows = filterEvents(mergeForInbox(s.log), selected, severity).filter(
+    (ev) => resolveAlert(s.alerts, ev.kind, ev.carrierId) !== 'off',
+  );
   return (
     <>
       <h3>This run</h3>
@@ -338,6 +342,7 @@ export function App() {
         onTactical={() => setTactical((v) => !v)}
         onQuality={() => updateSettings({ quality: settings.quality === 'high' ? 'low' : 'high' })}
       />
+      <CarrierBar />
       <GearButton onClick={() => setMenu(true)} />
       <div className={`side ${collapsed ? 'collapsed' : ''}`}>
         <div className="tabs">

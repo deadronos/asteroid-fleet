@@ -1,4 +1,4 @@
-import type { Severity, SimEvent, SimEventKind } from '../sim/types';
+import type { AlertMode, AlertRules, Severity, SimEvent, SimEventKind } from '../sim/types';
 
 /** How many toasts are on screen at once. Newer arrivals wait behind these. */
 export const VISIBLE_CAP = 3;
@@ -69,8 +69,19 @@ export const TOAST_POLICY: Record<SimEventKind, ToastPolicy> = {
 
 const SEV_RANK: Record<Severity, number> = { critical: 0, warn: 1, good: 2, info: 3 };
 
+/** The player's rule for this event: the carrier's override, else the fleet's, else none. */
+export function resolveAlert(
+  rules: AlertRules | undefined,
+  kind: SimEventKind,
+  carrierId: number,
+): AlertMode | null {
+  return rules?.byCarrier[carrierId]?.[kind] ?? rules?.fleet[kind] ?? null;
+}
+
 /** True when this event should appear as a toast for the carrier the player is watching. */
-export function wantsToast(ev: SimEvent, focusedCarrierId: number): boolean {
+export function wantsToast(ev: SimEvent, focusedCarrierId: number, rules?: AlertRules): boolean {
+  const mode = resolveAlert(rules, ev.kind, ev.carrierId);
+  if (mode) return mode === 'toast' || mode === 'pause' || mode === 'focus';
   if (ev.severity === 'critical') return true;
   const policy = TOAST_POLICY[ev.kind];
   switch (policy) {
@@ -416,6 +427,7 @@ export function offerToasts(
   queue: ToastQueue,
   events: readonly (SimEvent & { id: number })[],
   focusedCarrierId: number,
+  rules?: AlertRules,
 ): boolean {
   const ordered = events
     .slice()
@@ -424,7 +436,7 @@ export function offerToasts(
   for (const ev of ordered) {
     // A toast already open for this id keeps receiving merges, even when the new
     // payload would not have opened one (a barge loss followed by a drone).
-    if (!wantsToast(ev, focusedCarrierId) && !queue.has(ev.id)) continue;
+    if (!wantsToast(ev, focusedCarrierId, rules) && !queue.has(ev.id)) continue;
     const key = queue.push({
       eventId: ev.id,
       event: ev,
@@ -435,4 +447,27 @@ export function offerToasts(
     if (key !== null) changed = true;
   }
   return changed;
+}
+
+/**
+ * Events whose rule asks for more than a toast: the game pauses on `pause`, and the
+ * newest `focus` event names the carrier to switch to. `seen` holds bus ids already
+ * acted on, so a merge into the same event does not pause or refocus again.
+ */
+export function alertActions(
+  events: readonly (SimEvent & { id: number })[],
+  rules: AlertRules | undefined,
+  seen: Set<number>,
+): { pause: boolean; focus: number | null } {
+  let pause = false;
+  let focus: number | null = null;
+  for (const ev of events) {
+    const mode = resolveAlert(rules, ev.kind, ev.carrierId);
+    if ((mode !== 'pause' && mode !== 'focus') || seen.has(ev.id)) continue;
+    seen.add(ev.id);
+    if (seen.size > 256) seen.delete(seen.values().next().value as number);
+    if (mode === 'pause') pause = true;
+    else focus = ev.carrierId;
+  }
+  return { pause, focus };
 }

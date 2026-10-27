@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { engine, useGame } from '../game/engine';
 import { marksPayout, researchPayout } from '../sim/actions';
-import { MARKS_DIVISOR, RP_DIVISOR, SHIP_STATS, TIER_NAMES } from '../sim/config';
+import { HULLS, MARKS_DIVISOR, RP_DIVISOR, SHIP_STATS, TIER_NAMES } from '../sim/config';
 import {
   RESEARCH,
   canBuyResearch,
@@ -10,16 +10,40 @@ import {
   researchLocked,
   type Branch,
 } from '../sim/research';
-import { SHIP_CLASSES, type ShipClass } from '../sim/types';
+import { SHIP_CLASSES, type HullId, type ShipClass } from '../sim/types';
 import { fmt } from './format';
 
 const GLOBAL: Branch[] = ['Logistics', 'Mining', 'Combat', 'Carrier', 'Reserves', 'Automation'];
+
+function Pair(p: { a: string; av: string; b: string; bv: string }) {
+  return (
+    <div className="row">
+      <div className="grow">
+        <div className="hint" style={{ margin: 0 }}>
+          {p.a}
+        </div>
+        <div className="big">{p.av}</div>
+      </div>
+      <div style={{ textAlign: 'right' }}>
+        <div className="hint" style={{ margin: 0 }}>
+          {p.b}
+        </div>
+        <div className="big" style={{ color: '#c9b6ff' }}>
+          {p.bv}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function ResearchPanel() {
   const s = useGame();
   const [confirm, setConfirm] = useState(false);
   const [confirmAdm, setConfirmAdm] = useState(false);
   const marks = marksPayout(s);
+  const current = s.carrier.hullClass;
+  const [hull, setHull] = useState<HullId | null>(null);
+  const pick = hull && s.hulls.includes(hull) ? hull : current;
   const rp = researchPayout(s);
   const tier = s.stats.furthestTier as 1 | 2 | 3;
   const branch = (b: Branch) => {
@@ -75,22 +99,12 @@ export function ResearchPanel() {
   return (
     <>
       <div className="prestige-box">
-        <div className="row">
-          <div className="grow">
-            <div className="hint" style={{ margin: 0 }}>
-              Research points available
-            </div>
-            <div className="big">{s.research} RP</div>
-          </div>
-          <div style={{ textAlign: 'right' }}>
-            <div className="hint" style={{ margin: 0 }}>
-              Prestige now pays
-            </div>
-            <div className="big" style={{ color: '#c9b6ff' }}>
-              +{rp} RP
-            </div>
-          </div>
-        </div>
+        <Pair
+          a="Research points available"
+          av={`${s.research} RP`}
+          b="Prestige now pays"
+          bv={`+${rp} RP`}
+        />
         <p className="hint">
           RP = ⌊√(ore value delivered ÷ {fmt(RP_DIVISOR)})⌋ × furthest zone tier. This run:{' '}
           {fmt(s.stats.oreValueDelivered)} delivered, furthest {TIER_NAMES[tier]} (×{tier}).
@@ -104,9 +118,22 @@ export function ResearchPanel() {
         ) : (
           <div className="row">
             <span>Reset this operation for +{rp} RP?</span>
+            {s.hulls.length > 1 && (
+              <select
+                aria-label="Hull class for the next run"
+                value={pick}
+                onChange={(e) => setHull(e.target.value as HullId)}
+              >
+                {s.hulls.map((id) => (
+                  <option key={id} value={id} title={HULLS[id].blurb}>
+                    {HULLS[id].name}
+                  </option>
+                ))}
+              </select>
+            )}
             <button
               onClick={() => {
-                engine.doPrestige();
+                engine.doPrestige(pick);
                 setConfirm(false);
               }}
             >
@@ -117,26 +144,10 @@ export function ResearchPanel() {
         )}
       </div>
       <div className="prestige-box">
-        <div className="row">
-          <div className="grow">
-            <div className="hint" style={{ margin: 0 }}>
-              Admiralty Marks
-            </div>
-            <div className="big">{fmt(s.marks)}</div>
-          </div>
-          <div style={{ textAlign: 'right' }}>
-            <div className="hint" style={{ margin: 0 }}>
-              Admiralty now pays
-            </div>
-            <div className="big" style={{ color: '#c9b6ff' }}>
-              +{fmt(marks)}
-            </div>
-          </div>
-        </div>
+        <Pair a="Admiralty Marks" av={fmt(s.marks)} b="Admiralty now pays" bv={`+${fmt(marks)}`} />
         <p className="hint">
-          Marks = ⌊√(lifetime RP ÷ {MARKS_DIVISOR})⌋ less Marks already paid. Admiralty resets the
-          research tree, RP and discovered systems along with the run. Automation research, hulls,
-          rules and Marks persist.
+          Marks = ⌊√(lifetime RP ÷ {MARKS_DIVISOR})⌋ minus Marks paid. Resets research and
+          discovered systems; automation and hulls stay.
         </p>
         {!confirmAdm ? (
           <button disabled={marks <= 0} onClick={() => setConfirmAdm(true)}>
@@ -144,7 +155,7 @@ export function ResearchPanel() {
           </button>
         ) : (
           <div className="row">
-            <span>Reset research for +{fmt(marks)} Marks?</span>
+            <span>Reset for +{fmt(marks)} Marks?</span>
             <button
               onClick={() => {
                 engine.doAdmiralty();

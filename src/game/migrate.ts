@@ -102,8 +102,21 @@ export const migrations: Record<number, Migration> = {
     save.ops = [op];
     return save;
   },
-  // v11: Admiralty Marks and the second prestige layer (#68).
+  // v11: hull classes (#65). Everyone keeps the standard carrier; later hulls unlock from prestige 1.
   10: (save) => {
+    save.hulls = ['standard'];
+    if (Array.isArray(save.ops))
+      for (const op of save.ops)
+        if (isRecord(op) && isRecord(op.carrier)) op.carrier.hullClass ??= 'standard';
+    return save;
+  },
+  // v12: per-carrier alert rules in Doctrine (#79). Old saves keep the built-in policy.
+  11: (save) => {
+    save.alerts = { fleet: {}, byCarrier: {} };
+    return save;
+  },
+  // v13: Admiralty Marks and the second prestige layer (#68).
+  12: (save) => {
     const lifetime = isRecord(save.lifetime) ? save.lifetime : { prestiges: 0, researchEarned: 0 };
     save.lifetime = { ...lifetime, admiralties: 0, marksEarned: 0 };
     save.marks = 0;
@@ -179,10 +192,13 @@ function validateSave(save: SaveBlob): MigrateResult {
   if (!isRecord(save.doctrine)) return { ok: false, reason: 'corrupt' };
   if (!isRecord(save.automation)) return { ok: false, reason: 'corrupt' };
 
+  if (!isRecord(save.alerts) || !isRecord(save.alerts.fleet) || !isRecord(save.alerts.byCarrier))
+    save.alerts = { fleet: {}, byCarrier: {} };
   if (!Array.isArray(save.log)) save.log = [];
   if (!Array.isArray(save.cards)) save.cards = [];
   if (!Array.isArray(save.unlockedRules)) save.unlockedRules = [];
   if (!Array.isArray(save.events)) save.events = [];
+  if (!Array.isArray(save.hulls) || !save.hulls.includes('standard')) save.hulls = ['standard'];
 
   if (typeof save.credits !== 'number' || !Number.isFinite(save.credits))
     return { ok: false, reason: 'corrupt' };

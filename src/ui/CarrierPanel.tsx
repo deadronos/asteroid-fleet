@@ -4,17 +4,16 @@ import {
   MINING_RATE,
   REFINE_ENERGY,
   REFINERY_COST,
-  refineRate,
+  HULLS,
   FUSION_RATE,
   HANGAR_UPKEEP,
   SHIP_STATS,
   SHIP_UPKEEP,
   TIER_NAMES,
-  warpCost,
   warpPayment,
 } from '../sim/config';
 import { lvl, repeatEffect } from '../sim/research';
-import { solarRate, upkeep } from '../sim/state';
+import { jumpCost, refineThroughput, solarRate, upkeep } from '../sim/state';
 import { cargoCap } from '../sim/tick';
 import { SHIP_CLASSES, type Sim } from '../sim/types';
 import { fmt } from './format';
@@ -34,7 +33,7 @@ function throughput(s: Sim) {
     ? (haulers * cargoCap(s, 'hauler')) / ((2 * avgTrip) / SHIP_STATS.hauler.speed + 3)
     : Infinity;
   const spare = Math.max(0, solarRate(s) - upkeep(s).total);
-  const refinery = Math.min(refineRate(s.carrier.refinery), spare / REFINE_ENERGY);
+  const refinery = Math.min(refineThroughput(s), spare / REFINE_ENERGY);
   const links = [
     { name: 'Mining', v: mining },
     { name: 'Drone transport', v: droneTransport },
@@ -130,10 +129,14 @@ export function CarrierPanel() {
         ))}
       </div>
 
+      <p className="hint">
+        {HULLS[s.carrier.hullClass].name}: {HULLS[s.carrier.hullClass].blurb}
+      </p>
+
       <h3>Refinery · level {s.carrier.refinery}</h3>
       <div className="row">
         <span className="grow hint" style={{ margin: 0 }}>
-          {refineRate(s.carrier.refinery).toFixed(0)} ore/s, {REFINE_ENERGY} energy per unit
+          {refineThroughput(s).toFixed(0)} ore/s, {REFINE_ENERGY} energy per unit
         </span>
         <button
           disabled={s.carrier.refinery >= MAX_REFINERY || s.credits < refCost}
@@ -167,7 +170,7 @@ export function CarrierPanel() {
       </p>
       {s.systems.map((o) => {
         const here = o.id === s.systemId;
-        const cost = warpCost(sys.distance, o.distance);
+        const cost = jumpCost(s, sys.distance, o.distance);
         const pay = warpPayment(cost, s.carrier.energy, s.carrier.h2);
         return (
           <div key={o.id} className={`sys ${here ? 'here' : ''} ${o.discovered ? '' : 'unknown'}`}>

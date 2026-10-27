@@ -12,6 +12,9 @@ function richGame() {
   g.unlocked = ['harvester'];
   g.systems[1].discovered = true;
   g.credits = 9999;
+  g.hulls = ['standard', 'bastion'];
+  g.ops[0].carrier.hullClass = 'bastion';
+  g.alerts = { fleet: {}, byCarrier: {} };
   return g;
 }
 
@@ -42,6 +45,9 @@ describe('Admiralty (#68)', () => {
     expect(next.stats.oreValueDelivered).toBe(0);
     expect(next.lifetime.admiralties).toBe(1);
     expect(next.lifetime.marksEarned).toBe(marks);
+    expect(next.hulls).toEqual(g.hulls);
+    expect(next.ops[0].carrier.hullClass).toBe(g.ops[0].carrier.hullClass);
+    expect(next.alerts).toEqual(g.alerts);
     expect(next.log[0]?.kind).toBe('Admiralty');
   });
 
@@ -69,9 +75,9 @@ describe('Admiralty (#68)', () => {
     expect(r.state.researchLevels).toEqual(next.researchLevels);
   });
 
-  it('migrates a v10 save with zero Marks', () => {
+  it('migrates a v12 save with zero Marks', () => {
     const v10 = JSON.parse(JSON.stringify(newGame()));
-    v10.version = 10;
+    v10.version = 12;
     delete v10.marks;
     v10.lifetime = { prestiges: 2, researchEarned: 9 };
     const r = migrate(v10);

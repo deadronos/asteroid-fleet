@@ -11,6 +11,7 @@ import saveV6 from './fixtures/save-v6.json';
 import saveV7 from './fixtures/save-v7.json';
 import saveV8 from './fixtures/save-v8.json';
 import saveV9 from './fixtures/save-v9.json';
+import saveV10 from './fixtures/save-v10.json';
 import { applyMigrationSteps, migrate, type SaveBlob } from './migrate';
 import {
   SAVE_BACKUP_FAILED_NOTICE,
@@ -277,8 +278,14 @@ describe('migrate', () => {
       expect(g).not.toHaveProperty(k);
       // Timers are compared below: JSON null comes back as Infinity.
       if (k === 'id' || k === 'wave' || k === 'storm') continue;
+      if (k === 'carrier') continue;
       expect.soft(op[k]).toEqual((saveV9 as SaveBlob)[k]);
     }
+    // v11 adds the hull class.
+    expect(op.carrier).toEqual({
+      ...((saveV9 as SaveBlob).carrier as object),
+      hullClass: 'standard',
+    });
     expect(op.ships).toHaveLength(4);
     expect(op.wave.timer).toBe(Infinity);
     expect(op.storm.timer).toBe(Infinity);
@@ -287,6 +294,22 @@ describe('migrate', () => {
     expect(g.cards).toEqual(saveV9.cards);
     expect(g.log).toEqual(saveV9.log);
     expect(g.time).toBe(saveV9.time);
+  });
+
+  it('gives a v10 save the standard hull and only that hull unlocked (#65)', () => {
+    expect(saveV10.version).toBe(10);
+    const r = migrate(saveV10);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.state.version).toBe(SAVE_VERSION);
+    expect(r.state.hulls).toEqual(['standard']);
+    expect(r.state.ops[0].carrier.hullClass).toBe('standard');
+    expect(r.state.ops[0].carrier.maxHull).toBe(saveV10.ops[0].carrier.maxHull);
+  });
+
+  it('gives older saves empty alert rules (#79)', () => {
+    const r = migrate(saveV10);
+    expect(r.ok && r.state.alerts).toEqual({ fleet: {}, byCarrier: {} });
   });
 
   it('rejects a save whose operations are missing or broken', () => {
@@ -324,6 +347,7 @@ describe('migrate', () => {
     ['v7', saveV7],
     ['v8', saveV8],
     ['v9', saveV9],
+    ['v10', saveV10],
   ])('a migrated %s fixture keeps running through step()', (_, fixture) => {
     const r = migrate(fixture);
     expect(r.ok).toBe(true);

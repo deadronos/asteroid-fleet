@@ -1,7 +1,8 @@
 import { admiralty, apply, prestige, settleOffline, type OfflineReport } from '../sim/actions';
 import { DT } from '../sim/config';
-import { focusOp } from '../sim/state';
-import { step } from '../sim/tick';
+import { BG_DT, dematerialise, materialise, stepBackground } from '../sim/background';
+import { bind, focusOp } from '../sim/state';
+import { step, stepOp } from '../sim/tick';
 import type { GameState } from '../sim/types';
 import { EventAggregator } from './events';
 import { PUMP_MS, encodeFrame, type InMsg, type OutMsg } from './protocol';
@@ -30,6 +31,9 @@ export class SimRunner {
   private fieldsAt: number | null = null;
   private timer: ReturnType<typeof setInterval> | null = null;
   private events = new EventAggregator();
+  /** Carriers in Tier A (on the map). Every other one runs `stepBackground` (Tier B). */
+  private live = new Set<number>();
+  private bgAcc = 0;
   /** Run generation from the last init or replace. Stamped on every events batch. */
   private epoch = 0;
 
@@ -45,6 +49,8 @@ export class SimRunner {
         this.adopt(msg.state);
         if (msg.settle)
           this.offline = settleOffline(msg.state, (msg.now - msg.state.savedAt) / 1000);
+        // Settlement leaves every carrier materialised.
+        this.resync();
         this.sendEvents();
         this.sendState();
         this.start();
@@ -58,6 +64,13 @@ export class SimRunner {
         this.sendState();
         return;
       }
+      case 'focus':
+        if (!this.state || !this.state.ops.some((op) => op.id === msg.carrierId)) return;
+        this.state.focusId = msg.carrierId;
+        this.retier();
+        this.sendState();
+        this.sendFrame();
+        return;
       case 'speed':
         this.speed = msg.v;
         return;
@@ -66,7 +79,7 @@ export class SimRunner {
         return;
       case 'prestige':
         if (!this.state) return;
-        this.adopt(prestige(this.state));
+        this.adopt(prestige(this.state, msg.hull));
         this.sendEvents();
         this.sendState();
         this.sendFrame();
@@ -120,12 +133,14 @@ export class SimRunner {
       // time; game speed applies to live ticks only.
       const report = settleOffline(s, elapsed / 1000);
       if (report) this.offline = report;
+      this.resync();
       this.acc = 0;
       this.dirty = true;
     }
     let ticks = 0;
     while (this.acc >= TICK_MS && ticks < MAX_CATCHUP_TICKS) {
       step(s, focusOp(s));
+      this.stepOthers(s);
       this.acc -= TICK_MS;
       ticks++;
     }
@@ -140,8 +155,53 @@ export class SimRunner {
   /** A new state (a load, an import, a new run) starts with no open merges. */
   private adopt(state: GameState) {
     this.state = state;
+    this.resync();
     this.fieldsAt = null;
     this.events.reset();
+  }
+
+  /**
+   * Carriers in the viewed system run at Tier A (two may share a system, Q11 in #49);
+   * the rest drop to Tier B. A carrier's map state is cleared when it leaves Tier A and
+   * rebuilt when it enters, so a jump or a focus change keeps the tiers right.
+   */
+  private resync() {
+    if (!this.state) return;
+    this.live = new Set(this.state.ops.map((op) => op.id));
+    this.retier();
+  }
+
+  private retier() {
+    const g = this.state;
+    if (!g) return;
+    const here = focusOp(g).systemId;
+    for (const op of g.ops) {
+      const wantLive = op.systemId === here;
+      const isLive = this.live.has(op.id);
+      if (wantLive === isLive) continue;
+      if (wantLive) {
+        materialise(bind(g, op));
+        this.live.add(op.id);
+      } else {
+        dematerialise(bind(g, op));
+        this.live.delete(op.id);
+      }
+    }
+  }
+
+  /** The rest of one step: Tier A for carriers sharing the viewed system, Tier B for others. */
+  private stepOthers(g: GameState) {
+    if (g.ops.length < 2) return;
+    this.retier();
+    const focus = focusOp(g);
+    this.bgAcc += TICK_MS / 1000;
+    const bg = this.bgAcc >= BG_DT;
+    if (bg) this.bgAcc -= BG_DT;
+    for (const op of g.ops) {
+      if (op === focus) continue;
+      if (this.live.has(op.id)) stepOp(bind(g, op));
+      else if (bg) stepBackground(bind(g, op), BG_DT);
+    }
   }
 
   /** Drain the sim's outbox, merge and rank it, and send what changed. */
