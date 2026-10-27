@@ -20,6 +20,7 @@ import { cardSlots, checkCard, nextCardId } from './cards';
 import { autoBuyUnlocked, autoRebuildUnlocked, engagementUnlocked } from './automation';
 import { CHALLENGES, shipBanned } from './modifiers';
 import { moveShip as moveOnBoard } from './hangar';
+import { buyAdmiralty } from './admiralty';
 import { buyResearch as buyNode, lvl, RESEARCH_BY_ID } from './research';
 import { bind, createShip, emit, focused, jumpCost, maxEnergy, newGame } from './state';
 import { executeJump } from './tick';
@@ -66,6 +67,7 @@ export type Order =
   | { type: 'setPower'; mode: Sim['powerMode'] }
   | { type: 'setCarrierStance'; stance: CarrierStance }
   | { type: 'buyResearch'; id: string }
+  | { type: 'buyAdmiralty'; id: string }
   | {
       type: 'setAutomation';
       patch: Partial<Pick<Sim['automation'], 'autoBuy' | 'autoRebuild' | 'creditFloor'>>;
@@ -292,6 +294,8 @@ export function order(s: Sim, c: Order): string | null {
       s.carrier.refinery++;
       return null;
     }
+    case 'buyAdmiralty':
+      return buyAdmiralty(s, c.id) ? null : 'Not enough Marks';
     case 'buyResearch':
       return buyNode(s, c.id) ? null : 'Cannot research that yet';
     case 'setAutomation': {
@@ -353,6 +357,7 @@ export function prestige(
     challengesDone: [...s.challengesDone],
     modifiers: run?.modifiers,
     challenge: run?.challenge,
+    admiralty: { ...s.admiralty },
     doctrine: structuredClone(s.doctrine),
     alerts: structuredClone(s.alerts),
     cards: structuredClone(s.cards),
@@ -417,6 +422,7 @@ export function admiralty(s: GameState): GameState {
     alerts: structuredClone(s.alerts),
     marks: s.marks + marks,
     challengesDone: [...s.challengesDone],
+    admiralty: { ...s.admiralty },
     doctrine: structuredClone(s.doctrine),
     cards: structuredClone(s.cards),
     automation: structuredClone(s.automation),

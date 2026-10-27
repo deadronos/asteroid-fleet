@@ -41,7 +41,7 @@ export function heatFactor(s: Sim): number {
 export function waveWarning(s: Sim): number {
   let scouts = 0;
   for (const x of s.ships) if (x.cls === 'scout' && x.mode !== 'docked') scouts++;
-  return WAVE_WARNING + (lvl(s, 'scoutRelay') > 0 ? 10 * scouts : 0);
+  return WAVE_WARNING + 5 * lvl(s, 'sensors') + (lvl(s, 'scoutRelay') > 0 ? 10 * scouts : 0);
 }
 
 function fighterTarget(s: Sim, ship: Ship, ctx: Ctx, engagement: string): Pirate | null {

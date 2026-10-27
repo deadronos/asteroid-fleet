@@ -122,8 +122,13 @@ export const migrations: Record<number, Migration> = {
     save.marks = 0;
     return save;
   },
-  // v14: run modifiers and challenge runs (#71).
+  // v14: Admiralty upgrade shop (#69).
   13: (save) => {
+    save.admiralty = {};
+    return save;
+  },
+  // v15: run modifiers and challenge runs (#71).
+  14: (save) => {
     save.modifiers = [];
     save.challenge = null;
     save.challengesDone = [];

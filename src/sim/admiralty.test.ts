@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { admiralty, marksPayout, prestige } from './actions';
+import { admiralty, apply, marksPayout, prestige } from './actions';
+import { admiraltyCost, admiraltyEffect, buyAdmiralty } from './admiralty';
 import { newGame } from './state';
 import { migrate } from '../game/migrate';
 
@@ -17,6 +18,55 @@ function richGame() {
   g.alerts = { fleet: {}, byCarrier: {} };
   return g;
 }
+
+describe('Admiralty shop (#69)', () => {
+  it('costs grow geometrically and effects soft-cap', () => {
+    const g = newGame(1);
+    const c0 = admiraltyCost(g, 'admYield');
+    g.admiralty.admYield = 5;
+    expect(admiraltyCost(g, 'admYield')).toBeGreaterThan(c0 * 5);
+    g.admiralty.admYield = 1000;
+    expect(admiraltyEffect(g, 'admYield')).toBeLessThanOrEqual(1.5);
+    expect(admiraltyEffect(g, 'admYield')).toBeGreaterThan(1.49);
+    g.admiralty.admYield = 1;
+    const e1 = admiraltyEffect(g, 'admYield');
+    g.admiralty.admYield = 2;
+    const e2 = admiraltyEffect(g, 'admYield');
+    g.admiralty.admYield = 3;
+    expect(admiraltyEffect(g, 'admYield') - e2).toBeLessThan(e2 - e1);
+  });
+
+  it('spends Marks, refuses when short, and ignores unknown ids', () => {
+    const g = newGame(1);
+    expect(buyAdmiralty(g, 'admYield')).toBe(false);
+    expect(buyAdmiralty(g, 'nope')).toBe(false);
+    g.marks = 10;
+    expect(buyAdmiralty(g, 'admYield')).toBe(true);
+    expect(g.marks).toBe(9);
+    expect(g.admiralty.admYield).toBe(1);
+    expect(apply(g, { type: 'buyAdmiralty', id: 'admEnergy', carrierId: g.ops[0].id })).toBeNull();
+    expect(g.admiralty.admEnergy).toBe(1);
+  });
+
+  it('levels survive prestige and admiralty', () => {
+    const g = richGame();
+    g.lifetime.researchEarned = 200;
+    g.admiralty = { admYield: 3, admCredits: 2 };
+    expect(prestige(g).admiralty).toEqual({ admYield: 3, admCredits: 2 });
+    const next = admiralty(g);
+    expect(next.admiralty).toEqual({ admYield: 3, admCredits: 2 });
+    expect(next.admiralty).not.toBe(g.admiralty);
+    expect(next.credits).toBeGreaterThan(150);
+  });
+
+  it('migrates a v13 save with an empty shop', () => {
+    const save = JSON.parse(JSON.stringify(newGame(3))) as Record<string, unknown>;
+    delete save.admiralty;
+    save.version = 13;
+    const r = migrate(save);
+    expect(r.ok && r.state.admiralty).toEqual({});
+  });
+});
 
 describe('Admiralty (#68)', () => {
   it('pays nothing for a fresh game', () => {
@@ -45,7 +95,8 @@ describe('Admiralty (#68)', () => {
     expect(next.stats.oreValueDelivered).toBe(0);
     expect(next.lifetime.admiralties).toBe(1);
     expect(next.lifetime.marksEarned).toBe(marks);
-    expect(next.hulls).toEqual(g.hulls);
+    // The first Admiralty also unlocks the remaining hull classes (#70).
+    expect(next.hulls).toEqual(expect.arrayContaining(g.hulls));
     expect(next.ops[0].carrier.hullClass).toBe(g.ops[0].carrier.hullClass);
     expect(next.alerts).toEqual(g.alerts);
     expect(next.log[0]?.kind).toBe('Admiralty');

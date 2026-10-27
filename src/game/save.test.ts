@@ -13,6 +13,7 @@ import saveV8 from './fixtures/save-v8.json';
 import saveV9 from './fixtures/save-v9.json';
 import saveV10 from './fixtures/save-v10.json';
 import saveV13 from './fixtures/save-v13.json';
+import saveV14 from './fixtures/save-v14.json';
 import { applyMigrationSteps, migrate, type SaveBlob } from './migrate';
 import {
   SAVE_BACKUP_FAILED_NOTICE,
@@ -350,6 +351,7 @@ describe('migrate', () => {
     ['v9', saveV9],
     ['v10', saveV10],
     ['v13', saveV13],
+    ['v14', saveV14],
   ])('a migrated %s fixture keeps running through step()', (_, fixture) => {
     const r = migrate(fixture);
     expect(r.ok).toBe(true);

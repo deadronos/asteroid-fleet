@@ -10,8 +10,16 @@ import {
   researchLocked,
   type Branch,
 } from '../sim/research';
+import { MILESTONES, carrierSlots } from '../sim/milestones';
 import { SHIP_CLASSES, type ChallengeId, type HullId, type ShipClass } from '../sim/types';
 import { CHALLENGES, CHALLENGE_IDS, MODIFIERS, challengeProgress } from '../sim/modifiers';
+import {
+  ADMIRALTY_UPGRADES,
+  admiraltyCost,
+  admiraltyEffect,
+  admiraltyLevel,
+  canBuyAdmiralty,
+} from '../sim/admiralty';
 import { fmt } from './format';
 
 const GLOBAL: Branch[] = ['Logistics', 'Mining', 'Combat', 'Carrier', 'Reserves', 'Automation'];
@@ -216,6 +224,40 @@ export function ResearchPanel() {
           );
         })}
         <p className="hint">Starting a challenge resets the operation like a prestige.</p>
+      </div>
+      <div className="branch">
+        <h3>
+          Admiralty shop <span className="hint">{fmt(s.marks)} Marks</span>
+        </h3>
+        {ADMIRALTY_UPGRADES.map((u) => (
+          <div className="row" key={u.id}>
+            <div className="grow">
+              <b>{u.name}</b>
+              <div className="hint" style={{ margin: 0 }}>
+                {u.desc} · level {fmt(admiraltyLevel(s, u.id))}: {u.label(admiraltyEffect(s, u.id))}
+              </div>
+            </div>
+            <button
+              disabled={!canBuyAdmiralty(s, u.id)}
+              onClick={() => engine.dispatch({ type: 'buyAdmiralty', id: u.id })}
+            >
+              {fmt(admiraltyCost(s, u.id))} Marks
+            </button>
+          </div>
+        ))}
+      </div>
+      <div className="prestige-box">
+        <Pair
+          a="Admiralty resets"
+          av={String(s.lifetime.admiralties)}
+          b="Carrier slots"
+          bv={String(carrierSlots(s))}
+        />
+        {MILESTONES.map((m) => (
+          <div key={m.at} className="hint">
+            {s.lifetime.admiralties >= m.at ? '✓' : '○'} {m.at}: {m.label}
+          </div>
+        ))}
       </div>
       {GLOBAL.map(branch)}
       {SHIP_CLASSES.map((c) => branch(c))}

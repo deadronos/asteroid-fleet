@@ -69,7 +69,7 @@ v10 (#75): per-carrier state moves into `ops: Operation[]`, so several carriers 
 
 v11 (#65): hull classes. `GameState.hulls` lists the unlocked classes (a v10 save has only `standard`) and each carrier gets `hullClass: 'standard'`. `save-v10.json` is the fixture.
 
-v14 (#71): run modifiers and challenge runs. `GameState.modifiers` (active run modifiers), `challenge` (the attempt in progress) and `challengesDone` (completed challenges, permanent). A v13 save gets none of them. `save-v13.json` is the fixture. The modifier framework is `src/sim/modifiers.ts`; each modifier is read through one hook there.
+v15 (#71): run modifiers and challenge runs. `GameState.modifiers` (active run modifiers), `challenge` (the attempt in progress) and `challengesDone` (completed challenges, permanent). A v14 save gets none of them. `save-v14.json` is the fixture. The modifier framework is `src/sim/modifiers.ts`; each modifier is read through one hook there.
 
 The primary save lives in IndexedDB; the localStorage copy is only written when IndexedDB cannot hold it, and a stale one is removed, so a large fleet does not fill the localStorage quota the save slots use. A failed autosave or active-slot write shows a toast once, until a write succeeds again.
 

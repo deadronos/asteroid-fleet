@@ -429,6 +429,8 @@ export interface GameState {
   challenge: ChallengeId | null;
   /** Challenges completed, ever (#71). Their permanent bonuses survive every reset. */
   challengesDone: ChallengeId[];
+  /** Admiralty shop levels by upgrade id (#69). Survive both prestige layers. */
+  admiralty: Record<string, number>;
   powerMode: 'balanced' | 'income' | 'defense';
   /** The last few events, newest first, for the Log tab. Saved. */
   log: SimEvent[];

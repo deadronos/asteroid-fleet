@@ -1,3 +1,4 @@
+import { hullsUnlockedByMilestone } from './milestones';
 import {
   DEFAULT_STANCE,
   ENERGY_MAX,
@@ -18,7 +19,8 @@ import { addPreset } from './cards';
 import { findSpace } from './hangar';
 import { challengeBonus, energyMult, shipBanned, startSystem } from './modifiers';
 import { onSphere, seeded, v3 } from './math';
-import { lvl, repeatEffect } from './research';
+import { admiraltyEffect } from './admiralty';
+import { lvl, repeatEffect, softcap } from './research';
 import type {
   Asteroid,
   ChallengeId,
@@ -42,7 +44,7 @@ import type {
 } from './types';
 
 /** Bump together with a `migrations[n]` step and a fixture. See README "Save migrations". */
-export const SAVE_VERSION = 14;
+export const SAVE_VERSION = 15;
 
 /** Every `Operation` field. The `satisfies` below fails to compile when one is missing. */
 export const OP_KEYS = [
@@ -138,6 +140,12 @@ class SimView implements Sim {
   }
   set challengesDone(v) {
     this.g.challengesDone = v;
+  }
+  get admiralty() {
+    return this.g.admiralty;
+  }
+  set admiralty(v) {
+    this.g.admiralty = v;
   }
   get researchLevels() {
     return this.g.researchLevels;
@@ -571,13 +579,19 @@ export function maxHull(s: Sim, cls: ShipClass): number {
   return h;
 }
 
+/** Carrier hull points: hull class times Reinforced frame. */
+export function carrierMaxHull(s: Sim): number {
+  return HULLS[s.carrier.hullClass].hull * (1 + 0.12 * lvl(s, 'frame'));
+}
+
 export function maxEnergy(s: Sim): number {
   return (
     ENERGY_MAX *
     HULLS[s.carrier.hullClass].energy *
     energyMult(s) *
     (1 + 0.25 * lvl(s, 'energyCap')) *
-    (1 + repeatEffect(s, 'deepEnergy'))
+    (1 + repeatEffect(s, 'deepEnergy')) *
+    (1 + admiraltyEffect(s, 'admEnergy'))
   );
 }
 
@@ -586,20 +600,22 @@ export function refineThroughput(s: Sim): number {
   return (
     refineRate(s.carrier.refinery) *
     HULLS[s.carrier.hullClass].refinery *
+    (1 + 0.1 * lvl(s, 'reactor')) *
     (1 + 0.25 * lvl(s, 'voidRefining'))
   );
 }
 
 /** Jump energy between two system distances, with the hull's multiplier. */
 export function jumpCost(s: Sim, from: number, to: number): number {
-  return warpCost(from, to, HULLS[s.carrier.hullClass].warpCost);
+  return warpCost(from, to, HULLS[s.carrier.hullClass].warpCost * (1 - 0.05 * lvl(s, 'sensors')));
 }
 
 /** Unlock hull classes the run has earned: after the first prestige, by furthest tier. */
 export function unlockHulls(s: Sim) {
-  if (s.lifetime.prestiges < 1) return;
+  const all = hullsUnlockedByMilestone(s);
+  if (s.lifetime.prestiges < 1 && !all) return;
   for (const id of HULL_IDS)
-    if (HULLS[id].tier <= s.stats.furthestTier && !s.hulls.includes(id)) s.hulls.push(id);
+    if ((all || HULLS[id].tier <= s.stats.furthestTier) && !s.hulls.includes(id)) s.hulls.push(id);
 }
 
 /** Solar recharge in the current system, energy/s, before storm boosts. */
@@ -751,6 +767,7 @@ interface Carry {
   /** Modifiers and challenge of the run being started (#71). */
   modifiers?: ModifierId[];
   challenge?: ChallengeId | null;
+  admiralty?: Record<string, number>;
   doctrine?: GameState['doctrine'];
   alerts?: GameState['alerts'];
   cards?: GameState['cards'];
@@ -769,8 +786,8 @@ export function newGame(seed = 1337, carry?: Carry): GameState {
     carrier: {
       pos: v3(),
       target: null,
-      hull: hd.hull,
-      maxHull: hd.hull,
+      hull: hd.hull * (1 + 0.12 * (carry?.researchLevels.frame ?? 0)),
+      maxHull: hd.hull * (1 + 0.12 * (carry?.researchLevels.frame ?? 0)),
       energy: ENERGY_MAX * 0.6,
       shield: 1,
       ore: 0,
@@ -821,7 +838,10 @@ export function newGame(seed = 1337, carry?: Carry): GameState {
     seed,
     time: 0,
     nextId: 1,
-    credits: 150 + 250 * (carry?.researchLevels.startCredits ?? 0),
+    credits:
+      150 +
+      250 * (carry?.researchLevels.startCredits ?? 0) +
+      Math.round(softcap(carry?.admiralty?.admCredits ?? 0, 5000)),
     research: carry?.research ?? 0,
     researchLevels: carry?.researchLevels ?? {},
     unlocked: carry?.unlocked ?? [],
@@ -855,6 +875,7 @@ export function newGame(seed = 1337, carry?: Carry): GameState {
     modifiers: [...(carry?.modifiers ?? [])],
     challenge: carry?.challenge ?? null,
     challengesDone: [...(carry?.challengesDone ?? [])],
+    admiralty: carry?.admiralty ?? {},
     powerMode: 'balanced',
     log: [],
     events: [],

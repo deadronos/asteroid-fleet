@@ -5,7 +5,7 @@ import { focused, maxEnergy, newGame } from './state';
 import { step, stepSim } from './tick';
 import { game } from './testing';
 import { migrate } from '../game/migrate';
-import saveV13 from '../game/fixtures/save-v13.json';
+import saveV14 from '../game/fixtures/save-v14.json';
 
 function run(seed: number, mods: Parameters<typeof newGame>[1], ticks: number) {
   const g = newGame(seed, mods);
@@ -134,15 +134,25 @@ describe('challenge runs (#71)', () => {
     );
   });
 
+  it('prestige and Admiralty reset keep both shop levels and completed challenges', () => {
+    const g = newGame(3);
+    g.admiralty = { admEnergy: 2 };
+    g.challengesDone = ['lowPower'];
+    for (const next of [prestige(g), admiralty(g)]) {
+      expect(next.admiralty).toEqual({ admEnergy: 2 });
+      expect(next.challengesDone).toEqual(['lowPower']);
+    }
+  });
+
   it('unknown challenge ids are ignored', () => {
     expect(startChallenge(newGame(), 'nope' as never)).toBeNull();
   });
 });
 
-describe('save v14 (#71)', () => {
-  it('migrates a v13 fixture with no modifiers', () => {
-    expect(saveV13.version).toBe(13);
-    const r = migrate(saveV13);
+describe('save v15 (#71)', () => {
+  it('migrates a v14 fixture with no modifiers', () => {
+    expect(saveV14.version).toBe(14);
+    const r = migrate(saveV14);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.state.modifiers).toEqual([]);
