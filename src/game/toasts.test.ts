@@ -57,6 +57,7 @@ describe('toast policy', () => {
     }
     expect(toasting.sort()).toEqual(
       [
+        'ChallengeComplete',
         'EmergencyJump',
         'PirateWaveIncoming',
         'PiratesArrived',
@@ -468,6 +469,10 @@ function sampleOf(kind: SimEventKind): SimEvent {
       return ev(kind, { research: 3 });
     case 'Admiralty':
       return ev(kind, { marks: 2 });
+    case 'ChallengeStarted':
+      return ev(kind, { challenge: 'pacifist' });
+    case 'ChallengeComplete':
+      return ev(kind, { challenge: 'pacifist', marks: 1 });
     case 'WelcomeBack':
       return ev(kind, { credits: 20 });
     case 'Legacy':

@@ -127,6 +127,13 @@ export const migrations: Record<number, Migration> = {
     save.admiralty = {};
     return save;
   },
+  // v15: run modifiers and challenge runs (#71).
+  14: (save) => {
+    save.modifiers = [];
+    save.challenge = null;
+    save.challengesDone = [];
+    return save;
+  },
 };
 
 const LEGACY_TONE: Record<string, Severity> = {
@@ -203,6 +210,9 @@ function validateSave(save: SaveBlob): MigrateResult {
   if (!Array.isArray(save.cards)) save.cards = [];
   if (!Array.isArray(save.unlockedRules)) save.unlockedRules = [];
   if (!Array.isArray(save.events)) save.events = [];
+  if (!Array.isArray(save.modifiers)) save.modifiers = [];
+  if (!Array.isArray(save.challengesDone)) save.challengesDone = [];
+  if (typeof save.challenge !== 'string') save.challenge = null;
   if (!Array.isArray(save.hulls) || !save.hulls.includes('standard')) save.hulls = ['standard'];
 
   if (typeof save.credits !== 'number' || !Number.isFinite(save.credits))

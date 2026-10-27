@@ -1,7 +1,16 @@
 import { useSyncExternalStore } from 'react';
 import type { OfflineReport, Order } from '../sim/actions';
 import { focused, focusOp, newGame } from '../sim/state';
-import type { GameState, HullId, Pirate, Severity, Ship, Sim, Vec3 } from '../sim/types';
+import type {
+  ChallengeId,
+  GameState,
+  HullId,
+  Pirate,
+  Severity,
+  Ship,
+  Sim,
+  Vec3,
+} from '../sim/types';
 import type { BusEvent } from './events';
 import { createSimHost, type SimHost } from './host';
 import { MODES, PUMP_MS, type Frame, type OutMsg } from './protocol';
@@ -309,6 +318,11 @@ class Engine {
 
   doPrestige(hull?: HullId) {
     this.host?.post({ t: 'prestige', hull });
+    void this.save();
+  }
+
+  doChallenge(id: ChallengeId, hull?: HullId) {
+    this.host?.post({ t: 'challenge', id, hull });
     void this.save();
   }
 

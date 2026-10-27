@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { admiralty, apply, prestige } from './actions';
+import { admiralty, apply, prestige, startChallenge } from './actions';
 import { CARRIER_COST } from './config';
+import { CHALLENGES } from './modifiers';
 import { migrate } from '../game/migrate';
+import type { ChallengeId } from './types';
 import { newGame } from './state';
 import { step } from './tick';
 
@@ -17,7 +19,7 @@ const buy = (g: ReturnType<typeof newGame>) =>
 describe('buy a carrier (#78)', () => {
   it('refuses without a free slot, then without credits', () => {
     const g = ready(0);
-    expect(buy(g)).toBe('No slot');
+    expect(buy(g)).toBe('No free carrier slot');
     const h = ready(3);
     h.credits = CARRIER_COST(1) - 1;
     expect(buy(h)).toBe('Not enough credits');
@@ -31,7 +33,7 @@ describe('buy a carrier (#78)', () => {
     expect(g.credits).toBe(before - CARRIER_COST(1));
     expect(buy(g)).toBeNull();
     expect(g.ops).toHaveLength(3);
-    expect(buy(g)).toBe('No slot');
+    expect(buy(g)).toBe('No free carrier slot');
     expect(CARRIER_COST(2)).toBeGreaterThan(CARRIER_COST(1));
   });
 
@@ -83,5 +85,12 @@ describe('buy a carrier (#78)', () => {
     buy(g);
     g.lifetime.admiralties = 3;
     expect(prestige(g).ops).toHaveLength(2);
+  });
+
+  it('a challenge run keeps the carriers too', () => {
+    const g = ready(5);
+    buy(g);
+    const next = startChallenge(g, Object.keys(CHALLENGES)[0] as ChallengeId);
+    expect(next?.ops).toHaveLength(2);
   });
 });
