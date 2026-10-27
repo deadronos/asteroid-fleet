@@ -473,7 +473,8 @@ export const RESEARCH: ResearchNode[] = [
     desc: 'Repeatable; hangar launch interval, diminishing toward −50 %',
     maxLevel: Infinity,
     cost: geo(10, 1.25),
-    repeat: { base: 'warpCharge', cap: 0.5, label: (e) => `−${pct(e)} % launch interval` },
+    // No finite node touches launch speed; Hangar frames is the closest hangar node.
+    repeat: { base: 'slots', cap: 0.5, label: (e) => `−${pct(e)} % launch interval` },
   },
 ];
 
