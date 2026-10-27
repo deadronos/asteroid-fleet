@@ -16,7 +16,7 @@ import {
 } from './config';
 import { addPreset } from './cards';
 import { findSpace } from './hangar';
-import { challengeBonus, energyMult, startSystem } from './modifiers';
+import { challengeBonus, energyMult, shipBanned, startSystem } from './modifiers';
 import { onSphere, seeded, v3 } from './math';
 import { lvl, repeatEffect } from './research';
 import type {
@@ -653,6 +653,8 @@ export function createShip(
   preferredHangar?: number,
   start?: number,
 ): Ship | null {
+  // The one place every ship comes from (buy, reserves, auto-buy, rebuilds): modifiers ban here.
+  if (shipBanned(s, cls)) return null;
   let hangar: Hangar | undefined;
   let at = start ?? -1;
   if (preferredHangar !== undefined && start !== undefined) {

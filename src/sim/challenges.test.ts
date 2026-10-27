@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { admiralty, order, prestige, startChallenge } from './actions';
 import { CHALLENGES, challengeProgress, hasModifier } from './modifiers';
 import { focused, maxEnergy, newGame } from './state';
-import { step } from './tick';
+import { step, stepSim } from './tick';
 import { game } from './testing';
 import { migrate } from '../game/migrate';
 import saveV13 from '../game/fixtures/save-v13.json';
@@ -51,6 +51,28 @@ describe('run modifiers (#71)', () => {
     plain.unlocked.push('fighter');
     plain.credits = 1e6;
     expect(order(plain, { type: 'buyShip', cls: 'fighter' })).toBeNull();
+  });
+
+  it('noFighters holds on every creation path: reserves, auto-buy and rebuilds', () => {
+    const s = focused(newGame(5, carry(['noFighters'])));
+    s.unlocked.push('fighter');
+    s.credits = 1e6;
+    s.researchLevels.reserveFighter = 2;
+    s.researchLevels.autoBuy = 1;
+    s.researchLevels.autoRebuild = 1;
+    order(s, { type: 'setAutomation', patch: { autoBuy: true, autoRebuild: true } });
+    order(s, { type: 'setHangarTarget', hangarId: 1, cls: 'fighter', count: 4 });
+    s.automation.rebuildQueue.push({ cls: 'fighter', hangarId: 1 });
+    for (let i = 0; i < 20_000; i++) stepSim(s);
+    expect(s.ships.some((x) => x.cls === 'fighter')).toBe(false);
+    expect(s.automation.rebuildQueue).toEqual([]);
+    // The same setup without the modifier does build them.
+    const plain = focused(newGame(5));
+    plain.unlocked.push('fighter');
+    plain.credits = 1e6;
+    plain.researchLevels.reserveFighter = 2;
+    for (let i = 0; i < 20_000; i++) stepSim(plain);
+    expect(plain.ships.some((x) => x.cls === 'fighter')).toBe(true);
   });
 
   it('deepSpace starts in a tier-2 system', () => {
