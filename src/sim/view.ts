@@ -1,6 +1,10 @@
 import type { GameState, Operation, Sim } from './types';
+import { SimView } from './viewAccessors';
 
-/** Every `Operation` field. The `satisfies` below fails to compile when one is missing. */
+/**
+ * Every `Operation` field. The `satisfies` below fails to compile when one is missing.
+ * `SimView` (viewAccessors.ts) is generated from this list and GAME_KEYS: run `pnpm run gen:view`.
+ */
 export const OP_KEYS = [
   'id',
   'rng',
@@ -63,33 +67,6 @@ const gameKeysComplete: Missing<
 void opKeysComplete;
 void gameKeysComplete;
 
-/**
- * A `Sim` over one GameState and one Operation. The accessors are defined once on the
- * prototype from the key lists above, so every read stays monomorphic in the hot loop.
- */
-class SimView {
-  constructor(
-    readonly g: GameState,
-    readonly op: Operation,
-  ) {}
-}
-
-/**
- * One getter/setter pair per key, compiled with the key as a literal (`this.g.credits`) so each
- * access site has its own inline cache. Closures over `k` would share one megamorphic site.
- */
-function forward(from: 'g' | 'op', keys: readonly string[]) {
-  for (const k of keys) {
-    // oxlint-disable-next-line typescript/no-implied-eval -- fixed key lists, no user input
-    const get = new Function(`return this.${from}.${k};`) as () => unknown;
-    // oxlint-disable-next-line typescript/no-implied-eval -- fixed key lists, no user input
-    const set = new Function('v', `this.${from}.${k} = v;`) as (v: unknown) => void;
-    Object.defineProperty(SimView.prototype, k, { get, set, enumerable: true, configurable: true });
-  }
-}
-forward('g', GAME_KEYS);
-forward('op', OP_KEYS);
-
 const views = new WeakMap<Operation, SimView>();
 
 /** `g` and `op` as one `Sim`. Not serialisable: save `g` itself. */
@@ -99,7 +76,7 @@ export function bind(g: GameState, op: Operation): Sim {
     v = new SimView(g, op);
     views.set(op, v);
   }
-  return v as unknown as Sim;
+  return v;
 }
 
 /** The run-wide state behind a bound `Sim`. */

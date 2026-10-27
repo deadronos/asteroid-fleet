@@ -14,7 +14,7 @@ import type {
 import type { BusEvent } from './events';
 import { createSimHost, type SimHost } from './host';
 import { MODES, PUMP_MS, type Frame, type OutMsg } from './protocol';
-import { applySnapshot, type CarrierBrief, type OtherCarrier } from './snapshot';
+import { OTHER_ROW, applySnapshot, type CarrierBrief, type OtherCarrier } from './snapshot';
 import { allowSaveOverwrite, loadGame, saveGame, saveOverwriteBlocked } from './save';
 import { getActiveSlot, writeSlot } from './slots';
 import { alertActions, offerToasts, ToastQueue } from './toasts';
@@ -60,8 +60,8 @@ class Engine {
   others: OtherCarrier[] = [];
   /** Where each of `others` was in the state message before, by carrier id. */
   othersPrev = new Map<number, Vec3>();
-  /** Ship rows of each of `others` in the state message before, by carrier id. */
-  othersPrevShips = new Map<number, ArrayLike<number>>();
+  /** Each other carrier's ships in the state message before: x, y, z by ship id. */
+  othersPrevShips = new Map<number, [number, number, number]>();
   private othersAt = performance.now();
   private othersGap = 200;
   /** Warnings and worse that arrived for a carrier since it was last viewed. */
@@ -188,9 +188,12 @@ class Engine {
 
   private adoptOthers(next: OtherCarrier[]) {
     const prev = new Map(this.others.map((o) => [o.id, o.pos]));
-    this.othersPrevShips = new Map(
-      next.map((o) => [o.id, this.others.find((p) => p.id === o.id)?.ships ?? o.ships]),
-    );
+    // Keyed by ship id, so a ship lost or launched mid-list doesn't pair the rest with the wrong ship.
+    const ships = new Map<number, [number, number, number]>();
+    for (const o of this.others)
+      for (let i = 0; i < o.ships.length; i += OTHER_ROW)
+        ships.set(o.ships[i], [o.ships[i + 2], o.ships[i + 3], o.ships[i + 4]]);
+    this.othersPrevShips = ships;
     this.othersPrev = new Map(next.map((o) => [o.id, prev.get(o.id) ?? o.pos]));
     const now = performance.now();
     const gap = now - this.othersAt;

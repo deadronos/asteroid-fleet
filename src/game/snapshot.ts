@@ -37,8 +37,8 @@ export interface UiSnapshot {
 export interface OtherCarrier {
   id: number;
   pos: Vec3;
-  /** Non-docked ships, 4 numbers each: class index, x, y, z. */
-  ships: Float32Array<ArrayBuffer>;
+  /** Non-docked ships, `OTHER_ROW` numbers each: id, class index, x, y, z. Float64 so ids stay exact. */
+  ships: Float64Array<ArrayBuffer>;
 }
 
 /** What the carrier bar shows about one carrier. */
@@ -107,8 +107,8 @@ const SHIP_ROW = 23 + MAX_MODULES;
 const PIRATE_ROW = 10;
 // id pos×3 ore maxOre value radius respawn
 const ASTEROID_ROW = 9;
-// cls pos×3
-export const OTHER_ROW = 4;
+// id cls pos×3
+export const OTHER_ROW = 5;
 
 export function encodeSnapshot(
   g: GameState,
@@ -190,12 +190,14 @@ export function encodeSnapshot(
   for (const op of g.ops) {
     if (op === s || op.systemId !== s.systemId) continue;
     const live = op.ships.filter((x) => x.mode !== 'docked');
-    const rows = new Float32Array(live.length * OTHER_ROW);
+    const rows = new Float64Array(live.length * OTHER_ROW);
     live.forEach((x, i) => {
-      rows[i * OTHER_ROW] = clsIndex.get(x.cls)!;
-      rows[i * OTHER_ROW + 1] = x.pos.x;
-      rows[i * OTHER_ROW + 2] = x.pos.y;
-      rows[i * OTHER_ROW + 3] = x.pos.z;
+      const o = i * OTHER_ROW;
+      rows[o] = x.id;
+      rows[o + 1] = clsIndex.get(x.cls)!;
+      rows[o + 2] = x.pos.x;
+      rows[o + 3] = x.pos.y;
+      rows[o + 4] = x.pos.z;
     });
     others.push({ id: op.id, pos: { ...op.carrier.pos }, ships: rows });
   }

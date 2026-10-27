@@ -16,7 +16,8 @@
     "balance:modules": "BALANCE=1 vitest run src/sim/balance.test.ts --reporter=verbose",
     "lint": "oxlint --type-aware --deny-warnings",
     "format": "oxfmt",
-    "format:check": "oxfmt --check"
+    "format:check": "oxfmt --check",
+    "gen:view": "node scripts/gen-sim-view.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",

@@ -266,7 +266,6 @@ function OtherCarriers() {
       otherAt.x = p.x + (o.pos.x - p.x) * a;
       otherAt.y = p.y + (o.pos.y - p.y) * a;
       otherAt.z = p.z + (o.pos.z - p.z) * a;
-      const prevRows = engine.othersPrevShips.get(o.id);
       const g = groups.current.get(o.id);
       if (g) {
         g.position.set(otherAt.x, otherAt.y, otherAt.z);
@@ -277,16 +276,14 @@ function OtherCarriers() {
         }
       }
       for (let i = 0; i < o.ships.length && n < 1024; i += OTHER_ROW) {
-        const c = ICON_COLORS[SHIP_CLASSES[o.ships[i]]];
-        const j = i + 1;
-        // Same ship in the previous state message (rows keep their order unless one was lost).
-        const q = prevRows && prevRows[i] === o.ships[i] ? prevRows : o.ships;
-        pos.setXYZ(
-          n,
-          q[j] + (o.ships[j] - q[j]) * a,
-          q[j + 1] + (o.ships[j + 1] - q[j + 1]) * a,
-          q[j + 2] + (o.ships[j + 2] - q[j + 2]) * a,
-        );
+        const c = ICON_COLORS[SHIP_CLASSES[o.ships[i + 1]]];
+        const x = o.ships[i + 2];
+        const y = o.ships[i + 3];
+        const z = o.ships[i + 4];
+        // New ships have no previous position and appear where they are.
+        const q = engine.othersPrevShips.get(o.ships[i]);
+        if (q) pos.setXYZ(n, q[0] + (x - q[0]) * a, q[1] + (y - q[1]) * a, q[2] + (z - q[2]) * a);
+        else pos.setXYZ(n, x, y, z);
         col.setXYZ(n, c.r, c.g, c.b);
         n++;
       }
