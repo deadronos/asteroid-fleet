@@ -12,14 +12,14 @@ import {
   RP_DIVISOR,
   SHIP_STATS,
   WARP_CHARGE,
-  warpCost,
   warpPayment,
+  HULLS,
 } from './config';
 import { cardSlots, checkCard, nextCardId } from './cards';
 import { autoBuyUnlocked, autoRebuildUnlocked, engagementUnlocked } from './automation';
 import { moveShip as moveOnBoard } from './hangar';
 import { buyResearch as buyNode, lvl } from './research';
-import { bind, createShip, emit, focused, maxEnergy, newGame } from './state';
+import { bind, createShip, emit, focused, jumpCost, maxEnergy, newGame } from './state';
 import { executeJump } from './tick';
 import { RETURN_GRACE_S, dematerialise, materialise, runBackground } from './background';
 import type {
@@ -29,6 +29,7 @@ import type {
   CarrierStance,
   Sim,
   HangarType,
+  HullId,
   ModuleId,
   RuleCard,
   ShipClass,
@@ -149,7 +150,7 @@ export function order(s: Sim, c: Order): string | null {
       s.hangars.push({
         id,
         type: c.hangarType,
-        slots: 4 + lvl(s, 'slots'),
+        slots: HULLS[s.carrier.hullClass].newSlots + lvl(s, 'slots'),
         items: [],
         stance: {},
         launchOrder: ['fighter', 'scout', 'drone', 'repair', 'hauler', 'barge', 'harvester'],
@@ -243,12 +244,16 @@ export function order(s: Sim, c: Order): string | null {
       const from = s.systems[s.systemId];
       const to = s.systems[c.systemId];
       if (!to || !to.discovered || to.id === from.id) return 'Unknown system';
-      const cost = warpCost(from.distance, to.distance);
+      const cost = jumpCost(s, from.distance, to.distance);
       const pay = warpPayment(cost, s.carrier.energy, s.carrier.h2);
       if (!pay) return `Needs ${cost} energy (or H2 to cover the gap)`;
       s.carrier.energy -= pay.energy;
       s.carrier.h2 -= pay.h2;
-      s.warp = { targetSystem: to.id, charge: WARP_CHARGE * (1 - 0.15 * lvl(s, 'warpCharge')) };
+      s.warp = {
+        targetSystem: to.id,
+        charge:
+          WARP_CHARGE * HULLS[s.carrier.hullClass].warpCharge * (1 - 0.15 * lvl(s, 'warpCharge')),
+      };
       emit(s, 'WarpCharging', { system: to.name });
       return null;
     }
@@ -258,7 +263,7 @@ export function order(s: Sim, c: Order): string | null {
       const to = s.systems[s.warp.targetSystem];
       s.carrier.energy = Math.min(
         maxEnergy(s),
-        s.carrier.energy + warpCost(from.distance, to.distance) * 0.75,
+        s.carrier.energy + jumpCost(s, from.distance, to.distance) * 0.75,
       );
       s.warp = null;
       emit(s, 'WarpCancelled', {});
@@ -319,13 +324,15 @@ export function researchPayout(s: Pick<GameState, 'stats'>): number {
   return Math.floor(Math.sqrt(s.stats.oreValueDelivered / RP_DIVISOR)) * s.stats.furthestTier;
 }
 
-export function prestige(s: GameState): GameState {
+export function prestige(s: GameState, hull?: HullId): GameState {
   const rp = researchPayout(s);
   const next = newGame(s.seed + s.lifetime.prestiges + 1, {
     research: s.research + rp,
     researchLevels: { ...s.researchLevels },
     unlocked: [...s.unlocked],
     unlockedRules: [...s.unlockedRules],
+    hulls: [...s.hulls],
+    hullClass: hull ?? focused(s).carrier.hullClass,
     discovered: s.systems.filter((x) => x.discovered).map((x) => x.id),
     lifetime: {
       prestiges: s.lifetime.prestiges + 1,

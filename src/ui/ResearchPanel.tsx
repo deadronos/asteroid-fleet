@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { engine, useGame } from '../game/engine';
 import { researchPayout } from '../sim/actions';
-import { RP_DIVISOR, SHIP_STATS, TIER_NAMES } from '../sim/config';
+import { HULLS, RP_DIVISOR, SHIP_STATS, TIER_NAMES } from '../sim/config';
 import {
   RESEARCH,
   canBuyResearch,
@@ -10,7 +10,7 @@ import {
   researchLocked,
   type Branch,
 } from '../sim/research';
-import { SHIP_CLASSES, type ShipClass } from '../sim/types';
+import { SHIP_CLASSES, type HullId, type ShipClass } from '../sim/types';
 import { fmt } from './format';
 
 const GLOBAL: Branch[] = ['Logistics', 'Mining', 'Combat', 'Carrier', 'Reserves', 'Automation'];
@@ -18,6 +18,9 @@ const GLOBAL: Branch[] = ['Logistics', 'Mining', 'Combat', 'Carrier', 'Reserves'
 export function ResearchPanel() {
   const s = useGame();
   const [confirm, setConfirm] = useState(false);
+  const current = s.carrier.hullClass;
+  const [hull, setHull] = useState<HullId | null>(null);
+  const pick = hull && s.hulls.includes(hull) ? hull : current;
   const rp = researchPayout(s);
   const tier = s.stats.furthestTier as 1 | 2 | 3;
   const branch = (b: Branch) => {
@@ -102,9 +105,22 @@ export function ResearchPanel() {
         ) : (
           <div className="row">
             <span>Reset this operation for +{rp} RP?</span>
+            {s.hulls.length > 1 && (
+              <select
+                aria-label="Hull class for the next run"
+                value={pick}
+                onChange={(e) => setHull(e.target.value as HullId)}
+              >
+                {s.hulls.map((id) => (
+                  <option key={id} value={id} title={HULLS[id].blurb}>
+                    {HULLS[id].name}
+                  </option>
+                ))}
+              </select>
+            )}
             <button
               onClick={() => {
-                engine.doPrestige();
+                engine.doPrestige(pick);
                 setConfirm(false);
               }}
             >

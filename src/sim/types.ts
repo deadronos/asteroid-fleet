@@ -41,6 +41,8 @@ export interface AlertRules {
 
 export type ModuleId = 'laser' | 'drill' | 'tractor' | 'shield' | 'compressor';
 
+/** Carrier hull class (#65). Chosen when a run starts; unlocked after the first prestige. */
+export type HullId = 'standard' | 'light' | 'fleet' | 'mining' | 'bastion';
 export type HangarType = 'launch' | 'drydock' | 'cargo' | 'fabricator';
 
 export interface HangarItem {
@@ -284,6 +286,8 @@ export interface Carrier {
   stance: CarrierStance;
   /** Refinery upgrade level, bought with credits. */
   refinery: number;
+  /** Hull class; scales energy, refinery, warp, shields and hull points (HULLS). */
+  hullClass: HullId;
 }
 
 export interface Warp {
@@ -392,6 +396,8 @@ export interface GameState {
   unlocked: ShipClass[];
   /** Presets unlocked so far; each unlocks its card's action for every card. */
   unlockedRules: RuleId[];
+  /** Hull classes unlocked so far. Persists through prestige. */
+  hulls: HullId[];
   systems: StarSystem[];
   /** Depletion records of systems left behind, keyed by system id. */
   fields: Record<number, FieldRecord>;
@@ -410,6 +416,8 @@ export interface GameState {
   savedAt: number; // wall-clock ms
   /** Actively played carriers. Always exactly one until #78. */
   ops: Operation[];
+  /** Id of the carrier the player is looking at; the first one when absent or unknown. */
+  focusId?: number;
 }
 
 /**

@@ -27,6 +27,7 @@ export function CameraRig({
   const anchor = useRef(new THREE.Vector3());
   const started = useRef(false);
   const system = useRef(-1);
+  const carrierId = useRef(-1);
   const lastFocus = useRef<number | null>(null);
   const autoOn = useRef(false);
   const wasTactical = useRef(tactical);
@@ -50,7 +51,7 @@ export function CameraRig({
     else carrierPos(a);
     goal.set(tmp.x, tmp.y, tmp.z);
 
-    const jumped = !started.current || system.current !== s.systemId;
+    const jumped = !started.current || system.current !== s.systemId || carrierId.current !== s.id;
     if (jumped) {
       delta.copy(goal).sub(anchor.current);
       anchor.current.copy(goal);
@@ -58,6 +59,7 @@ export function CameraRig({
       camera.position.add(delta);
       started.current = true;
       system.current = s.systemId;
+      carrierId.current = s.id;
     } else {
       // Ease toward the followed point; the carrier is slow enough that this is imperceptible.
       delta.copy(goal).sub(anchor.current).multiplyScalar(easeFactor(dt, FOLLOW_RATE));

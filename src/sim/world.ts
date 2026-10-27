@@ -9,8 +9,7 @@ import {
   FUSION_H2,
   FUSION_RATE,
   REFINE_ENERGY,
-  refineRate,
-  warpCost,
+  HULLS,
 } from './config';
 import { SHIELD_HP, card, damageShip, inHazard, type Ctx } from './ctx';
 import { oreNear } from './mining';
@@ -22,7 +21,9 @@ import {
   gasGiantPos,
   h2Storm,
   emit,
+  jumpCost,
   maxEnergy,
+  refineThroughput,
   solarRate,
   spawnAsteroid,
   upkeepRate,
@@ -47,7 +48,7 @@ export function power(s: Sim, dt: number, ctx: Ctx) {
   // Shield regen costs energy; when the pool is empty the shields stay down.
   if (c.shield < 1 && c.energy > 0) {
     const mult = s.powerMode === 'defense' ? 2 : s.powerMode === 'income' ? 0.5 : 1;
-    const regen = Math.min(1 - c.shield, 0.03 * mult * dt);
+    const regen = Math.min(1 - c.shield, 0.03 * HULLS[c.hullClass].shield * mult * dt);
     const cost = regen * SHIELD_HP * 0.4;
     if (c.energy >= cost) {
       c.energy -= cost;
@@ -63,14 +64,10 @@ export function refine(s: Sim, dt: number, ctx: Ctx) {
   let floor = s.powerMode === 'defense' ? 0.5 * max : s.powerMode === 'balanced' ? 0.15 * max : 0;
   if (card(s, ctx, 'reserveWarp', null)) {
     const sys = s.systems[s.systemId];
-    floor = Math.max(floor, warpCost(sys.distance, Math.max(0, sys.distance - 1)));
+    floor = Math.max(floor, jumpCost(s, sys.distance, Math.max(0, sys.distance - 1)));
   }
   const avail = Math.max(0, c.energy - floor);
-  const amount = Math.min(
-    c.ore,
-    refineRate(c.refinery) * (1 + 0.25 * lvl(s, 'voidRefining')) * dt,
-    avail / REFINE_ENERGY,
-  );
+  const amount = Math.min(c.ore, refineThroughput(s) * dt, avail / REFINE_ENERGY);
   if (amount <= 0) return;
   const value = (c.oreValue / c.ore) * amount;
   c.ore -= amount;

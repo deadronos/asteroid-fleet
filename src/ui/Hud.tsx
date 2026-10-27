@@ -1,8 +1,8 @@
 import { engine, useGame } from '../game/engine';
 import { lvl } from '../sim/research';
-import { maxEnergy } from '../sim/state';
+import { maxEnergy, refineThroughput } from '../sim/state';
 import { carrierStorage } from '../sim/hangar';
-import { refineRate, TIER_NAMES } from '../sim/config';
+import { TIER_NAMES } from '../sim/config';
 import { heatFactor } from '../sim/tick';
 import { leftBehind } from '../sim/warp';
 import { fmt } from './format';
@@ -73,7 +73,7 @@ export function Hud({
             {fmt(c.ore)}
             <span className="sub"> / {fmt(storage)}</span>
           </span>
-          <span className="sub">refine {refineRate(c.refinery).toFixed(0)}/s</span>
+          <span className="sub">refine {refineThroughput(s).toFixed(0)}/s</span>
         </div>
         {lvl(s, 'fusion') > 0 && (
           <div className="chip">

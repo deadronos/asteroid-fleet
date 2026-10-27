@@ -1,5 +1,5 @@
 import type { Command, OfflineReport } from '../sim/actions';
-import type { Carrier, Fx, GameState, Operation, ShipMode, Warp } from '../sim/types';
+import type { Carrier, HullId, Fx, GameState, Operation, ShipMode, Warp } from '../sim/types';
 import type { BusEvent } from './events';
 import type { UiSnapshot } from './snapshot';
 
@@ -29,9 +29,11 @@ const MODE_INDEX = new Map(MODES.map((m, i) => [m, i]));
 export type InMsg =
   | { t: 'init'; state: GameState; now: number; settle: boolean; epoch?: number }
   | { t: 'cmd'; cmd: Command }
+  /** Look at another carrier; unknown ids are ignored. */
+  | { t: 'focus'; carrierId: number }
   | { t: 'speed'; v: number }
   | { t: 'pause'; v: boolean }
-  | { t: 'prestige' }
+  | { t: 'prestige'; hull?: HullId }
   | { t: 'replace'; state: GameState; epoch: number }
   | { t: 'snapshot'; id: number };
 
@@ -41,6 +43,8 @@ export type InMsg =
  */
 export interface Frame {
   t: 'frame';
+  /** The carrier these entities belong to; a frame for a carrier no longer focused is dropped. */
+  carrierId: number;
   nShips: number;
   ids: Int32Array;
   pos: Float64Array;
@@ -93,6 +97,7 @@ export function encodeFrame(s: Operation): { frame: Frame; transfer: ArrayBuffer
   return {
     frame: {
       t: 'frame',
+      carrierId: s.id,
       nShips: s.ships.length,
       ids,
       pos,
