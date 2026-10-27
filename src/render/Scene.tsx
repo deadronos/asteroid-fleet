@@ -15,7 +15,7 @@ import { CameraRig } from './CameraRig';
 import { easeFactor, focus, isDoubleMiss, shortestArc } from './focus';
 import { engine, lerpCarrier } from '../game/engine';
 import { OTHER_ROW } from '../game/snapshot';
-import { COVER_RADIUS, H2_STORM_RADIUS, SHIP_STATS, WARP_CHARGE } from '../sim/config';
+import { COVER_RADIUS, H2_STORM_RADIUS, SHIP_STATS } from '../sim/config';
 import { gasGiantPos } from '../sim/state';
 import { SHIP_CLASSES, type Vec3 } from '../sim/types';
 import { AsteroidField } from './AsteroidField';
@@ -217,7 +217,7 @@ function Carrier() {
     if (warpRing.current) {
       warpRing.current.visible = !!s.warp;
       warpRing.current.rotation.z = st.clock.elapsedTime * 2;
-      const total = s.warp ? s.warp.total || WARP_CHARGE : 1;
+      const total = s.warp ? s.warp.total : 1;
       const k = s.warp ? 1 + (1 - Math.min(1, s.warp.charge / total)) * 2 : 1;
       warpRing.current.scale.setScalar(k);
     }
@@ -266,6 +266,7 @@ function OtherCarriers() {
       otherAt.x = p.x + (o.pos.x - p.x) * a;
       otherAt.y = p.y + (o.pos.y - p.y) * a;
       otherAt.z = p.z + (o.pos.z - p.z) * a;
+      const prevRows = engine.othersPrevShips.get(o.id);
       const g = groups.current.get(o.id);
       if (g) {
         g.position.set(otherAt.x, otherAt.y, otherAt.z);
@@ -277,7 +278,15 @@ function OtherCarriers() {
       }
       for (let i = 0; i < o.ships.length && n < 1024; i += OTHER_ROW) {
         const c = ICON_COLORS[SHIP_CLASSES[o.ships[i]]];
-        pos.setXYZ(n, o.ships[i + 1], o.ships[i + 2], o.ships[i + 3]);
+        const j = i + 1;
+        // Same ship in the previous state message (rows keep their order unless one was lost).
+        const q = prevRows && prevRows[i] === o.ships[i] ? prevRows : o.ships;
+        pos.setXYZ(
+          n,
+          q[j] + (o.ships[j] - q[j]) * a,
+          q[j + 1] + (o.ships[j + 1] - q[j + 1]) * a,
+          q[j + 2] + (o.ships[j + 2] - q[j + 2]) * a,
+        );
         col.setXYZ(n, c.r, c.g, c.b);
         n++;
       }

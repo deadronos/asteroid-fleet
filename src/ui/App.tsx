@@ -26,6 +26,7 @@ import { useStackLayout } from './layout';
 import { fmt, formatSimTime } from './format';
 import { GearButton } from './GearButton';
 import { tierHint } from '../sim/config';
+import { leaveTactical } from '../render/focus';
 import { Modal } from './Modal';
 import { Tabs } from './Tabs';
 import { ICON_SHAPE, PALETTE } from './palette';
@@ -346,6 +347,14 @@ export function App() {
   const [keysHelp, setKeysHelp] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
 
+  // While auto-tactical is on the button already shows "on", so a click leaves tactical instead.
+  const toggleTactical = () => {
+    if (autoTactical) {
+      setTactical(false);
+      leaveTactical();
+    } else setTactical((v) => !v);
+  };
+
   useStackLayout();
   useEffect(() => write('af-tab', tab), [tab]);
   useHotkeys([
@@ -379,7 +388,7 @@ export function App() {
       label: 'T',
       description: 'Toggle tactical view',
       group: 'View',
-      run: () => setTactical((v) => !v),
+      run: () => toggleTactical(),
     },
     {
       keys: ['m'],
@@ -426,7 +435,7 @@ export function App() {
         tactical={tactical}
         autoTactical={autoTactical}
         quality={settings.quality}
-        onTactical={() => setTactical((v) => !v)}
+        onTactical={toggleTactical}
         onQuality={() => {
           const quality = settings.quality === 'high' ? 'low' : 'high';
           updateSettings({ quality });

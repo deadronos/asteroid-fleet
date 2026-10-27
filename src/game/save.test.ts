@@ -373,6 +373,20 @@ describe('migrate', () => {
     expect(r.state.ops).toHaveLength(2);
   });
 
+  it('v16 -> v17 gives a running warp its total from the remaining charge', () => {
+    const r = migrate(saveV15);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const old = structuredClone(r.state) as unknown as SaveBlob;
+    old.version = 16;
+    const ops = old.ops as { warp: unknown }[];
+    ops[0].warp = { targetSystem: 1, charge: 7 };
+    const again = migrate(old);
+    expect(again.ok).toBe(true);
+    if (!again.ok) return;
+    expect(again.state.ops[0].warp).toEqual({ targetSystem: 1, charge: 7, total: 7 });
+  });
+
   it('applies one migration step per version, in order', () => {
     const seen: number[] = [];
     const steps: Record<number, (save: SaveBlob) => SaveBlob> = {

@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react';
-import { MODAL_PRIORITY, useHotkeys } from './hotkeys';
+import { MODAL_PRIORITY, isTopModal, pushModal, useHotkeys } from './hotkeys';
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -22,6 +22,7 @@ export function Modal({
 }) {
   const titleId = useId();
   const ref = useRef<HTMLDivElement>(null);
+  const downOnBackdrop = useRef(false);
   const onCloseRef = useRef(onClose);
   useEffect(() => {
     onCloseRef.current = onClose;
@@ -42,12 +43,14 @@ export function Modal({
   ]);
 
   useEffect(() => {
+    const id = Symbol('modal');
+    const popModal = pushModal(id);
     const opener = document.activeElement as HTMLElement | null;
     const node = ref.current;
     const items = () => Array.from(node?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? []);
     (items()[0] ?? node)?.focus();
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Tab' || !node) return;
+      if (e.key !== 'Tab' || !node || !isTopModal(id)) return;
       const list = items();
       if (list.length === 0) {
         e.preventDefault();
@@ -68,13 +71,22 @@ export function Modal({
     document.addEventListener('keydown', onKey);
     return () => {
       document.removeEventListener('keydown', onKey);
+      popModal();
       // The opener may have unmounted (Settings -> Help); fall back to the app root.
       (opener?.isConnected ? opener : document.getElementById('app-root'))?.focus();
     };
   }, []);
 
   return (
-    <div className="modal-bg" onClick={onClose}>
+    <div
+      className="modal-bg"
+      onMouseDown={(e) => (downOnBackdrop.current = e.target === e.currentTarget)}
+      onClick={(e) => {
+        // A drag that starts inside the dialog and ends on the backdrop is not a backdrop click.
+        if (e.target === e.currentTarget && downOnBackdrop.current) onClose();
+        downOnBackdrop.current = false;
+      }}
+    >
       <div
         ref={ref}
         className={`modal ${className}`.trim()}
@@ -82,7 +94,6 @@ export function Modal({
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        onClick={(e) => e.stopPropagation()}
       >
         <div className="settings-head">
           <h2 id={titleId}>{title}</h2>

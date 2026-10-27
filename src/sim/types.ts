@@ -293,8 +293,8 @@ export interface Carrier {
 export interface Warp {
   targetSystem: number;
   charge: number; // seconds remaining
-  /** Charge time at the start of the jump; absent in saves from before it was stored. */
-  total?: number;
+  /** Charge time at the start of the jump. */
+  total: number;
 }
 
 export type FxKind = 'laser' | 'mine' | 'explosion' | 'repair' | 'pirateLaser' | 'warp';

@@ -7,7 +7,9 @@ import {
   focus,
   isDoubleMiss,
   resolveFocus,
+  leaveTactical,
   stepTactical,
+  takeTacticalExit,
   shortestArc,
 } from './focus';
 
@@ -56,6 +58,16 @@ describe('focus store', () => {
 
 const step = (wasTactical: boolean, tactical: boolean, auto: boolean, dist: number) =>
   stepTactical({ wasTactical, tactical, auto, dist });
+
+describe('leaveTactical', () => {
+  it('is consumed once and makes auto-tactical reset the camera', () => {
+    leaveTactical();
+    expect(takeTacticalExit()).toBe(true);
+    expect(takeTacticalExit()).toBe(false);
+    // The rig then treats it as manual tactical switched off.
+    expect(step(true, false, true, 230)).toEqual({ resetCamera: true, auto: false });
+  });
+});
 
 describe('stepTactical', () => {
   it('manual off resets the camera and clears auto even when far away', () => {

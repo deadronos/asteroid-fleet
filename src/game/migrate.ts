@@ -145,6 +145,16 @@ export const migrations: Record<number, Migration> = {
     save.routes = [];
     return save;
   },
+  // v17: a jump in progress stores its full charge time. Older saves only know what is left.
+  16: (save) => {
+    if (Array.isArray(save.ops))
+      for (const op of save.ops) {
+        const w = isRecord(op) && isRecord(op.warp) ? op.warp : null;
+        if (w && !(typeof w.total === 'number' && w.total > 0))
+          w.total = typeof w.charge === 'number' && w.charge > 0 ? w.charge : 1;
+      }
+    return save;
+  },
 };
 
 const LEGACY_TONE: Record<string, Severity> = {
