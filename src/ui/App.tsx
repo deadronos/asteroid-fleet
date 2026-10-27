@@ -383,7 +383,7 @@ export function App() {
                 id={`side-tab-${id}`}
                 role="tab"
                 aria-selected={tab === id}
-                aria-controls="side-panel"
+                aria-controls={collapsed ? undefined : 'side-panel'}
                 tabIndex={tab === id ? 0 : -1}
                 className={tab === id && !collapsed ? 'on' : ''}
                 onClick={() => {
@@ -398,7 +398,7 @@ export function App() {
           <button
             className="collapse-btn"
             aria-expanded={!collapsed}
-            aria-controls="side-panel"
+            aria-controls={collapsed ? undefined : 'side-panel'}
             aria-label={collapsed ? 'Expand panel' : 'Collapse panel'}
             onClick={() => setCollapsed((c) => !c)}
           >
