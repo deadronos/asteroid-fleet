@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { engineReady } from './helpers';
 
 // Draw calls per frame with 400 ships out, summed over all passes (bloom included).
 // Ships, trails and asteroids are instanced, so this does not grow with fleet size.
@@ -36,6 +37,20 @@ async function spawnFleet(page: Page, count: number) {
   }, count);
 }
 
+/**
+ * Draw calls of a frame drawn after now. Waits for the frame counter to move on by a few frames
+ * instead of sleeping, so a slow runner can't be sampled before the change has been drawn.
+ */
+async function freshRender(page: Page) {
+  const start = await page.evaluate(() => (globalThis as unknown as Win).__render?.frame ?? 0);
+  await expect
+    .poll(() => page.evaluate(() => (globalThis as unknown as Win).__render?.frame ?? 0), {
+      timeout: 60_000,
+    })
+    .toBeGreaterThan(start + 3);
+  return page.evaluate(() => (globalThis as unknown as Win).__render!);
+}
+
 /** Frames rendered per second, counted from the frame number RenderStats bumps each frame. */
 function renderRate(page: Page, ms = 2000) {
   return page.evaluate(
@@ -71,18 +86,17 @@ test('400 ships stay within the draw-call budget; low quality caps the frame rat
 
   await page.goto('./');
   await page.getByRole('button', { name: 'Take command' }).click();
+  await engineReady(page);
   await expect.poll(() => models.length, { timeout: 20_000 }).toBe(9);
   expect(models.every((s) => s === 200)).toBe(true);
 
   await spawnFleet(page, 400);
-  await page.waitForTimeout(1500);
-  const high = await page.evaluate(() => (globalThis as unknown as Win).__render!);
+  const high = await freshRender(page);
   console.log(`high quality, 400 ships: ${high.calls} draw calls, ${high.triangles} triangles`);
   expect(high.calls).toBeLessThanOrEqual(DRAW_CALL_BUDGET);
 
   await page.getByRole('button', { name: 'HQ' }).click();
-  await page.waitForTimeout(500);
-  const low = await page.evaluate(() => (globalThis as unknown as Win).__render!);
+  const low = await freshRender(page);
   console.log(`low quality, 400 ships: ${low.calls} draw calls, ${low.triangles} triangles`);
   expect(low.calls).toBeLessThanOrEqual(DRAW_CALL_BUDGET);
   // Default cap is 30 fps; allow slack for timer jitter.

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { engineReady, reopenApp } from './helpers';
+import { engineReady, openApp, reopenApp } from './helpers';
 
 test('app loads, renders the canvas, and opens settings without console errors', async ({
   page,
@@ -91,8 +91,7 @@ test('shows a fallback instead of a blank screen without WebGL', async ({ page }
 });
 
 test('? lists the shortcuts, Escape closes it, and Space pauses', async ({ page }) => {
-  await page.goto('./');
-  await page.getByRole('button', { name: 'Take command' }).click();
+  await openApp(page);
   await page.keyboard.press('?');
   const dialog = page.getByRole('dialog', { name: 'Keyboard shortcuts' });
   await expect(dialog).toContainText('Pause or resume');
