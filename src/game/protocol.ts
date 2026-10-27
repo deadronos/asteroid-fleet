@@ -36,6 +36,8 @@ export type InMsg =
   | { t: 'prestige'; hull?: HullId }
   | { t: 'admiralty' }
   | { t: 'replace'; state: GameState; epoch: number }
+  /** The main thread handled one pump-driven frame or state; the sim may send another. */
+  | { t: 'ack' }
   | { t: 'snapshot'; id: number };
 
 /**
