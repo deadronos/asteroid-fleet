@@ -29,9 +29,10 @@ import { GearButton } from './GearButton';
 const Scene = lazy(() => import('../render/Scene').then((m) => ({ default: m.Scene })));
 const loadResearch = () => import('./ResearchPanel').then((m) => ({ default: m.ResearchPanel }));
 const loadSettings = () => import('./Settings').then((m) => ({ default: m.SettingsMenu }));
-const loadCarrier = () => import('./CarrierPanel').then((m) => ({ default: m.CarrierPanel }));
+const CarrierPanel = lazy(() =>
+  import('./CarrierPanel').then((m) => ({ default: m.CarrierPanel })),
+);
 const ResearchPanel = lazy(loadResearch);
-const CarrierPanel = lazy(loadCarrier);
 const SettingsMenu = lazy(loadSettings);
 
 // Warm the secondary chunks once the browser is idle so opening them doesn't pop in.
@@ -40,7 +41,6 @@ const whenIdle = (fn: () => void) =>
 whenIdle(() => {
   void loadResearch();
   void loadSettings();
-  void loadCarrier();
 });
 
 type Tab = 'fleet' | 'doctrine' | 'carrier' | 'research' | 'log';
