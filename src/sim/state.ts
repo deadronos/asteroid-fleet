@@ -16,16 +16,19 @@ import {
 } from './config';
 import { addPreset } from './cards';
 import { findSpace } from './hangar';
+import { challengeBonus, energyMult, startSystem } from './modifiers';
 import { onSphere, seeded, v3 } from './math';
 import { lvl, repeatEffect } from './research';
 import type {
   Asteroid,
+  ChallengeId,
   EventData,
   FieldRecord,
   GameState,
   Hangar,
   Hazard,
   HullId,
+  ModifierId,
   Operation,
   RuleId,
   Ship,
@@ -39,7 +42,7 @@ import type {
 } from './types';
 
 /** Bump together with a `migrations[n]` step and a fixture. See README "Save migrations". */
-export const SAVE_VERSION = 13;
+export const SAVE_VERSION = 14;
 
 /** Every `Operation` field. The `satisfies` below fails to compile when one is missing. */
 export const OP_KEYS = [
@@ -117,6 +120,24 @@ class SimView implements Sim {
   }
   set marks(v) {
     this.g.marks = v;
+  }
+  get modifiers() {
+    return this.g.modifiers;
+  }
+  set modifiers(v) {
+    this.g.modifiers = v;
+  }
+  get challenge() {
+    return this.g.challenge;
+  }
+  set challenge(v) {
+    this.g.challenge = v;
+  }
+  get challengesDone() {
+    return this.g.challengesDone;
+  }
+  set challengesDone(v) {
+    this.g.challengesDone = v;
   }
   get researchLevels() {
     return this.g.researchLevels;
@@ -440,6 +461,7 @@ export function spawnAsteroid(
       (1 + far / 140) *
       (1 + 0.1 * lvl(s, 'rich')) *
       (1 + richBonus) *
+      (1 + challengeBonus(s)) *
       rare,
     radius: 0.8 + (maxOre / 300) * 1.6,
     respawn: 0,
@@ -553,6 +575,7 @@ export function maxEnergy(s: Sim): number {
   return (
     ENERGY_MAX *
     HULLS[s.carrier.hullClass].energy *
+    energyMult(s) *
     (1 + 0.25 * lvl(s, 'energyCap')) *
     (1 + repeatEffect(s, 'deepEnergy'))
   );
@@ -685,6 +708,8 @@ export const SEVERITY: Record<SimEventKind, Severity> = {
   EmergencyJump: 'critical',
   Prestiged: 'good',
   Admiralty: 'good',
+  ChallengeStarted: 'info',
+  ChallengeComplete: 'good',
   WelcomeBack: 'good',
   Legacy: 'info',
 };
@@ -720,6 +745,10 @@ interface Carry {
   discovered: number[];
   lifetime: GameState['lifetime'];
   marks?: number;
+  challengesDone?: ChallengeId[];
+  /** Modifiers and challenge of the run being started (#71). */
+  modifiers?: ModifierId[];
+  challenge?: ChallengeId | null;
   doctrine?: GameState['doctrine'];
   alerts?: GameState['alerts'];
   cards?: GameState['cards'];
@@ -821,6 +850,9 @@ export function newGame(seed = 1337, carry?: Carry): GameState {
       marksEarned: 0,
     },
     marks: carry?.marks ?? 0,
+    modifiers: [...(carry?.modifiers ?? [])],
+    challenge: carry?.challenge ?? null,
+    challengesDone: [...(carry?.challengesDone ?? [])],
     powerMode: 'balanced',
     log: [],
     events: [],
@@ -833,6 +865,8 @@ export function newGame(seed = 1337, carry?: Carry): GameState {
   if (carry) for (const id of carry.discovered) if (s.systems[id]) s.systems[id].discovered = true;
   s.carrier.energy = maxEnergy(s) * 0.6;
   enterSystem(s, 0);
+  const start = startSystem(s);
+  if (start !== 0) enterSystem(s, start);
   for (let i = 0; i < 4; i++) createShip(s, 'drone', 1);
   emit(s, 'CarrierOnline', { system: s.systems[0].name });
   return g;

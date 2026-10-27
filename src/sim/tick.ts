@@ -30,6 +30,7 @@ import {
 } from './mining';
 import { copy, moveAway, onSphere, rand } from './math';
 import { lvl, repeatEffect } from './research';
+import { CHALLENGES, challengeProgress } from './modifiers';
 import { bind, emit, maxHull } from './state';
 import { carrierDisabled, executeJump, warpStep } from './warp';
 import { drift, field, hazards, power, refine, reserves } from './world';
@@ -124,11 +125,30 @@ export function stepOp(s: Sim, dt = DT) {
   }
   if (s.carrier.hull <= 0) carrierDisabled(s);
 
+  checkChallenge(s);
   s.stats.creditsEarned += ctx.income;
   const a = Math.min(1, dt / 120);
   s.incomeAvg = s.incomeAvg * (1 - a) + (ctx.income / dt) * a;
   s.miningIncomeAvg = s.miningIncomeAvg * (1 - a) + (ctx.mining / dt) * a;
   warpStep(s, dt);
+}
+
+// ---------- challenges ----------
+
+/**
+ * Finish the challenge in progress once its goal is delivered (#71). Pays its Marks, records it
+ * for the permanent bonus and ends the attempt; the modifiers stay until the run is reset.
+ */
+function checkChallenge(s: Sim) {
+  const id = s.challenge;
+  if (!id || challengeProgress(s) !== 1) return;
+  const def = CHALLENGES[id];
+  s.challenge = null;
+  if (!s.challengesDone.includes(id)) {
+    s.challengesDone.push(id);
+    s.marks += def.marks;
+    emit(s, 'ChallengeComplete', { challenge: id, marks: def.marks });
+  }
 }
 
 // ---------- launching ----------

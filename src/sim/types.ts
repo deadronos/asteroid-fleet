@@ -331,6 +331,8 @@ export interface EventData {
   EmergencyJump: Record<string, never>;
   Prestiged: { research: number };
   Admiralty: { marks: number };
+  ChallengeStarted: { challenge: ChallengeId };
+  ChallengeComplete: { challenge: ChallengeId; marks: number };
   WelcomeBack: { credits: number };
   /** A plain-text line from a save written before typed events (v7 and older). */
   Legacy: { text: string };
@@ -385,6 +387,9 @@ export interface Operation {
   fx: Fx[];
 }
 
+export type ModifierId = 'noFighters' | 'halfEnergy' | 'deepSpace';
+export type ChallengeId = 'pacifist' | 'lowPower' | 'deepStart';
+
 /** Run-wide state. The whole GameState is what gets saved. */
 export interface GameState {
   version: number;
@@ -418,6 +423,12 @@ export interface GameState {
   };
   /** Unspent Admiralty Marks (#68). Survive both prestige layers. */
   marks: number;
+  /** Run modifiers active in this run (#71). Reset by every prestige and Admiralty reset. */
+  modifiers: ModifierId[];
+  /** The challenge being attempted, or null (#71). */
+  challenge: ChallengeId | null;
+  /** Challenges completed, ever (#71). Their permanent bonuses survive every reset. */
+  challengesDone: ChallengeId[];
   powerMode: 'balanced' | 'income' | 'defense';
   /** The last few events, newest first, for the Log tab. Saved. */
   log: SimEvent[];
