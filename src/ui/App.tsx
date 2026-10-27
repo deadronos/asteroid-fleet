@@ -20,6 +20,7 @@ import {
 import { SceneBoundary } from './ErrorBoundary';
 import { FleetPanel } from './FleetPanel';
 import { CarrierBar } from './CarrierBar';
+import { ignoresHotkey } from './carriers';
 import { Hud } from './Hud';
 import { fmt } from './format';
 import { GearButton } from './GearButton';
@@ -34,6 +35,8 @@ const CarrierPanel = lazy(() =>
 );
 const ResearchPanel = lazy(loadResearch);
 const SettingsMenu = lazy(loadSettings);
+const loadStarMap = () => import('./StarMap').then((m) => ({ default: m.StarMap }));
+const StarMap = lazy(loadStarMap);
 
 // Warm the secondary chunks once the browser is idle so opening them doesn't pop in.
 const whenIdle = (fn: () => void) =>
@@ -41,6 +44,7 @@ const whenIdle = (fn: () => void) =>
 whenIdle(() => {
   void loadResearch();
   void loadSettings();
+  void loadStarMap();
 });
 
 type Tab = 'fleet' | 'doctrine' | 'carrier' | 'research' | 'log';
@@ -307,10 +311,19 @@ export function App() {
   const [autoTactical, setAutoTactical] = useState(false);
   const settings = useSettings();
   const [menu, setMenu] = useState(false);
+  const [map, setMap] = useState(false);
   const [help, setHelp] = useState(() => read<string>('af-seen-help', '') !== '1');
   const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => write('af-tab', tab), [tab]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (ignoresHotkey(e) || e.key.toLowerCase() !== 'm') return;
+      setMap((v) => !v);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
   useEffect(() => {
     document.documentElement.style.setProperty('--ui-scale', String(settings.uiScale));
   }, [settings.uiScale]);
@@ -343,6 +356,7 @@ export function App() {
         quality={settings.quality}
         onTactical={() => setTactical((v) => !v)}
         onQuality={() => updateSettings({ quality: settings.quality === 'high' ? 'low' : 'high' })}
+        onMap={() => setMap(true)}
       />
       <CarrierBar />
       <GearButton onClick={() => setMenu(true)} />
@@ -413,6 +427,11 @@ export function App() {
               setHelp(true);
             }}
           />
+        </Suspense>
+      )}
+      {map && (
+        <Suspense fallback={null}>
+          <StarMap onClose={() => setMap(false)} />
         </Suspense>
       )}
       {help && (

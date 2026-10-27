@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { engine, useGame } from '../game/engine';
 import { focus } from '../render/focus';
-import { RETROFIT_COST, shipCost } from '../sim/actions';
+import { RETROFIT_COST, shipCost } from '../sim/costs';
 import {
   HANGAR_SLOT_COST,
   HANGAR_TYPES,
@@ -17,7 +17,7 @@ import {
 import { autoBuyUnlocked, autoRebuildUnlocked } from '../sim/automation';
 import { effectiveStance, stanceSource } from '../sim/doctrine';
 import { maxHull } from '../sim/state';
-import { cargoCap } from '../sim/tick';
+import { cargoCap } from '../sim/ctx';
 import {
   SHIP_CLASSES,
   type Sim,

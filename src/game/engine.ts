@@ -304,6 +304,11 @@ class Engine {
     this.host?.post({ t: 'cmd', cmd: { ...order, carrierId: focusOp(this.state).id } });
   }
 
+  /** An order for a named carrier, e.g. a supply route that starts at another one. */
+  dispatchFor(carrierId: number, order: Order) {
+    this.host?.post({ t: 'cmd', cmd: { ...order, carrierId } });
+  }
+
   /** The sim's current state, exact (unlike the mirror, which is up to one UI tick behind). */
   async fullState(): Promise<GameState> {
     // Before the save is loaded, `state` is a placeholder new game, not the sim's state.

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { engine, useGame } from '../game/engine';
-import { marksPayout, researchPayout } from '../sim/actions';
+import { marksPayout, researchPayout } from '../sim/costs';
 import {
   CARRIER_COST,
   HULLS,

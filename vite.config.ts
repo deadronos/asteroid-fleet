@@ -20,6 +20,9 @@ const VENDOR_GROUPS: [name: string, test: RegExp][] = [
   ['postprocessing', pkg('postprocessing|@react-three[\\\\/]postprocessing|n8ao')],
 ];
 
+const SIM_FALLBACK =
+  /src[\\/](game[\\/](runner|localHost)|sim[\\/](actions|tick|background|routes|world))\.ts/;
+
 export default defineConfig({
   plugins: [react()],
   base: '/asteroid-fleet/',
@@ -27,11 +30,22 @@ export default defineConfig({
     rolldownOptions: {
       output: {
         codeSplitting: {
-          groups: VENDOR_GROUPS.map(([name, test], i) => ({
-            name,
-            test,
-            priority: VENDOR_GROUPS.length - i,
-          })),
+          groups: [
+            ...VENDOR_GROUPS.map(([name, test], i) => ({
+              name,
+              test,
+              priority: VENDOR_GROUPS.length - i,
+            })),
+            // The main-thread sim fallback (only fetched when the worker fails) and the
+            // command/tick code only it uses, kept out of the entry chunk. Modules the UI
+            // shares stay in the entry, so dependencies are not pulled along.
+            {
+              name: 'localHost',
+              test: SIM_FALLBACK,
+              priority: 0,
+              includeDependenciesRecursively: false,
+            },
+          ],
         },
       },
     },

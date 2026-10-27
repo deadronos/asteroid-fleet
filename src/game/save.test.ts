@@ -14,6 +14,7 @@ import saveV9 from './fixtures/save-v9.json';
 import saveV10 from './fixtures/save-v10.json';
 import saveV13 from './fixtures/save-v13.json';
 import saveV14 from './fixtures/save-v14.json';
+import saveV15 from './fixtures/save-v15.json';
 import { applyMigrationSteps, migrate, type SaveBlob } from './migrate';
 import {
   SAVE_BACKUP_FAILED_NOTICE,
@@ -352,6 +353,7 @@ describe('migrate', () => {
     ['v10', saveV10],
     ['v13', saveV13],
     ['v14', saveV14],
+    ['v15', saveV15],
   ])('a migrated %s fixture keeps running through step()', (_, fixture) => {
     const r = migrate(fixture);
     expect(r.ok).toBe(true);
@@ -359,6 +361,16 @@ describe('migrate', () => {
     for (let i = 0; i < 50; i++) step(r.state, r.state.ops[0]);
     expect(Number.isFinite(r.state.credits)).toBe(true);
     expect(r.state.time).toBeGreaterThan(0);
+  });
+
+  it('migrates a v15 fixture to v16 with no supply routes (#80)', () => {
+    expect(saveV15.version).toBe(15);
+    const r = migrate(saveV15);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.state.version).toBe(SAVE_VERSION);
+    expect(r.state.routes).toEqual([]);
+    expect(r.state.ops).toHaveLength(2);
   });
 
   it('applies one migration step per version, in order', () => {

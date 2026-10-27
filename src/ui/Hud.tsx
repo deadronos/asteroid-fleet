@@ -3,7 +3,7 @@ import { lvl } from '../sim/research';
 import { maxEnergy, refineThroughput } from '../sim/state';
 import { carrierStorage } from '../sim/hangar';
 import { TIER_NAMES } from '../sim/config';
-import { heatFactor } from '../sim/tick';
+import { heatFactor } from '../sim/combat';
 import { leftBehind } from '../sim/warp';
 import { fmt } from './format';
 
@@ -21,12 +21,14 @@ export function Hud({
   quality,
   onTactical,
   onQuality,
+  onMap,
 }: {
   tactical: boolean;
   autoTactical: boolean;
   quality: 'high' | 'low';
   onTactical: () => void;
   onQuality: () => void;
+  onMap: () => void;
 }) {
   const s = useGame();
   const c = s.carrier;
@@ -118,6 +120,9 @@ export function Hud({
               {v}×
             </button>
           ))}
+          <button onClick={onMap} title="Star map and supply routes (M)">
+            Map
+          </button>
           <button
             className={tactical || autoTactical ? 'on' : ''}
             onClick={onTactical}

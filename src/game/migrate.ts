@@ -1,7 +1,13 @@
 import { presetCard } from '../sim/cards';
 import { PRESETS } from '../sim/config';
 import { OP_KEYS, SAVE_VERSION, makeSystems } from '../sim/state';
-import type { GameState, RuleCard, RuleId, Severity } from '../sim/types';
+import {
+  ROUTE_RESOURCES,
+  type GameState,
+  type RuleCard,
+  type RuleId,
+  type Severity,
+} from '../sim/types';
 
 export type SaveFailure = 'corrupt' | 'newer' | 'unknown';
 
@@ -134,6 +140,11 @@ export const migrations: Record<number, Migration> = {
     save.challengesDone = [];
     return save;
   },
+  // v16: supply routes between carriers (#80).
+  15: (save) => {
+    save.routes = [];
+    return save;
+  },
 };
 
 const LEGACY_TONE: Record<string, Severity> = {
@@ -211,6 +222,7 @@ function validateSave(save: SaveBlob): MigrateResult {
   if (!Array.isArray(save.unlockedRules)) save.unlockedRules = [];
   if (!Array.isArray(save.events)) save.events = [];
   if (!Array.isArray(save.modifiers)) save.modifiers = [];
+  if (!Array.isArray(save.routes)) save.routes = [];
   if (!Array.isArray(save.challengesDone)) save.challengesDone = [];
   if (typeof save.challenge !== 'string') save.challenge = null;
   if (!Array.isArray(save.hulls) || !save.hulls.includes('standard')) save.hulls = ['standard'];
@@ -234,6 +246,21 @@ function validateSave(save: SaveBlob): MigrateResult {
   }
 
   const state = save as unknown as GameState;
+  state.routes = state.routes.filter(
+    (r) =>
+      isRecord(r) &&
+      Number.isFinite(r.id) &&
+      ids.has(r.from) &&
+      ids.has(r.to) &&
+      r.from !== r.to &&
+      ROUTE_RESOURCES.includes(r.resource) &&
+      Number.isFinite(r.rate) &&
+      Number.isFinite(r.rng),
+  );
+  for (const r of state.routes) {
+    if (!Number.isFinite(r.moved)) r.moved = 0;
+    if (!Number.isFinite(r.lost)) r.lost = 0;
+  }
   for (const op of state.ops) {
     // JSON turns Infinity into null; restore "no timer".
     if (op.wave.timer === null) op.wave.timer = Infinity;

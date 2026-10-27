@@ -44,7 +44,7 @@ import type {
 } from './types';
 
 /** Bump together with a `migrations[n]` step and a fixture. See README "Save migrations". */
-export const SAVE_VERSION = 15;
+export const SAVE_VERSION = 16;
 
 /** Every `Operation` field. The `satisfies` below fails to compile when one is missing. */
 export const OP_KEYS = [
@@ -236,6 +236,12 @@ class SimView implements Sim {
   }
   set events(v) {
     this.g.events = v;
+  }
+  get routes() {
+    return this.g.routes;
+  }
+  set routes(v) {
+    this.g.routes = v;
   }
   get savedAt() {
     return this.g.savedAt;
@@ -909,6 +915,7 @@ export function newGame(seed = 1337, carry?: Carry): GameState {
     log: [],
     events: [],
     savedAt: Date.now(),
+    routes: [],
     ops: [op],
   };
   const s = bind(g, op);

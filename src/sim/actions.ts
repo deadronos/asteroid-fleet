@@ -10,8 +10,6 @@ import {
   CARRIER_COST,
   OFFLINE_CAP_S,
   OFFLINE_EFFICIENCY,
-  MARKS_DIVISOR,
-  RP_DIVISOR,
   SHIP_STATS,
   WARP_CHARGE,
   warpPayment,
@@ -35,7 +33,9 @@ import {
   newGame,
   stateOf,
 } from './state';
+import { RETROFIT_COST, lifetimeResearch, marksPayout, researchPayout, shipCost } from './costs';
 import { executeJump } from './tick';
+import { addRoute, removeRoute, routeTick } from './routes';
 import { refit } from './shipyard';
 import { RETURN_GRACE_S, dematerialise, materialise, runBackground } from './background';
 import type {
@@ -49,6 +49,7 @@ import type {
   ModuleId,
   ModifierId,
   ChallengeId,
+  RouteResource,
   RuleCard,
   ShipClass,
   Stance,
@@ -63,6 +64,9 @@ export type Order =
   | { type: 'buyHangar'; hangarType: HangarType }
   /** Buy another carrier (#78); credits are shared, so any carrier can place it. */
   | { type: 'buyCarrier' }
+  /** Start a supply route (#80) from the carrier the command names to `to`. */
+  | { type: 'addRoute'; to: number; resource: RouteResource; rate: number }
+  | { type: 'removeRoute'; routeId: number }
   | { type: 'retrofitHangar'; hangarId: number; hangarType: HangarType }
   | { type: 'setLaunchOrder'; hangarId: number; order: ShipClass[] }
   | {
@@ -95,12 +99,7 @@ export type Order =
 /** Every command names the carrier (operation) it is for. */
 export type Command = Order & { carrierId: number };
 
-export const RETROFIT_COST = 800;
-
-export function shipCost(s: Sim, cls: ShipClass): number {
-  const n = s.ships.filter((x) => x.cls === cls).length;
-  return Math.round(SHIP_STATS[cls].cost * Math.pow(1.07, n));
-}
+export { RETROFIT_COST, marksPayout, researchPayout, shipCost };
 
 export function apply(g: GameState, c: Command): string | null {
   const op = g.ops.find((o) => o.id === c.carrierId);
@@ -122,6 +121,10 @@ export function order(s: Sim, c: Order): string | null {
       s.credits -= cost;
       return null;
     }
+    case 'addRoute':
+      return addRoute(stateOf(s), s.id, c.to, c.resource, c.rate);
+    case 'removeRoute':
+      return removeRoute(stateOf(s), c.routeId);
     case 'scrapShip': {
       const ship = s.ships.find((x) => x.id === c.shipId);
       if (!ship) return 'No such ship';
@@ -358,10 +361,6 @@ export function order(s: Sim, c: Order): string | null {
 
 // ---------- prestige ----------
 
-export function researchPayout(s: Pick<GameState, 'stats'>): number {
-  return Math.floor(Math.sqrt(s.stats.oreValueDelivered / RP_DIVISOR)) * s.stats.furthestTier;
-}
-
 /** Carriers survive a reset (#78): as many fresh ones as were owned, up to the slots. */
 function refillCarriers(next: GameState, owned: number) {
   for (const n = Math.min(owned, carrierSlots(next)); next.ops.length < n;) addCarrier(next);
@@ -419,16 +418,6 @@ export function startChallenge(s: GameState, id: ChallengeId, hull?: HullId): Ga
 // ---------- admiralty ----------
 
 /** Lifetime RP counting the run in progress, as an Admiralty reset would bank it. */
-function lifetimeResearch(s: Pick<GameState, 'stats' | 'lifetime'>): number {
-  return s.lifetime.researchEarned + researchPayout(s);
-}
-
-/** Marks the next Admiralty reset pays: floor(sqrt(lifetime RP / divisor)) less what was paid. */
-export function marksPayout(s: Pick<GameState, 'stats' | 'lifetime'>): number {
-  const total = Math.floor(Math.sqrt(lifetimeResearch(s) / MARKS_DIVISOR));
-  return Math.max(0, total - s.lifetime.marksEarned);
-}
-
 /**
  * Second prestige layer (#68, Q6 in #49). Resets the research tree, RP and discovered systems
  * along with the run. Keeps automation nodes, unlocked hulls and rules, carriers (rebuilt
@@ -489,6 +478,8 @@ export function settleOffline(g: GameState, elapsedS: number): OfflineReport | n
     report.credits += r.credits;
     report.rebuilt += r.rebuilt;
   }
+  // Routes keep running over the time away (whole seconds; the remainder is dropped).
+  for (let i = 0; i < t && g.routes.length; i++) routeTick(g, 1);
   return report;
 }
 

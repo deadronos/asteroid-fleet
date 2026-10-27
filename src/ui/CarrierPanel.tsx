@@ -15,7 +15,7 @@ import {
 import { admiraltyEffect } from '../sim/admiralty';
 import { lvl, repeatEffect } from '../sim/research';
 import { jumpCost, refineThroughput, solarRate, upkeep } from '../sim/state';
-import { cargoCap } from '../sim/tick';
+import { cargoCap } from '../sim/ctx';
 import { SHIP_CLASSES, type Sim } from '../sim/types';
 import { fmt } from './format';
 import { Shipyard } from './Shipyard';

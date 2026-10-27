@@ -387,6 +387,26 @@ export interface Operation {
   fx: Fx[];
 }
 
+/** What a supply route carries. Credits and RP are shared, so only per-carrier pools move (Q10, #49). */
+export type RouteResource = 'ore' | 'h2' | 'energy';
+export const ROUTE_RESOURCES: RouteResource[] = ['ore', 'h2', 'energy'];
+
+/** A standing flow of one resource from one carrier to another (#80). */
+export interface SupplyRoute {
+  id: number;
+  /** Carrier ids. */
+  from: number;
+  to: number;
+  resource: RouteResource;
+  /** Units per second asked for; what arrives depends on stock, room and interception. */
+  rate: number;
+  /** Own rng state, so a route rolls the same whichever tier its carriers are in. */
+  rng: number;
+  /** Units delivered and units lost to interception, ever. */
+  moved: number;
+  lost: number;
+}
+
 export type ModifierId = 'noFighters' | 'halfEnergy' | 'deepSpace';
 export type ChallengeId = 'pacifist' | 'lowPower' | 'deepStart';
 
@@ -437,7 +457,9 @@ export interface GameState {
   /** Outbox of events since the host last drained it, oldest first. */
   events: SimEvent[];
   savedAt: number; // wall-clock ms
-  /** Actively played carriers. Always exactly one until #78. */
+  /** Supply routes between carriers (#80). */
+  routes: SupplyRoute[];
+  /** Actively played carriers. */
   ops: Operation[];
   /** Id of the carrier the player is looking at; the first one when absent or unknown. */
   focusId?: number;

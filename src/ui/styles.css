@@ -889,3 +889,81 @@ label.button:hover {
     animation: none;
   }
 }
+
+/* star map and supply routes (#80) */
+.map-btn {
+  white-space: nowrap;
+}
+.starmap {
+  width: min(820px, 100%);
+}
+.starmap-svg {
+  width: 100%;
+  height: auto;
+  background: rgba(4, 7, 15, 0.8);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.starmap-svg text {
+  fill: var(--muted);
+  font-size: 11px;
+  pointer-events: none;
+}
+.starmap-svg .sys {
+  cursor: pointer;
+}
+.starmap-svg .sys.sel circle:first-child {
+  stroke: #fff;
+  stroke-width: 2;
+}
+.starmap-svg .sys:focus-visible,
+.starmap-svg .carrier-mark:focus-visible {
+  outline: 2px solid var(--accent);
+}
+.starmap-svg .carrier-mark {
+  cursor: pointer;
+}
+.starmap-svg .carrier-mark rect {
+  fill: var(--panel-2);
+  stroke: var(--line-strong);
+}
+.starmap-svg .carrier-mark.on rect {
+  stroke: var(--shield);
+  stroke-width: 2;
+}
+.starmap-svg .carrier-mark text {
+  fill: var(--text);
+  font-weight: 600;
+}
+.starmap-svg .route {
+  stroke-width: 2;
+  opacity: 0.8;
+}
+.starmap-svg .route.ore {
+  stroke: var(--warn);
+}
+.starmap-svg .route.h2 {
+  stroke: #ff9f5a;
+}
+.starmap-svg .route.energy {
+  stroke: var(--energy);
+}
+.starmap-info {
+  margin: 8px 0;
+  min-height: 24px;
+}
+.starmap h3 {
+  margin: 10px 0 4px;
+  font-size: 14px;
+}
+.routes {
+  list-style: none;
+  padding: 0;
+}
+.routes li {
+  padding: 3px 0;
+}
+.route-form {
+  flex-wrap: wrap;
+  align-items: center;
+}

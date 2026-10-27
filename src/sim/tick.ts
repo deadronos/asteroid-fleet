@@ -31,7 +31,8 @@ import {
 import { copy, moveAway, onSphere, rand } from './math';
 import { lvl, repeatEffect } from './research';
 import { CHALLENGES, challengeProgress } from './modifiers';
-import { bind, emit, maxHull } from './state';
+import { bind, emit, maxHull, stateOf } from './state';
+import { stepRoutes } from './routes';
 import { carrierDisabled, executeJump, warpStep } from './warp';
 import { drift, field, hazards, power, refine, reserves } from './world';
 import type { GameState, Operation, Sim, Ship, ShipClass } from './types';
@@ -49,12 +50,14 @@ export { executeJump };
 export function step(g: GameState, op: Operation, dt = DT) {
   g.time += dt;
   stepOp(bind(g, op), dt);
+  stepRoutes(g);
 }
 
 /** `step` for a single bound operation: headless runs, tests and benchmarks. */
 export function stepSim(s: Sim, dt = DT) {
   s.time += dt;
   stepOp(s, dt);
+  stepRoutes(stateOf(s));
 }
 
 /** One operation's share of a step. The run clock has already moved. */
