@@ -1,3 +1,4 @@
+import { hullsUnlockedByMilestone } from './milestones';
 import {
   DEFAULT_STANCE,
   ENERGY_MAX,
@@ -574,9 +575,10 @@ export function jumpCost(s: Sim, from: number, to: number): number {
 
 /** Unlock hull classes the run has earned: after the first prestige, by furthest tier. */
 export function unlockHulls(s: Sim) {
-  if (s.lifetime.prestiges < 1) return;
+  const all = hullsUnlockedByMilestone(s);
+  if (s.lifetime.prestiges < 1 && !all) return;
   for (const id of HULL_IDS)
-    if (HULLS[id].tier <= s.stats.furthestTier && !s.hulls.includes(id)) s.hulls.push(id);
+    if ((all || HULLS[id].tier <= s.stats.furthestTier) && !s.hulls.includes(id)) s.hulls.push(id);
 }
 
 /** Solar recharge in the current system, energy/s, before storm boosts. */

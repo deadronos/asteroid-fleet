@@ -10,6 +10,7 @@ import {
   researchLocked,
   type Branch,
 } from '../sim/research';
+import { MILESTONES, carrierSlots } from '../sim/milestones';
 import { SHIP_CLASSES, type HullId, type ShipClass } from '../sim/types';
 import { fmt } from './format';
 
@@ -167,6 +168,19 @@ export function ResearchPanel() {
             <button onClick={() => setConfirmAdm(false)}>Cancel</button>
           </div>
         )}
+      </div>
+      <div className="prestige-box">
+        <Pair
+          a="Admiralty resets"
+          av={String(s.lifetime.admiralties)}
+          b="Carrier slots"
+          bv={String(carrierSlots(s))}
+        />
+        {MILESTONES.map((m) => (
+          <div key={m.at} className="hint">
+            {s.lifetime.admiralties >= m.at ? '✓' : '○'} {m.at}: {m.label}
+          </div>
+        ))}
       </div>
       {GLOBAL.map(branch)}
       {SHIP_CLASSES.map((c) => branch(c))}
