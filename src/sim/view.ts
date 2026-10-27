@@ -74,18 +74,17 @@ class SimView {
   ) {}
 }
 
+/**
+ * One getter/setter pair per key, compiled with the key as a literal (`this.g.credits`) so each
+ * access site has its own inline cache. Closures over `k` would share one megamorphic site.
+ */
 function forward(from: 'g' | 'op', keys: readonly string[]) {
   for (const k of keys) {
-    Object.defineProperty(SimView.prototype, k, {
-      get(this: SimView) {
-        return (this[from] as unknown as Record<string, unknown>)[k];
-      },
-      set(this: SimView, v: unknown) {
-        (this[from] as unknown as Record<string, unknown>)[k] = v;
-      },
-      enumerable: true,
-      configurable: true,
-    });
+    // oxlint-disable-next-line typescript/no-implied-eval -- fixed key lists, no user input
+    const get = new Function(`return this.${from}.${k};`) as () => unknown;
+    // oxlint-disable-next-line typescript/no-implied-eval -- fixed key lists, no user input
+    const set = new Function('v', `this.${from}.${k} = v;`) as (v: unknown) => void;
+    Object.defineProperty(SimView.prototype, k, { get, set, enumerable: true, configurable: true });
   }
 }
 forward('g', GAME_KEYS);
