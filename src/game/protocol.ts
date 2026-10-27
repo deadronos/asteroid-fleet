@@ -32,6 +32,7 @@ export type InMsg =
   | { t: 'speed'; v: number }
   | { t: 'pause'; v: boolean }
   | { t: 'prestige' }
+  | { t: 'admiralty' }
   | { t: 'replace'; state: GameState; epoch: number }
   | { t: 'snapshot'; id: number };
 

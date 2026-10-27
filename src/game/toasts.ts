@@ -62,6 +62,7 @@ export const TOAST_POLICY: Record<SimEventKind, ToastPolicy> = {
   Warped: 'toast',
   EmergencyJump: 'toast',
   Prestiged: 'inbox',
+  Admiralty: 'inbox',
   WelcomeBack: 'toast',
   Legacy: 'inbox',
 };

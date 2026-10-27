@@ -445,6 +445,8 @@ export const GAS_PIRATE_HARVESTER_BIAS = 3;
  * first run pays out in about an hour. Tune here.
  */
 export const RP_DIVISOR = 10_000;
+/** Admiralty Marks = floor(sqrt(lifetime RP / D)), less Marks already paid (#68). */
+export const MARKS_DIVISOR = 50;
 export const OFFLINE_EFFICIENCY = 0.5;
 export const OFFLINE_CAP_S = 12 * 3600;
 

@@ -102,6 +102,13 @@ export const migrations: Record<number, Migration> = {
     save.ops = [op];
     return save;
   },
+  // v11: Admiralty Marks and the second prestige layer (#68).
+  10: (save) => {
+    const lifetime = isRecord(save.lifetime) ? save.lifetime : { prestiges: 0, researchEarned: 0 };
+    save.lifetime = { ...lifetime, admiralties: 0, marksEarned: 0 };
+    save.marks = 0;
+    return save;
+  },
 };
 
 const LEGACY_TONE: Record<string, Severity> = {

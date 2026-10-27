@@ -315,6 +315,7 @@ export interface EventData {
   Warped: { system: string };
   EmergencyJump: Record<string, never>;
   Prestiged: { research: number };
+  Admiralty: { marks: number };
   WelcomeBack: { credits: number };
   /** A plain-text line from a save written before typed events (v7 and older). */
   Legacy: { text: string };
@@ -389,7 +390,16 @@ export interface GameState {
   cards: RuleCard[];
   automation: Automation;
   stats: Stats;
-  lifetime: { prestiges: number; researchEarned: number };
+  lifetime: {
+    prestiges: number;
+    researchEarned: number;
+    /** Admiralty resets so far (#68). */
+    admiralties: number;
+    /** Admiralty Marks ever paid out; the next payout is the new total minus this. */
+    marksEarned: number;
+  };
+  /** Unspent Admiralty Marks (#68). Survive both prestige layers. */
+  marks: number;
   powerMode: 'balanced' | 'income' | 'defense';
   /** The last few events, newest first, for the Log tab. Saved. */
   log: SimEvent[];

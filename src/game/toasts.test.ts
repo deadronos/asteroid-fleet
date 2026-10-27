@@ -466,6 +466,8 @@ function sampleOf(kind: SimEventKind): SimEvent {
       return ev(kind, { system: 'Lumen' });
     case 'Prestiged':
       return ev(kind, { research: 3 });
+    case 'Admiralty':
+      return ev(kind, { marks: 2 });
     case 'WelcomeBack':
       return ev(kind, { credits: 20 });
     case 'Legacy':

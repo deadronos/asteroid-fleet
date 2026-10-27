@@ -9,6 +9,7 @@ import {
   NEW_HANGAR_COST,
   OFFLINE_CAP_S,
   OFFLINE_EFFICIENCY,
+  MARKS_DIVISOR,
   RP_DIVISOR,
   SHIP_STATS,
   WARP_CHARGE,
@@ -18,7 +19,7 @@ import {
 import { cardSlots, checkCard, nextCardId } from './cards';
 import { autoBuyUnlocked, autoRebuildUnlocked, engagementUnlocked } from './automation';
 import { moveShip as moveOnBoard } from './hangar';
-import { buyResearch as buyNode, lvl } from './research';
+import { buyResearch as buyNode, lvl, RESEARCH_BY_ID } from './research';
 import { bind, createShip, emit, focused, maxEnergy, newGame } from './state';
 import { executeJump } from './tick';
 import { RETURN_GRACE_S, dematerialise, materialise, runBackground } from './background';
@@ -312,14 +313,60 @@ export function prestige(s: GameState): GameState {
     unlockedRules: [...s.unlockedRules],
     discovered: s.systems.filter((x) => x.discovered).map((x) => x.id),
     lifetime: {
+      ...s.lifetime,
       prestiges: s.lifetime.prestiges + 1,
       researchEarned: s.lifetime.researchEarned + rp,
     },
+    marks: s.marks,
     doctrine: structuredClone(s.doctrine),
     cards: structuredClone(s.cards),
     automation: structuredClone(s.automation),
   });
   emit(focused(next), 'Prestiged', { research: rp });
+  return next;
+}
+
+// ---------- admiralty ----------
+
+/** Lifetime RP counting the run in progress, as an Admiralty reset would bank it. */
+function lifetimeResearch(s: Pick<GameState, 'stats' | 'lifetime'>): number {
+  return s.lifetime.researchEarned + researchPayout(s);
+}
+
+/** Marks the next Admiralty reset pays: floor(sqrt(lifetime RP / divisor)) less what was paid. */
+export function marksPayout(s: Pick<GameState, 'stats' | 'lifetime'>): number {
+  const total = Math.floor(Math.sqrt(lifetimeResearch(s) / MARKS_DIVISOR));
+  return Math.max(0, total - s.lifetime.marksEarned);
+}
+
+/**
+ * Second prestige layer (#68, Q6 in #49). Resets the research tree, RP and discovered systems
+ * along with the run. Keeps automation nodes, unlocked hulls and rules, carriers (`ops` are
+ * rebuilt as one fresh carrier until #78), Marks, doctrine and cards.
+ */
+export function admiralty(s: GameState): GameState {
+  const marks = marksPayout(s);
+  const kept = Object.fromEntries(
+    Object.entries(s.researchLevels).filter(([id]) => RESEARCH_BY_ID[id]?.branch === 'Automation'),
+  );
+  const next = newGame(s.seed + s.lifetime.prestiges + s.lifetime.admiralties + 1, {
+    research: 0,
+    researchLevels: kept,
+    unlocked: [...s.unlocked],
+    unlockedRules: [...s.unlockedRules],
+    discovered: [],
+    lifetime: {
+      prestiges: s.lifetime.prestiges,
+      researchEarned: lifetimeResearch(s),
+      admiralties: s.lifetime.admiralties + 1,
+      marksEarned: s.lifetime.marksEarned + marks,
+    },
+    marks: s.marks + marks,
+    doctrine: structuredClone(s.doctrine),
+    cards: structuredClone(s.cards),
+    automation: structuredClone(s.automation),
+  });
+  emit(focused(next), 'Admiralty', { marks });
   return next;
 }
 

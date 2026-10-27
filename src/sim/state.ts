@@ -34,7 +34,7 @@ import type {
 } from './types';
 
 /** Bump together with a `migrations[n]` step and a fixture. See README "Save migrations". */
-export const SAVE_VERSION = 10;
+export const SAVE_VERSION = 11;
 
 /** Every `Operation` field. The `satisfies` below fails to compile when one is missing. */
 export const OP_KEYS = [
@@ -106,6 +106,12 @@ class SimView implements Sim {
   }
   set research(v) {
     this.g.research = v;
+  }
+  get marks() {
+    return this.g.marks;
+  }
+  set marks(v) {
+    this.g.marks = v;
   }
   get researchLevels() {
     return this.g.researchLevels;
@@ -633,6 +639,7 @@ export const SEVERITY: Record<SimEventKind, Severity> = {
   Warped: 'good',
   EmergencyJump: 'critical',
   Prestiged: 'good',
+  Admiralty: 'good',
   WelcomeBack: 'good',
   Legacy: 'info',
 };
@@ -665,6 +672,7 @@ interface Carry {
   unlockedRules: RuleId[];
   discovered: number[];
   lifetime: GameState['lifetime'];
+  marks?: number;
   doctrine?: GameState['doctrine'];
   cards?: GameState['cards'];
   automation?: GameState['automation'];
@@ -752,7 +760,13 @@ export function newGame(seed = 1337, carry?: Carry): GameState {
       piratesKilled: 0,
       furthestTier: 1,
     },
-    lifetime: carry?.lifetime ?? { prestiges: 0, researchEarned: 0 },
+    lifetime: carry?.lifetime ?? {
+      prestiges: 0,
+      researchEarned: 0,
+      admiralties: 0,
+      marksEarned: 0,
+    },
+    marks: carry?.marks ?? 0,
     powerMode: 'balanced',
     log: [],
     events: [],

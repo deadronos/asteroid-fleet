@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { engine, useGame } from '../game/engine';
-import { researchPayout } from '../sim/actions';
-import { RP_DIVISOR, SHIP_STATS, TIER_NAMES } from '../sim/config';
+import { marksPayout, researchPayout } from '../sim/actions';
+import { MARKS_DIVISOR, RP_DIVISOR, SHIP_STATS, TIER_NAMES } from '../sim/config';
 import {
   RESEARCH,
   canBuyResearch,
@@ -18,6 +18,8 @@ const GLOBAL: Branch[] = ['Logistics', 'Mining', 'Combat', 'Carrier', 'Reserves'
 export function ResearchPanel() {
   const s = useGame();
   const [confirm, setConfirm] = useState(false);
+  const [confirmAdm, setConfirmAdm] = useState(false);
+  const marks = marksPayout(s);
   const rp = researchPayout(s);
   const tier = s.stats.furthestTier as 1 | 2 | 3;
   const branch = (b: Branch) => {
@@ -111,6 +113,47 @@ export function ResearchPanel() {
               Yes, reset
             </button>
             <button onClick={() => setConfirm(false)}>Cancel</button>
+          </div>
+        )}
+      </div>
+      <div className="prestige-box">
+        <div className="row">
+          <div className="grow">
+            <div className="hint" style={{ margin: 0 }}>
+              Admiralty Marks
+            </div>
+            <div className="big">{fmt(s.marks)}</div>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <div className="hint" style={{ margin: 0 }}>
+              Admiralty now pays
+            </div>
+            <div className="big" style={{ color: '#c9b6ff' }}>
+              +{fmt(marks)}
+            </div>
+          </div>
+        </div>
+        <p className="hint">
+          Marks = ⌊√(lifetime RP ÷ {MARKS_DIVISOR})⌋ less Marks already paid. Admiralty resets the
+          research tree, RP and discovered systems along with the run. Automation research, hulls,
+          rules and Marks persist.
+        </p>
+        {!confirmAdm ? (
+          <button disabled={marks <= 0} onClick={() => setConfirmAdm(true)}>
+            Admiralty reset…
+          </button>
+        ) : (
+          <div className="row">
+            <span>Reset research for +{fmt(marks)} Marks?</span>
+            <button
+              onClick={() => {
+                engine.doAdmiralty();
+                setConfirmAdm(false);
+              }}
+            >
+              Yes, reset
+            </button>
+            <button onClick={() => setConfirmAdm(false)}>Cancel</button>
           </div>
         )}
       </div>

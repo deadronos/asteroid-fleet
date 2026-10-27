@@ -275,6 +275,11 @@ class Engine {
     void this.save();
   }
 
+  doAdmiralty() {
+    this.host?.post({ t: 'admiralty' });
+    void this.save();
+  }
+
   replace(state: GameState) {
     this.epoch += 1;
     this.toasts.clear();

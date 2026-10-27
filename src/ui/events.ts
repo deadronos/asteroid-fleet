@@ -69,6 +69,8 @@ export function formatEvent(ev: SimEvent): string {
       return 'Carrier hull critical! Emergency jump to the starter system.';
     case 'Prestiged':
       return `Operation reset. +${ev.data.research} research points.`;
+    case 'Admiralty':
+      return `Admiralty reset. +${ev.data.marks} Admiralty Marks.`;
     case 'WelcomeBack':
       return `Welcome back. The fleet earned ${ev.data.credits} credits while you were away.`;
     case 'Legacy':
