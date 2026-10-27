@@ -367,7 +367,8 @@ class Engine {
   }
 
   private saveMirror() {
-    // The mirror holds only the focused carrier; with several it would drop the others.
+    // The mirror holds only the focused carrier, so writing it would drop the others from the
+    // save. Trade-off: closing the tab with several carriers loses up to one autosave interval.
     if (this.carriers.length > 1) return;
     if (!saveOverwriteBlocked()) void this.write(this.state);
   }

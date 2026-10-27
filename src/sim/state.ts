@@ -815,14 +815,13 @@ function buildOp(
 export function addCarrier(g: GameState): Operation {
   const id = g.nextId++;
   const op = buildOp(id, g.seed + id * 7919, 'standard', g.researchLevels);
-  const top = Math.max(...g.ops.flatMap((o) => o.hangars.map((h) => h.id)));
+  // Offset by the (always growing) op id, so ranges never overlap.
+  const top = id * 1e3;
   for (const h of op.hangars) h.id += top;
   g.ops.push(op);
   const s = bind(g, op);
-  s.carrier.energy = maxEnergy(s) * 0.6;
   enterSystem(s, 0);
-  for (let i = 0; i < 4; i++) createShip(s, 'drone', op.hangars[0].id);
-  emit(s, 'CarrierOnline', { system: s.systems[0].name });
+  for (let i = 0; i < 4; i++) createShip(s, 'drone', 1 + top);
   return op;
 }
 
