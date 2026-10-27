@@ -181,7 +181,10 @@ function launch(s: Sim, dt: number, ctx: Ctx) {
     };
     if (next.cls === 'barge') boardBargeBay(s, next);
     else assignBargeBay(s, next, ctx);
-    h.launchTimer = HANGAR_TYPES[h.type].launchInterval * (1 - repeatEffect(s, 'deepLaunch'));
+    h.launchTimer =
+      HANGAR_TYPES[h.type].launchInterval *
+      (1 - 0.08 * lvl(s, 'bays')) *
+      (1 - repeatEffect(s, 'deepLaunch'));
   }
 }
 

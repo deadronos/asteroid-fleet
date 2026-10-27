@@ -1,5 +1,5 @@
 import { HANGAR_TYPES, ZONE_RULE_UNLOCKS } from './config';
-import { unlockRule } from './state';
+import { carrierMaxHull, unlockRule } from './state';
 import type { Sim, ShipClass } from './types';
 
 export type Branch =
@@ -447,6 +447,40 @@ export const RESEARCH: ResearchNode[] = [
     cost: lin(1, 2),
     requires: 'fusion',
   },
+  // Carrier frame, reactor, bays and sensors (#67): improve the hull class stats.
+  {
+    id: 'frame',
+    branch: 'Carrier',
+    name: 'Reinforced frame',
+    desc: '+12 % carrier hull',
+    maxLevel: 5,
+    cost: lin(2, 1),
+  },
+  {
+    id: 'reactor',
+    branch: 'Carrier',
+    name: 'Reactor tuning',
+    desc: '+10 % refinery throughput and +10 % shield regeneration',
+    maxLevel: 5,
+    cost: lin(2, 1),
+  },
+  {
+    id: 'bays',
+    branch: 'Carrier',
+    name: 'Catapult bays',
+    desc: '-8 % hangar launch interval',
+    maxLevel: 4,
+    cost: lin(2, 2),
+    requires: 'slots',
+  },
+  {
+    id: 'sensors',
+    branch: 'Carrier',
+    name: 'Long-range sensors',
+    desc: '-5 % jump energy and +5 s pirate wave warning',
+    maxLevel: 4,
+    cost: lin(2, 1),
+  },
   // Repeatable sinks (#64): unlimited levels, geometric cost, diminishing returns.
   {
     id: 'deepYield',
@@ -533,6 +567,12 @@ export function buyResearch(s: Sim, id: string): boolean {
   s.research -= node.cost(lvl(s, id));
   s.researchLevels[id] = lvl(s, id) + 1;
   if (id === 'fusion' && !s.unlocked.includes('harvester')) s.unlocked.push('harvester');
+  if (id === 'frame') {
+    const c = s.carrier;
+    const max = carrierMaxHull(s);
+    c.hull += max - c.maxHull;
+    c.maxHull = max;
+  }
   if (id === 'tactics') for (const rid of ZONE_RULE_UNLOCKS[2]) unlockRule(s, rid);
   return true;
 }

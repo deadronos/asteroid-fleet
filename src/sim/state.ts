@@ -549,6 +549,11 @@ export function maxHull(s: Sim, cls: ShipClass): number {
   return h;
 }
 
+/** Carrier hull points: hull class times Reinforced frame. */
+export function carrierMaxHull(s: Sim): number {
+  return HULLS[s.carrier.hullClass].hull * (1 + 0.12 * lvl(s, 'frame'));
+}
+
 export function maxEnergy(s: Sim): number {
   return (
     ENERGY_MAX *
@@ -563,13 +568,14 @@ export function refineThroughput(s: Sim): number {
   return (
     refineRate(s.carrier.refinery) *
     HULLS[s.carrier.hullClass].refinery *
+    (1 + 0.1 * lvl(s, 'reactor')) *
     (1 + 0.25 * lvl(s, 'voidRefining'))
   );
 }
 
 /** Jump energy between two system distances, with the hull's multiplier. */
 export function jumpCost(s: Sim, from: number, to: number): number {
-  return warpCost(from, to, HULLS[s.carrier.hullClass].warpCost);
+  return warpCost(from, to, HULLS[s.carrier.hullClass].warpCost * (1 - 0.05 * lvl(s, 'sensors')));
 }
 
 /** Unlock hull classes the run has earned: after the first prestige, by furthest tier. */
@@ -738,8 +744,8 @@ export function newGame(seed = 1337, carry?: Carry): GameState {
     carrier: {
       pos: v3(),
       target: null,
-      hull: hd.hull,
-      maxHull: hd.hull,
+      hull: hd.hull * (1 + 0.12 * (carry?.researchLevels.frame ?? 0)),
+      maxHull: hd.hull * (1 + 0.12 * (carry?.researchLevels.frame ?? 0)),
       energy: ENERGY_MAX * 0.6,
       shield: 1,
       ore: 0,
