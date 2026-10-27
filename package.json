@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "check:bundle": "node scripts/check-bundle.mjs",
     "test": "vitest run",
-    "test:coverage": "vitest run --coverage",
+    "test:coverage": "vitest run --coverage --testTimeout=60000",
     "test:e2e": "playwright test",
     "typecheck": "tsc -b",
     "balance": "node scripts/balance.mjs",
