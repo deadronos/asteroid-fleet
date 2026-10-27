@@ -1,5 +1,5 @@
 import { MODULE_IDS, MODULE_SLOTS } from '../sim/config';
-import { focusOp } from '../sim/state';
+import { bind, focusOp, maxEnergy } from '../sim/state';
 import {
   SHIP_CLASSES,
   type Asteroid,
@@ -26,6 +26,18 @@ import {
 export interface UiSnapshot {
   global: GlobalPart;
   focus: FocusPart;
+  /** One entry per carrier, in `ops` order, for the carrier bar. */
+  carriers: CarrierBrief[];
+}
+
+/** What the carrier bar shows about one carrier. */
+export interface CarrierBrief {
+  id: number;
+  systemId: number;
+  hull: number; // 0..1
+  energy: number;
+  maxEnergy: number;
+  income: number; // credits/s
 }
 
 /** Operation fields sent as packed rows, or (fx) with frames instead. */
@@ -176,7 +188,18 @@ export function encodeSnapshot(
   focus.pirates = pirates;
   focus.asteroids = asteroids;
   return {
-    snap: { global: global as GlobalPart, focus: focus as FocusPart },
+    snap: {
+      global: global as GlobalPart,
+      focus: focus as FocusPart,
+      carriers: g.ops.map((op) => ({
+        id: op.id,
+        systemId: op.systemId,
+        hull: op.carrier.hull / op.carrier.maxHull,
+        energy: op.carrier.energy,
+        maxEnergy: maxEnergy(bind(g, op)),
+        income: op.incomeAvg,
+      })),
+    },
     transfer: [
       ships.buffer,
       pirates.buffer,
@@ -278,7 +301,7 @@ export function applySnapshot(prevState: GameState | null, snap: UiSnapshot): Ga
     ships,
     pirates,
     asteroids,
-    fx: prev?.fx ?? [],
+    fx: prev && prev.id === focus.id ? prev.fx : [],
   };
   return {
     ...global,

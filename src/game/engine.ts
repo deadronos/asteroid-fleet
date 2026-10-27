@@ -1,11 +1,11 @@
 import { useSyncExternalStore } from 'react';
 import type { OfflineReport, Order } from '../sim/actions';
 import { focused, focusOp, newGame } from '../sim/state';
-import type { GameState, HullId, Pirate, Ship, Sim, Vec3 } from '../sim/types';
+import type { GameState, HullId, Pirate, Severity, Ship, Sim, Vec3 } from '../sim/types';
 import type { BusEvent } from './events';
 import { createSimHost, type SimHost } from './host';
 import { MODES, PUMP_MS, type Frame, type OutMsg } from './protocol';
-import { applySnapshot } from './snapshot';
+import { applySnapshot, type CarrierBrief } from './snapshot';
 import { allowSaveOverwrite, loadGame, saveGame, saveOverwriteBlocked } from './save';
 import { getActiveSlot, writeSlot } from './slots';
 import { offerToasts, ToastQueue } from './toasts';
@@ -41,11 +41,15 @@ class Engine {
    * already in flight cannot toast the previous run.
    */
   epoch = 0;
-  /**
-   * Carrier the player asked to look at (toast Go to). The mirror still follows
-   * `focusOp` until carrier switching (#77) posts this id to the worker.
-   */
+  /** Carrier the player is looking at; follows the worker's `focusId`. */
   focusedCarrierId = 0;
+  /** One entry per carrier for the carrier bar, from the latest state message. */
+  carriers: CarrierBrief[] = [];
+  /** Warnings and worse that arrived for a carrier since it was last viewed. */
+  unseen = new Map<number, { count: number; severity: Severity }>();
+  /** Bumped on every switch, so the UI can play the camera cut. */
+  cuts = 0;
+  private pendingFocus: number | null = null;
   /** Recent events from the sim, newest first; a merged event replaces its earlier copy. */
   events: BusEvent[] = [];
   /** Shown when the stored save could not be loaded. Autosave stays off. */
@@ -123,6 +127,7 @@ class Engine {
   private receive(msg: OutMsg) {
     switch (msg.t) {
       case 'state':
+        this.carriers = msg.snap.carriers;
         this.adopt(applySnapshot(this.state, msg.snap));
         if (msg.offline) this.offline = msg.offline;
         if (this.ready) {
@@ -139,6 +144,7 @@ class Engine {
         if (msg.epoch !== this.epoch) return;
         const ids = new Set(msg.events.map((e) => e.id));
         this.events = [...msg.events, ...this.events.filter((e) => !ids.has(e.id))].slice(0, 50);
+        this.markUnseen(msg.events);
         if (offerToasts(this.toasts, msg.events, this.focusedCarrierId)) this.emit();
         return;
       }
@@ -158,15 +164,30 @@ class Engine {
   /** A new state replaces the mirror. Positions keep coming from frames in between. */
   private adopt(state: GameState) {
     const first = this.ships.size === 0 && this.pirates.size === 0;
+    const switched = focusOp(state).id !== focusOp(this.state).id;
     this.state = state;
-    if (!state.ops.some((op) => op.id === this.focusedCarrierId))
-      this.focusedCarrierId = focusOp(state).id;
+    const mirrored = focusOp(state).id;
+    if (this.pendingFocus === mirrored) this.pendingFocus = null;
+    // A state sent before the worker saw the switch must not flip the selection back.
+    this.focusedCarrierId = this.pendingFocus ?? mirrored;
+    this.unseen.delete(this.focusedCarrierId);
     this.ships.clear();
     this.pirates.clear();
     const op = focusOp(state);
     for (const sh of op.ships) this.ships.set(sh.id, sh);
     for (const p of op.pirates) this.pirates.set(p.id, p);
-    if (first) this.snapshot();
+    if (first || switched) this.snapshot();
+  }
+
+  private markUnseen(events: BusEvent[]) {
+    for (const e of events) {
+      if (e.carrierId === this.focusedCarrierId) continue;
+      if (e.severity !== 'warn' && e.severity !== 'critical') continue;
+      const cur = this.unseen.get(e.carrierId);
+      const severity =
+        cur?.severity === 'critical' || e.severity === 'critical' ? 'critical' : 'warn';
+      this.unseen.set(e.carrierId, { count: (cur?.count ?? 0) + 1, severity });
+    }
   }
 
   private snapshot() {
@@ -188,6 +209,8 @@ class Engine {
 
   private applyFrame(f: Frame) {
     const s = focusOp(this.state);
+    // A frame already in flight when the focus changed belongs to the previous carrier.
+    if (f.carrierId !== s.id) return;
     const ships: Ship[] = [];
     const pirates: Pirate[] = [];
     const n = f.ids.length;
@@ -231,12 +254,20 @@ class Engine {
   }
 
   /**
-   * Point the UI at a carrier. With one carrier this only records the id; #77 will
-   * send it to the worker and switch the mirror. Unknown ids are ignored.
+   * Look at another carrier. The worker switches tiers and answers with a state for it;
+   * until that arrives the mirror still shows the old one. Unknown ids and the current
+   * carrier are ignored.
    */
   focusCarrier(carrierId: number) {
-    if (!this.state.ops.some((op) => op.id === carrierId)) return;
+    if (carrierId === this.focusedCarrierId) return;
+    const known = this.carriers.length > 0 ? this.carriers : this.state.ops;
+    if (!known.some((c) => c.id === carrierId)) return;
     this.focusedCarrierId = carrierId;
+    this.pendingFocus = carrierId;
+    this.unseen.delete(carrierId);
+    this.cuts++;
+    this.host?.post({ t: 'focus', carrierId });
+    this.emit();
   }
 
   /** Drop a toast. The next one waiting takes the free slot. */
@@ -277,6 +308,8 @@ class Engine {
 
   replace(state: GameState) {
     this.epoch += 1;
+    this.pendingFocus = null;
+    this.unseen.clear();
     this.toasts.clear();
     this.events = [];
     this.saveNotice = null;

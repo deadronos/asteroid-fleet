@@ -19,6 +19,7 @@ import {
 } from './inbox';
 import { SceneBoundary } from './ErrorBoundary';
 import { FleetPanel } from './FleetPanel';
+import { CarrierBar } from './CarrierBar';
 import { Hud } from './Hud';
 import { fmt } from './format';
 import { GearButton } from './GearButton';
@@ -338,6 +339,7 @@ export function App() {
         onTactical={() => setTactical((v) => !v)}
         onQuality={() => updateSettings({ quality: settings.quality === 'high' ? 'low' : 'high' })}
       />
+      <CarrierBar />
       <GearButton onClick={() => setMenu(true)} />
       <div className={`side ${collapsed ? 'collapsed' : ''}`}>
         <div className="tabs">
