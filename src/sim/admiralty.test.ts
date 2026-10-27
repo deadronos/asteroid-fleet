@@ -95,7 +95,8 @@ describe('Admiralty (#68)', () => {
     expect(next.stats.oreValueDelivered).toBe(0);
     expect(next.lifetime.admiralties).toBe(1);
     expect(next.lifetime.marksEarned).toBe(marks);
-    expect(next.hulls).toEqual(g.hulls);
+    // The first Admiralty also unlocks the remaining hull classes (#70).
+    expect(next.hulls).toEqual(expect.arrayContaining(g.hulls));
     expect(next.ops[0].carrier.hullClass).toBe(g.ops[0].carrier.hullClass);
     expect(next.alerts).toEqual(g.alerts);
     expect(next.log[0]?.kind).toBe('Admiralty');
