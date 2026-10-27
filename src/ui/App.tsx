@@ -22,6 +22,7 @@ import { FleetPanel } from './FleetPanel';
 import { CarrierBar } from './CarrierBar';
 import { ignoresHotkey } from './carriers';
 import { Hud } from './Hud';
+import { useStackLayout } from './layout';
 import { fmt } from './format';
 import { GearButton } from './GearButton';
 
@@ -315,6 +316,7 @@ export function App() {
   const [help, setHelp] = useState(() => read<string>('af-seen-help', '') !== '1');
   const [collapsed, setCollapsed] = useState(false);
 
+  useStackLayout();
   useEffect(() => write('af-tab', tab), [tab]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

@@ -145,7 +145,7 @@ input[type='range'] {
 
 .alert {
   position: absolute;
-  top: 74px;
+  top: calc(var(--hud-bottom, 73px) + 4px);
   left: 50%;
   transform: translateX(-50%);
   padding: 7px 16px;
@@ -172,7 +172,8 @@ input[type='range'] {
 /* ---------- side panel ---------- */
 .side {
   position: absolute;
-  top: 78px;
+  /* Below the HUD and carrier bar (see useStackLayout); the panel is zoomed, they are measured on screen. */
+  top: calc(var(--stack-bottom, 73px) / var(--ui-scale, 1) + 5px);
   left: 10px;
   bottom: 10px;
   width: min(470px, calc(100vw - 20px));
@@ -832,7 +833,7 @@ label.button:hover {
 
 .carrier-bar {
   position: absolute;
-  top: 74px;
+  top: calc(var(--hud-bottom, 73px) + 4px);
   left: 10px;
   z-index: 4;
   display: flex;
