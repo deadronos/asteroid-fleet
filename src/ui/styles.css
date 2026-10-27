@@ -989,3 +989,28 @@ label.button:hover {
   flex-wrap: wrap;
   align-items: center;
 }
+
+.goals {
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  background: rgba(10, 16, 28, 0.6);
+  border: 1px solid #2a3a55;
+  border-radius: 6px;
+  font-size: 12px;
+}
+.goals ul {
+  list-style: none;
+  margin: 4px 0;
+  padding: 0;
+}
+.goals li.done {
+  opacity: 0.55;
+  text-decoration: line-through;
+}
+.glossary dt {
+  font-weight: 600;
+  margin-top: 6px;
+}
+.glossary dd {
+  margin: 0;
+}

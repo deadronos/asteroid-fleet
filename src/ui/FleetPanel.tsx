@@ -1,3 +1,5 @@
+import { Goals } from './Goals';
+import { creditsShort } from '../sim/costs';
 import { useState } from 'react';
 import { engine, useGame } from '../game/engine';
 import { focus } from '../render/focus';
@@ -6,6 +8,7 @@ import {
   HANGAR_SLOT_COST,
   HANGAR_TYPES,
   hangarLocked,
+  tierHint,
   HANGAR_UPKEEP,
   MODULE_IDS,
   MODULE_SLOTS,
@@ -53,8 +56,8 @@ const modeLabel = (ship: Ship) =>
   ship.cls === 'hauler' && ship.mode === 'toDropoff' ? 'salvaging' : MODE_LABEL[ship.mode];
 
 const UNLOCK_HINT: Partial<Record<ShipClass, string>> = {
-  fighter: 'Reach the frontier',
-  repair: 'Reach the frontier',
+  fighter: tierHint(2),
+  repair: tierHint(2),
   harvester: 'Research the fusion reactor',
 };
 
@@ -217,9 +220,9 @@ function HangarBoard({
           {used}/{h.slots}
         </span>
         <button
-          disabled={s.credits < HANGAR_SLOT_COST(h.slots)}
+          disabled={!!creditsShort(s, HANGAR_SLOT_COST(h.slots))}
           onClick={() => engine.dispatch({ type: 'buySlot', hangarId: h.id })}
-          title="Buy one more slot"
+          title={creditsShort(s, HANGAR_SLOT_COST(h.slots)) ?? 'Buy one more slot'}
         >
           +slot {fmt(HANGAR_SLOT_COST(h.slots))}
         </button>
@@ -454,7 +457,13 @@ function ShipShop({ hangarId }: { hangarId: number }) {
             key={c}
             disabled={!unlocked || !affordable}
             onClick={() => engine.dispatch({ type: 'buyShip', cls: c, hangarId })}
-            title={st.role}
+            title={
+              !unlocked
+                ? (UNLOCK_HINT[c] ?? 'Locked')
+                : !affordable
+                  ? `Need ${Math.ceil(cost)} credits`
+                  : st.role
+            }
           >
             <span>
               <i className="swatch" style={{ background: st.color }} />
@@ -493,6 +502,7 @@ export function FleetPanel() {
   const hangarCount = f.ids.length;
   return (
     <>
+      <Goals />
       <h3>Shipyard · builds into Hangar {sel}</h3>
       <ShipShop hangarId={sel} />
       <h3>Hangars</h3>

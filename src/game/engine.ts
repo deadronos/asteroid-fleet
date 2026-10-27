@@ -310,6 +310,12 @@ class Engine {
     this.emit();
   }
 
+  /** Local info toast (UI feedback that never touches the sim). */
+  notify(text: string) {
+    this.toasts.push({ text, severity: 'info', carrierId: null });
+    this.emit();
+  }
+
   /** Drop a toast. The next one waiting takes the free slot. */
   dismissToast(key: string | null) {
     this.toasts.dismiss(key);

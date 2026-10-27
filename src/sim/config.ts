@@ -184,11 +184,18 @@ export const HANGAR_TYPES: Record<HangarType, HangarTypeDef> = {
   },
 };
 
+/** What to do to unlock content gated behind a system tier (single source for every hint). */
+export function tierHint(tier: number): string {
+  return tier >= 3
+    ? 'Warp to a Deep space system (Star map / Carrier tab)'
+    : 'Warp to a Frontier system (Star map / Carrier tab)';
+}
+
 /** Why a hangar type can't be installed yet, or null. */
 export function hangarLocked(type: HangarType, furthestTier: number): string | null {
   const t = HANGAR_TYPES[type].tier;
   if (furthestTier >= t) return null;
-  return `${HANGAR_TYPES[type].name}s unlock in ${t === 2 ? 'the frontier' : 'deep space'}`;
+  return `${HANGAR_TYPES[type].name}s: ${tierHint(t)}`;
 }
 
 export const BASE_STORAGE = 2000;
@@ -633,7 +640,7 @@ export const COMPRESSOR_CARGO = 1.4;
 export function moduleLocked(id: ModuleId, cls: ShipClass, furthestTier: number): string | null {
   const m = MODULES[id];
   if (!m.fits.includes(cls)) return `${m.name} does not fit a ${SHIP_STATS[cls].short}`;
-  if (furthestTier < m.tier) return `${m.name}s unlock in the frontier`;
+  if (furthestTier < m.tier) return `${m.name}s: ${tierHint(m.tier)}`;
   return null;
 }
 

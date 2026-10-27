@@ -24,6 +24,7 @@ import { Hud } from './Hud';
 import { useStackLayout } from './layout';
 import { fmt, formatSimTime } from './format';
 import { GearButton } from './GearButton';
+import { tierHint } from '../sim/config';
 import { Modal } from './Modal';
 import { Tabs } from './Tabs';
 
@@ -176,6 +177,24 @@ function Help({ onClose }: { onClose: () => void }) {
           <b>Research</b>: prestige resets the operation for research points that persist.
         </li>
       </ul>
+      <h3>Glossary</h3>
+      <dl className="glossary">
+        <dt>Tiers</dt>
+        <dd>
+          Starter, Frontier and Deep space systems. {tierHint(2)} to unlock fighters, repair ships
+          and more; Deep space is further out still.
+        </dd>
+        <dt>RP</dt>
+        <dd>Research points. Only a Prestige pays them; they buy research and persist.</dd>
+        <dt>Prestige</dt>
+        <dd>Resets credits, ships and position for RP. Research and discoveries stay.</dd>
+        <dt>Admiralty Marks</dt>
+        <dd>Paid by an Admiralty reset, spent in the Admiralty shop (Research tab).</dd>
+        <dt>Admiralty reset</dt>
+        <dd>
+          The bigger reset: also clears research and discovered systems. Marks and milestones stay.
+        </dd>
+      </dl>
       <p className="hint">
         Drag to orbit, scroll to zoom, right-drag to pan. Zoom far out (or press Tactical) for the
         sensor view. The game saves itself and keeps working at reduced rate while you are away.
@@ -357,7 +376,11 @@ export function App() {
         autoTactical={autoTactical}
         quality={settings.quality}
         onTactical={() => setTactical((v) => !v)}
-        onQuality={() => updateSettings({ quality: settings.quality === 'high' ? 'low' : 'high' })}
+        onQuality={() => {
+          const quality = settings.quality === 'high' ? 'low' : 'high';
+          updateSettings({ quality });
+          engine.notify(`Quality: ${quality === 'high' ? 'High' : 'Low'}`);
+        }}
         onMap={() => setMap(true)}
       />
       <CarrierBar />
@@ -447,7 +470,13 @@ export function App() {
         </Suspense>
       )}
       {map && (
-        <Suspense fallback={null}>
+        <Suspense
+          fallback={
+            <div className="modal-bg" role="status">
+              <div className="modal">Loading star map…</div>
+            </div>
+          }
+        >
           <StarMap onClose={() => setMap(false)} />
         </Suspense>
       )}
