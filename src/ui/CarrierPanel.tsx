@@ -5,7 +5,6 @@ import {
   REFINE_ENERGY,
   REFINERY_COST,
   HULLS,
-  REFIT_COST,
   FUSION_RATE,
   HANGAR_UPKEEP,
   SHIP_STATS,
@@ -15,10 +14,10 @@ import {
 } from '../sim/config';
 import { lvl, repeatEffect } from '../sim/research';
 import { jumpCost, refineThroughput, solarRate, upkeep } from '../sim/state';
-import { hasShipyard } from '../sim/shipyard';
 import { cargoCap } from '../sim/tick';
 import { SHIP_CLASSES, type Sim } from '../sim/types';
 import { fmt } from './format';
+import { Shipyard } from './Shipyard';
 
 /** Rough per-link rates for the throughput = min(...) readout. Ore units per second. */
 function throughput(s: Sim) {
@@ -135,34 +134,7 @@ export function CarrierPanel() {
         {HULLS[s.carrier.hullClass].name}: {HULLS[s.carrier.hullClass].blurb}
       </p>
 
-      {s.hulls.length > 1 && (
-        <>
-          <h3>Shipyard</h3>
-          {hasShipyard(s) ? (
-            <>
-              <p className="hint">
-                Change hull for {fmt(REFIT_COST)} cr. Ships that no longer fit move to free space or
-                are sold back at half price.
-              </p>
-              <div className="row">
-                {s.hulls.map((id) => (
-                  <button
-                    key={id}
-                    className={id === s.carrier.hullClass ? 'on' : ''}
-                    disabled={id === s.carrier.hullClass || s.credits < REFIT_COST || !!s.warp}
-                    title={HULLS[id].blurb}
-                    onClick={() => engine.dispatch({ type: 'refit', hull: id })}
-                  >
-                    {HULLS[id].name}
-                  </button>
-                ))}
-              </div>
-            </>
-          ) : (
-            <p className="hint">Refit needs a shipyard: return to a starter system.</p>
-          )}
-        </>
-      )}
+      {s.hulls.length > 1 && <Shipyard />}
 
       <h3>Refinery · level {s.carrier.refinery}</h3>
       <div className="row">
