@@ -38,3 +38,23 @@ export function isDoubleMiss(now: number): boolean {
 export function easeFactor(dt: number, rate: number): number {
   return 1 - Math.exp(-Math.max(0, dt) * rate);
 }
+
+/** Camera distance above which tactical turns on by itself. */
+export const AUTO_TACTICAL_ON = 200;
+/** Camera distance below which auto-tactical turns back off; lower than ON so it does not flicker. */
+export const AUTO_TACTICAL_OFF = 160;
+
+/**
+ * One frame of the tactical toggle / auto-tactical state machine. Switching tactical off by hand
+ * always resets the camera and clears auto; otherwise auto flips with hysteresis on camera distance.
+ */
+export function stepTactical(s: {
+  wasTactical: boolean;
+  tactical: boolean;
+  auto: boolean;
+  dist: number;
+}): { resetCamera: boolean; auto: boolean } {
+  if (s.wasTactical && !s.tactical) return { resetCamera: true, auto: false };
+  const auto = s.auto ? s.dist >= AUTO_TACTICAL_OFF : s.dist > AUTO_TACTICAL_ON;
+  return { resetCamera: false, auto };
+}

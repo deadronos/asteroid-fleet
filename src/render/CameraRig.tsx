@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { engine, lerpPos } from '../game/engine';
 import type { Vec3 } from '../sim/types';
-import { easeFactor, focus, resolveFocus } from './focus';
+import { easeFactor, focus, resolveFocus, stepTactical } from './focus';
 
 const FOCUS_DISTANCE = 45;
 const FOLLOW_RATE = 7;
@@ -80,15 +80,18 @@ export function CameraRig({
 
     if (tactical && !wasTactical.current) {
       camera.position.set(c.target.x, c.target.y + 230, c.target.z + 1);
-    } else if (!tactical && wasTactical.current && !autoOn.current) {
-      camera.position.set(c.target.x + 40, c.target.y + 28, c.target.z + 55);
     }
+    const step = stepTactical({
+      wasTactical: wasTactical.current,
+      tactical,
+      auto: autoOn.current,
+      dist: camera.position.distanceTo(c.target),
+    });
+    if (step.resetCamera) camera.position.set(c.target.x + 40, c.target.y + 28, c.target.z + 55);
     wasTactical.current = tactical;
-    const d = camera.position.distanceTo(c.target);
-    const shouldAuto = d > 190;
-    if (shouldAuto !== autoOn.current) {
-      autoOn.current = shouldAuto;
-      onAutoTactical(shouldAuto);
+    if (step.auto !== autoOn.current) {
+      autoOn.current = step.auto;
+      onAutoTactical(step.auto);
     }
     c.update();
   });
