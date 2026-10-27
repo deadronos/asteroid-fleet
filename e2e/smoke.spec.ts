@@ -65,8 +65,6 @@ test('saving goes through the worker and survives a reload', async ({ page }) =>
   const saved = await state();
   await page.getByRole('button', { name: 'Save now' }).click();
   await expect(page.getByText('Saved.')).toBeVisible();
-  // Reloading while the app is still starting aborts the navigation (ERR_ABORTED).
-  await engineReady(page);
   await page.reload();
   const loaded = await state();
   expect(loaded.seed).toBe(saved.seed);

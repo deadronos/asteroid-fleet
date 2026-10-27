@@ -54,7 +54,7 @@ describe('Hud', () => {
     );
     cleanup = m.cleanup;
     expect(m.el.querySelector('.hud')?.textContent).toContain('Credits');
-    expect(m.el.querySelector('.hud .chip .v')?.textContent).toMatch(/1[.,]?23/);
+    expect(m.el.querySelector('.hud .chip .v')?.textContent).toMatch(/^1[.,\s]?234$/);
   });
 });
 
@@ -63,6 +63,7 @@ describe('FleetPanel', () => {
     const poor = game();
     focused(poor).credits = 0;
     let m = await mount(<FleetPanel />, poor);
+    cleanup = m.cleanup;
     expect(m.button(/\+slot/)!.disabled).toBe(true);
     const buys = [...m.el.querySelectorAll<HTMLButtonElement>('.row button')].filter(
       (b) => b.title.length > 0 || b.disabled,
@@ -70,6 +71,7 @@ describe('FleetPanel', () => {
     expect(buys.length).toBeGreaterThan(0);
     expect(buys.every((b) => b.disabled)).toBe(true);
     await m.cleanup();
+    cleanup = null;
 
     const rich = game();
     focused(rich).credits = 1_000_000;
@@ -87,7 +89,7 @@ describe('FleetPanel', () => {
 });
 
 describe('CarrierPanel', () => {
-  it('gives a reason on disabled warp buttons and enables a charted system', async () => {
+  it('gives a reason on every disabled warp button', async () => {
     const s = game(7);
     const m = await mount(<CarrierPanel />, s);
     cleanup = m.cleanup;

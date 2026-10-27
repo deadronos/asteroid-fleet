@@ -23,8 +23,10 @@ jobs:
       # Balance is opt-in (`pnpm run balance`, BALANCE=1) and must stay out of CI.
       - run: pnpm run test:coverage
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: coverage
+          if-no-files-found: ignore
           path: coverage/lcov.info
       - run: pnpm run build
       - run: pnpm run check:bundle
