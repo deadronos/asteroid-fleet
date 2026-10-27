@@ -1,9 +1,29 @@
 // Combat: fighters, scouts, repair drones, pirate waves and pirate AI.
 
 import {
+  AGGRESSIVE_CARRIER_SENSOR_MULT,
+  AGGRESSIVE_ORBIT_RADIUS,
   CARRIER_SENSOR,
+  DEFENSIVE_VICTIM_RANGE,
+  ESCORT_ATTACKER_RANGE,
+  ESCORT_NEAR,
+  ESCORT_ORBIT_RADIUS,
   GAS_PIRATE_HARVESTER_BIAS,
+  HEAT_CARGO_PER_TIER,
+  PATROL_ORBIT_RADIUS,
   PIRATE_BASE,
+  PIRATE_DAMAGE_PER_DISTANCE,
+  PIRATE_HULL_PER_DISTANCE,
+  PIRATE_SPAWN_HEIGHT,
+  PIRATE_SPAWN_JITTER,
+  PIRATE_SPAWN_RADIUS,
+  SCOUT_ORBIT_RADIUS,
+  STORM_DURATION,
+  STORM_GAP,
+  WAVE_INTERVAL_JITTER,
+  WAVE_SIZE_BASE,
+  WAVE_SIZE_PER_DISTANCE,
+  WAVE_SIZE_PER_TIER,
   SHIP_STATS,
   SURVEY_RADIUS,
   VEIN_SCAN_RADIUS,
@@ -35,7 +55,15 @@ export function cargoHeat(s: Sim): number {
 
 export function heatFactor(s: Sim): number {
   const tier = s.systems[s.systemId].tier;
-  return 1 + Math.min(2, cargoHeat(s) / (2500 * tier));
+  return 1 + Math.min(2, cargoHeat(s) / (HEAT_CARGO_PER_TIER * tier));
+}
+
+/** Pirates in the next wave: grows with system distance and tier, scaled by cargo heat. */
+export function waveSize(s: Sim): number {
+  const sys = s.systems[s.systemId];
+  const base =
+    WAVE_SIZE_BASE + sys.distance * WAVE_SIZE_PER_DISTANCE + (sys.tier - 2) * WAVE_SIZE_PER_TIER;
+  return Math.max(1, Math.round(base * heatFactor(s)));
 }
 
 export function waveWarning(s: Sim): number {
@@ -48,7 +76,10 @@ function fighterTarget(s: Sim, ship: Ship, ctx: Ctx, engagement: string): Pirate
   const sensor = SHIP_STATS.fighter.sensor;
   if (engagement === 'passive') return null;
   if (engagement === 'aggressive')
-    return nearestPirate(s, ship.pos, sensor) ?? nearestPirate(s, s.carrier.pos, sensor * 1.5);
+    return (
+      nearestPirate(s, ship.pos, sensor) ??
+      nearestPirate(s, s.carrier.pos, sensor * AGGRESSIVE_CARRIER_SENSOR_MULT)
+    );
   if (engagement === 'escort') {
     const ward = ctx.ships.get(ship.escortId);
     const anchor = ward ? ward.pos : s.carrier.pos;
@@ -56,7 +87,7 @@ function fighterTarget(s: Sim, ship: Ship, ctx: Ctx, engagement: string): Pirate
     let bd = Infinity;
     for (const p of s.pirates) {
       const d = dist(p.pos, anchor);
-      if ((p.targetId === ship.escortId && d < 40) || d < 18) {
+      if ((p.targetId === ship.escortId && d < ESCORT_ATTACKER_RANGE) || d < ESCORT_NEAR) {
         if (d < bd) {
           bd = d;
           best = p;
@@ -70,7 +101,7 @@ function fighterTarget(s: Sim, ship: Ship, ctx: Ctx, engagement: string): Pirate
   let bd = Infinity;
   for (const p of s.pirates) {
     const victim = p.targetId === CARRIER ? s.carrier.pos : ctx.ships.get(p.targetId)?.pos;
-    const engaged = victim && dist(p.pos, victim) < 20;
+    const engaged = victim && dist(p.pos, victim) < DEFENSIVE_VICTIM_RANGE;
     const nearCarrier = dist(p.pos, s.carrier.pos) < CARRIER_SENSOR;
     if (!engaged && !nearCarrier) continue;
     const d = dist(p.pos, ship.pos);
@@ -139,13 +170,13 @@ export function fighter(s: Sim, ship: Ship, dt: number, ctx: Ctx, engagement: st
   const ward = ctx.ships.get(ship.escortId);
   if (engagement === 'escort' && ward) {
     ship.mode = 'escort';
-    orbit(ship.pos, ward.pos, 5, s.time, ship.id, v);
+    orbit(ship.pos, ward.pos, ESCORT_ORBIT_RADIUS, s.time, ship.id, v);
   } else if (engagement === 'aggressive') {
     ship.mode = 'patrol';
-    orbit(ship.pos, s.carrier.pos, 32, s.time * 0.5, ship.id, v);
+    orbit(ship.pos, s.carrier.pos, AGGRESSIVE_ORBIT_RADIUS, s.time * 0.5, ship.id, v);
   } else {
     ship.mode = 'patrol';
-    orbit(ship.pos, s.carrier.pos, 12, s.time, ship.id, v);
+    orbit(ship.pos, s.carrier.pos, PATROL_ORBIT_RADIUS, s.time, ship.id, v);
   }
 }
 
@@ -184,7 +215,7 @@ export function scout(s: Sim, ship: Ship, dt: number, ctx: Ctx) {
   if (target < 0) {
     ship.mode = 'patrol';
     ship.targetId = -1;
-    orbit(ship.pos, s.carrier.pos, 75, s.time * 0.15, ship.id * 1.7, v);
+    orbit(ship.pos, s.carrier.pos, SCOUT_ORBIT_RADIUS, s.time * 0.15, ship.id * 1.7, v);
     // A full lap later, sweep again.
     if (r.clusters.length >= centers.length && Math.floor(s.time * 10) % 600 === ship.id % 600)
       r.clusters.length = 0;
@@ -263,7 +294,7 @@ export function threats(s: Sim, dt: number) {
   const warn = waveWarning(s);
   if (!w.warning && w.timer <= warn) {
     w.warning = true;
-    w.size = Math.max(1, Math.round((1 + sys.distance * 0.7 + (sys.tier - 2) * 2) * heatFactor(s)));
+    w.size = waveSize(s);
     emit(s, 'PirateWaveIncoming', { size: w.size, eta: Math.ceil(w.timer) });
   }
   if (w.timer <= 0) {
@@ -271,26 +302,32 @@ export function threats(s: Sim, dt: number) {
     w.active = true;
     const r = seeded(s.rng ^ 0x77);
     const a = r() * Math.PI * 2;
-    const scale = 1 + sys.distance * 0.25;
+    const scale = 1 + sys.distance * PIRATE_HULL_PER_DISTANCE;
     for (let i = 0; i < w.size; i++) {
       const pos = {
-        x: s.carrier.pos.x + Math.cos(a) * 110 + randRange(s, -10, 10),
-        y: randRange(s, -6, 6),
-        z: s.carrier.pos.z + Math.sin(a) * 110 + randRange(s, -10, 10),
+        x:
+          s.carrier.pos.x +
+          Math.cos(a) * PIRATE_SPAWN_RADIUS +
+          randRange(s, -PIRATE_SPAWN_JITTER, PIRATE_SPAWN_JITTER),
+        y: randRange(s, -PIRATE_SPAWN_HEIGHT, PIRATE_SPAWN_HEIGHT),
+        z:
+          s.carrier.pos.z +
+          Math.sin(a) * PIRATE_SPAWN_RADIUS +
+          randRange(s, -PIRATE_SPAWN_JITTER, PIRATE_SPAWN_JITTER),
       };
       s.pirates.push({
         id: s.nextId++,
         pos,
         hull: PIRATE_BASE.hull * scale,
         maxHull: PIRATE_BASE.hull * scale,
-        damage: PIRATE_BASE.damage * (1 + sys.distance * 0.15),
+        damage: PIRATE_BASE.damage * (1 + sys.distance * PIRATE_DAMAGE_PER_DISTANCE),
         speed: PIRATE_BASE.speed,
         targetId: -1,
         fireCooldown: 0,
       });
     }
     emit(s, 'PiratesArrived', { size: w.size });
-    w.timer = WAVE_INTERVAL(sys.tier) * randRange(s, 0.8, 1.2);
+    w.timer = WAVE_INTERVAL(sys.tier) * randRange(s, ...WAVE_INTERVAL_JITTER);
   }
   // Solar storms in the frontier and beyond; H2 storms at gas giants.
   const st = s.storm;
@@ -300,8 +337,8 @@ export function threats(s: Sim, dt: number) {
   } else {
     st.timer -= dt;
     if (st.timer <= 0) {
-      st.active = 20;
-      st.timer = randRange(s, 120, 220);
+      st.active = STORM_DURATION;
+      st.timer = randRange(s, ...STORM_GAP);
       emit(s, 'StormStarted', { h2: s.systems[s.systemId].gasGiant });
     }
   }

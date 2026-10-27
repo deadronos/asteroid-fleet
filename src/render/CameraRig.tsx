@@ -4,6 +4,7 @@ import { useRef } from 'react';
 import * as THREE from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { engine } from '../game/engine';
+import { CAMERA_OFFSET } from './constants';
 import { fleetFrame } from './frameState';
 import type { Vec3 } from '../sim/types';
 import { useHotkeys } from '../ui/hotkeys';
@@ -96,7 +97,12 @@ export function CameraRig({
       auto: autoOn.current,
       dist: camera.position.distanceTo(c.target),
     });
-    if (step.resetCamera) camera.position.set(c.target.x + 40, c.target.y + 28, c.target.z + 55);
+    if (step.resetCamera)
+      camera.position.set(
+        c.target.x + CAMERA_OFFSET[0],
+        c.target.y + CAMERA_OFFSET[1],
+        c.target.z + CAMERA_OFFSET[2],
+      );
     wasTactical.current = tactical;
     if (step.auto !== autoOn.current) {
       autoOn.current = step.auto;

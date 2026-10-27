@@ -83,12 +83,17 @@ export function dockRepairRate(s: Sim, shipId: number): number {
   return rate * (1 + 0.3 * lvl(s, 'repair'));
 }
 
+/** Take a ship out of every hangar slot it occupies. */
+export function removeFromHangars(s: Sim, shipId: number) {
+  for (const h of s.hangars) h.items = h.items.filter((it) => it.shipId !== shipId);
+}
+
 export function moveShip(s: Sim, shipId: number, toHangar: number, start: number): boolean {
   const ship = s.ships.find((x) => x.id === shipId);
   const target = s.hangars.find((h) => h.id === toHangar);
   if (!ship || !target) return false;
   if (!fits(s, target, ship.cls, start, shipId)) return false;
-  for (const h of s.hangars) h.items = h.items.filter((it) => it.shipId !== shipId);
+  removeFromHangars(s, shipId);
   target.items.push({ shipId, start });
   ship.hangarId = target.id;
   return true;

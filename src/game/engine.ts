@@ -462,9 +462,13 @@ class Engine {
   getVersion = () => this.version;
 }
 
+declare global {
+  // Handy for debugging and balancing from the browser console.
+  var __fleet: Engine;
+}
+
 export const engine = new Engine();
-// Handy for debugging and balancing from the browser console.
-(globalThis as unknown as { __fleet: Engine }).__fleet = engine;
+globalThis.__fleet = engine;
 
 /**
  * Re-render on UI ticks. With a selector the component re-renders only when the selected value

@@ -10,6 +10,7 @@ import {
   CARRIER_COST,
   OFFLINE_CAP_S,
   OFFLINE_EFFICIENCY,
+  SCRAP_REFUND,
   SHIP_STATS,
   WARP_CHARGE,
   warpPayment,
@@ -18,7 +19,7 @@ import {
 import { cardSlots, checkCard, nextCardId } from './cards';
 import { autoBuyUnlocked, autoRebuildUnlocked, engagementUnlocked } from './automation';
 import { CHALLENGES, shipBanned } from './modifiers';
-import { moveShip as moveOnBoard } from './hangar';
+import { moveShip as moveOnBoard, removeFromHangars } from './hangar';
 import { carrierSlots } from './milestones';
 import { buyAdmiralty } from './admiralty';
 import { buyResearch as buyNode, lvl, RESEARCH_BY_ID } from './research';
@@ -130,9 +131,9 @@ export function order(s: Sim, c: Order): string | null {
       const ship = s.ships.find((x) => x.id === c.shipId);
       if (!ship) return 'No such ship';
       if (ship.mode !== 'docked') return 'Ship must be docked';
-      s.credits += Math.round(SHIP_STATS[ship.cls].cost * 0.5);
+      s.credits += Math.round(SHIP_STATS[ship.cls].cost * SCRAP_REFUND);
       s.ships = s.ships.filter((x) => x.id !== ship.id);
-      for (const h of s.hangars) h.items = h.items.filter((it) => it.shipId !== ship.id);
+      removeFromHangars(s, ship.id);
       return null;
     }
     case 'fitModule': {

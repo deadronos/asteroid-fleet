@@ -536,6 +536,44 @@ export const REFIT_COST = 5000;
 export const WAVE_INTERVAL = (tier: number) => (tier >= 3 ? 70 : 110);
 export const WAVE_WARNING = 15;
 export const PIRATE_BASE = { hull: 45, damage: 5, speed: 9 };
+/** Wave size = (base + distance * per-distance + (tier - 2) * per-tier) * heat factor, min 1. */
+export const WAVE_SIZE_BASE = 1;
+export const WAVE_SIZE_PER_DISTANCE = 0.7;
+export const WAVE_SIZE_PER_TIER = 2;
+/** Cargo value per system tier that adds +1 (capped at +2) to the pirate heat factor. */
+export const HEAT_CARGO_PER_TIER = 2500;
+/** Pirate hull scales by 1 + distance * this; damage by 1 + distance * PIRATE_DAMAGE_PER_DISTANCE. */
+export const PIRATE_HULL_PER_DISTANCE = 0.25;
+export const PIRATE_DAMAGE_PER_DISTANCE = 0.15;
+/** Pirates spawn this far from the carrier, with this much random scatter on each axis. */
+export const PIRATE_SPAWN_RADIUS = 110;
+export const PIRATE_SPAWN_JITTER = 10;
+export const PIRATE_SPAWN_HEIGHT = 6;
+/** Next wave arrives at WAVE_INTERVAL * a random factor in this range. */
+export const WAVE_INTERVAL_JITTER: [number, number] = [0.8, 1.2];
+/** Solar storm length, and the random gap between storms (seconds). */
+export const STORM_DURATION = 20;
+export const STORM_GAP: [number, number] = [120, 220];
+
+// ---------- Fighter / scout behaviour ----------
+
+/** Escort fighters engage pirates within ESCORT_NEAR of the ward, or ESCORT_ATTACKER_RANGE if they target it. */
+export const ESCORT_NEAR = 18;
+export const ESCORT_ATTACKER_RANGE = 40;
+/** Defensive fighters engage pirates this close to a victim. */
+export const DEFENSIVE_VICTIM_RANGE = 20;
+/** Aggressive fighters fall back to hunting this multiple of sensor range around the carrier. */
+export const AGGRESSIVE_CARRIER_SENSOR_MULT = 1.5;
+/** Patrol orbit radii around the ward or carrier. */
+export const ESCORT_ORBIT_RADIUS = 5;
+export const AGGRESSIVE_ORBIT_RADIUS = 32;
+export const PATROL_ORBIT_RADIUS = 12;
+export const SCOUT_ORBIT_RADIUS = 75;
+
+/** Share of a ship's build cost refunded when it is scrapped. */
+export const SCRAP_REFUND = 0.5;
+/** Ore value rises by 1 per this much distance of the cluster from the origin. */
+export const ORE_VALUE_DISTANCE_SCALE = 140;
 
 // ---------- Gas giants ----------
 

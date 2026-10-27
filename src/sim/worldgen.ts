@@ -1,4 +1,10 @@
-import { ZONE_RULE_UNLOCKS, ZONE_UNLOCKS, ORE_BY_TIER, STARTER_RULES } from './config';
+import {
+  ORE_VALUE_DISTANCE_SCALE,
+  ZONE_RULE_UNLOCKS,
+  ZONE_UNLOCKS,
+  ORE_BY_TIER,
+  STARTER_RULES,
+} from './config';
 import { addPreset } from './cards';
 import { challengeBonus } from './modifiers';
 import { onSphere, seeded, v3 } from './math';
@@ -91,7 +97,7 @@ export function spawnAsteroid(
     value:
       ore.value *
       sys.oreMult *
-      (1 + far / 140) *
+      (1 + far / ORE_VALUE_DISTANCE_SCALE) *
       (1 + 0.1 * lvl(s, 'rich')) *
       (1 + richBonus) *
       (1 + challengeBonus(s)) *
