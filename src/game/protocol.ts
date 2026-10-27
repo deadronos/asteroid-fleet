@@ -46,6 +46,8 @@ export type InMsg =
   | { t: 'admiralty' }
   | { t: 'challenge'; id: ChallengeId; hull?: HullId }
   | { t: 'replace'; state: GameState; epoch: number }
+  /** The main thread handled one pump-driven frame or state; the sim may send another. */
+  | { t: 'ack' }
   | { t: 'snapshot'; id: number };
 
 /**

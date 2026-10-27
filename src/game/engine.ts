@@ -71,7 +71,8 @@ class Engine {
 
   private host: SimHost | null = null;
   /** Pending while `init` loads the save; the sim host does not exist yet. */
-  private starting: Promise<void> | null = null;
+  private started!: () => void;
+  private starting: Promise<void> = new Promise((r) => (this.started = r));
   private version = 0;
   private listeners = new Set<() => void>();
   private ships = new Map<number, Ship>();
@@ -84,8 +85,6 @@ class Engine {
   private writeFailures = new Set<string>();
 
   async init(preferWorker = true) {
-    let started: (() => void) | undefined;
-    this.starting = new Promise((r) => (started = r));
     const saved = await loadGame();
     let state = newGame();
     let settle = false;
@@ -97,7 +96,7 @@ class Engine {
       this.saveBackupFailed = !saved.backedUp;
     }
     this.host = createSimHost((msg) => this.onSimMessage(msg), preferWorker);
-    started?.();
+    this.started();
     const first = new Promise<void>((r) => (this.ready = r));
     this.host.post({ t: 'init', state, now: Date.now(), settle, epoch: this.epoch });
     await first;
@@ -138,6 +137,7 @@ class Engine {
   private receive(msg: OutMsg) {
     switch (msg.t) {
       case 'state':
+        this.host?.post({ t: 'ack' });
         this.carriers = msg.snap.carriers;
         this.adopt(applySnapshot(this.state, msg.snap));
         if (msg.offline) this.offline = msg.offline;
@@ -148,6 +148,7 @@ class Engine {
         this.emit();
         return;
       case 'frame':
+        this.host?.post({ t: 'ack' });
         this.applyFrame(msg);
         return;
       case 'events': {

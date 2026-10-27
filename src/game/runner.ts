@@ -18,6 +18,7 @@ import { encodeSnapshot } from './snapshot';
 const TICK_MS = DT * 1000;
 const MAX_CATCHUP_TICKS = 600; // a minute of sim; longer gaps go through offline settlement
 const UI_HZ = 5;
+const MAX_INFLIGHT = 4;
 
 export type Post = (msg: OutMsg, transfer?: Transferable[]) => void;
 
@@ -33,6 +34,8 @@ export class SimRunner {
   private lastPump = 0;
   private lastUi = 0;
   private dirty = false;
+  /** Pump-driven frames and states the main thread has not acknowledged yet. */
+  private inflight = 0;
   private offline: OfflineReport | null = null;
   /** System whose `fields` the UI last got; they only change on a jump. */
   private fieldsAt: number | null = null;
@@ -114,6 +117,9 @@ export class SimRunner {
         this.sendState();
         this.sendFrame();
         return;
+      case 'ack':
+        this.inflight = Math.max(0, this.inflight - 1);
+        return;
       case 'snapshot':
         if (this.state) this.post({ t: 'snapshot', id: msg.id, state: this.state });
         return;
@@ -160,12 +166,15 @@ export class SimRunner {
       this.acc -= TICK_MS;
       ticks++;
     }
+    // A busy main thread must not fall behind an ever-growing queue: a request's reply
+    // would wait behind it. Skip pump-driven output until it has caught up.
+    const saturated = this.inflight >= MAX_INFLIGHT;
     if (ticks > 0) {
       this.dirty = true;
-      this.sendFrame();
+      if (!saturated) this.sendFrame(true);
     }
     this.sendEvents();
-    if (this.dirty && now - this.lastUi > 1000 / UI_HZ) this.sendState(now);
+    if (this.dirty && !saturated && now - this.lastUi > 1000 / UI_HZ) this.sendState(now, true);
   }
 
   /** A new state (a load, an import, a new run) starts with no open merges. */
@@ -229,14 +238,16 @@ export class SimRunner {
     this.post({ t: 'events', epoch: this.epoch, events });
   }
 
-  private sendFrame() {
+  private sendFrame(counted = false) {
     if (!this.state) return;
+    if (counted) this.inflight++;
     const { frame, transfer } = encodeFrame(focusOp(this.state));
     this.post(frame, transfer);
   }
 
-  private sendState(now = this.now()) {
+  private sendState(now = this.now(), counted = false) {
     if (!this.state) return;
+    if (counted) this.inflight++;
     this.lastUi = now;
     this.dirty = false;
     const s = this.state;
