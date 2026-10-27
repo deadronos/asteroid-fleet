@@ -27,6 +27,9 @@ export default defineConfig({
   plugins: [react()],
   base: '/asteroid-fleet/',
   build: {
+    // three.js alone is ~740 kB minified by design; scripts/check-bundle.mjs enforces the real
+    // gzip budgets, so the generic size warning is just noise.
+    chunkSizeWarningLimit: 800,
     rolldownOptions: {
       output: {
         codeSplitting: {
