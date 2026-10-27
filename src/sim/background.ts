@@ -6,9 +6,10 @@
 // operation and the run-wide state, never on what else was stepped. `settleOffline` plays
 // the same model over the time away (Tier C).
 
-import { WAVE_INTERVAL } from './config';
+import { STORM_DURATION, STORM_GAP, WAVE_INTERVAL, WAVE_INTERVAL_JITTER } from './config';
 import { queueRebuild } from './automation';
-import { heatFactor, waveWarning } from './combat';
+import { waveSize, waveWarning } from './combat';
+import { removeFromHangars } from './hangar';
 import { onSphere, rand, randRange } from './math';
 import { reserveDefs } from './research';
 import {
@@ -155,14 +156,14 @@ function timers(s: Sim, dt: number, ev: boolean): number {
   w.timer -= dt;
   if (!w.warning && w.timer <= waveWarning(s)) {
     w.warning = true;
-    w.size = Math.max(1, Math.round((1 + sys.distance * 0.7 + (sys.tier - 2) * 2) * heatFactor(s)));
+    w.size = waveSize(s);
     if (ev) emit(s, 'PirateWaveIncoming', { size: w.size, eta: Math.ceil(w.timer) });
   }
   if (w.timer <= 0) {
     w.warning = false;
     lost = rollWave(s, w.size, ev);
     if (ev) emit(s, 'WaveRepelled', {});
-    w.timer = WAVE_INTERVAL(sys.tier) * randRange(s, 0.8, 1.2);
+    w.timer = WAVE_INTERVAL(sys.tier) * randRange(s, ...WAVE_INTERVAL_JITTER);
   }
   const st = s.storm;
   if (st.active > 0) {
@@ -171,8 +172,8 @@ function timers(s: Sim, dt: number, ev: boolean): number {
   } else {
     st.timer -= dt;
     if (st.timer <= 0) {
-      st.active = 20;
-      st.timer = randRange(s, 120, 220);
+      st.active = STORM_DURATION;
+      st.timer = randRange(s, ...STORM_GAP);
       if (ev) emit(s, 'StormStarted', { h2: sys.gasGiant });
     }
   }
@@ -217,7 +218,7 @@ function rollWave(s: Sim, size: number, ev: boolean): number {
  * they would pile up and replay on `materialise`), and `ShipLost` only when events are on.
  */
 function lose(s: Sim, ship: Ship, ev: boolean) {
-  for (const h of s.hangars) h.items = h.items.filter((it) => it.shipId !== ship.id);
+  removeFromHangars(s, ship.id);
   s.stats.shipsLost++;
   queueRebuild(s, ship);
   if (ev) emit(s, 'ShipLost', { cls: ship.cls, cause: 'destroyed' });

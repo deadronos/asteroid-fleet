@@ -33,6 +33,10 @@ export interface RenderStatsData {
   otherCarriers: number;
 }
 
+declare global {
+  var __render: RenderStatsData;
+}
+
 const stats: RenderStatsData = { frame: 0, calls: 0, triangles: 0, otherCarriers: 0 };
 
 /** Draw calls and triangles per frame, summed over all passes, and the extra carriers drawn, on `__render`. */
@@ -41,7 +45,7 @@ export function RenderStats() {
   const scene = useThree((s) => s.scene);
   useEffect(() => {
     gl.info.autoReset = false;
-    (globalThis as unknown as { __render: RenderStatsData }).__render = stats;
+    globalThis.__render = stats;
     return () => {
       gl.info.autoReset = true;
     };

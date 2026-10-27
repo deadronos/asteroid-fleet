@@ -24,6 +24,7 @@ import { Fleet } from './Fleet';
 import { CLASSES, FleetPass, MAX_ENTITIES, asteroidById, fleetFrame } from './frameState';
 import { GAS_FRAG, GAS_VERT, NEBULA_FRAG, NEBULA_VERT } from './geometry';
 import { FrameCap, RenderStats } from './RenderLoop';
+import { ASTEROID_LOD, CAMERA_OFFSET, FLEET_LOD, MAX_ICONS } from './constants';
 import { ICON_SHAPE, PALETTE, SHAPES } from '../ui/palette';
 
 const Effects = lazy(() => import('./Effects'));
@@ -450,7 +451,6 @@ const ICON_COLORS: Record<string, THREE.Color> = {
 const CLASS_ICON = CLASSES.map((c) => ICON_COLORS[c]);
 const CLASS_SHAPE = CLASSES.map((c) => SHAPES.indexOf(ICON_SHAPE[c]));
 const shapeOf = (k: string) => SHAPES.indexOf(ICON_SHAPE[k]);
-const MAX_ICONS = 2048;
 
 function icon(
   pos: THREE.BufferAttribute,
@@ -502,9 +502,9 @@ function Tactical({ on }: { on: boolean }) {
   const dpr = useThree((st) => st.viewport.dpr);
   const geo = useMemo(() => {
     const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(2048 * 3), 3));
-    g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(2048 * 3), 3));
-    g.setAttribute('shape', new THREE.BufferAttribute(new Float32Array(2048), 1));
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(MAX_ICONS * 3), 3));
+    g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(MAX_ICONS * 3), 3));
+    g.setAttribute('shape', new THREE.BufferAttribute(new Float32Array(MAX_ICONS), 1));
     return g;
   }, []);
   const ring = useRef<THREE.Group>(null);
@@ -580,7 +580,7 @@ export const Scene = memo(function Scene({
   };
   return (
     <Canvas
-      camera={{ position: [40, 28, 55], fov: 55, near: 0.5, far: 3000 }}
+      camera={{ position: CAMERA_OFFSET, fov: 55, near: 0.5, far: 3000 }}
       dpr={quality === 'high' ? [1, 2] : 1}
       gl={{ antialias: quality === 'high', powerPreference: 'high-performance' }}
       frameloop="always"
@@ -589,13 +589,13 @@ export const Scene = memo(function Scene({
       <color attach="background" args={['#020308']} />
       <Sky />
       <GasGiant />
-      <AsteroidField lodDistance={quality === 'high' ? 140 : 80} />
+      <AsteroidField lodDistance={ASTEROID_LOD[quality]} />
       <Hazards />
       <Containers />
       <Carrier />
       <OtherCarriers />
       <FleetPass />
-      <Fleet lodDistance={quality === 'high' ? 120 : 70} />
+      <Fleet lodDistance={FLEET_LOD[quality]} />
       <Beams />
       <Explosions />
       <Tactical on={tactical || auto} />

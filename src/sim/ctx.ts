@@ -18,7 +18,7 @@ import {
 } from './config';
 import { compileCards, firing, type CompiledCards } from './cards';
 import { effectiveStance } from './doctrine';
-import { carrierStorage } from './hangar';
+import { carrierStorage, removeFromHangars } from './hangar';
 import { copy, dist, dist2, moveToward } from './math';
 import { admiraltyEffect } from './admiralty';
 import { lvl, repeatEffect } from './research';
@@ -361,7 +361,7 @@ export function damageCarrier(s: Sim, dmg: number) {
 
 export function destroyShip(s: Sim, ship: Ship, cause: LossCause) {
   s.fx.push({ kind: 'explosion', a: copy(ship.pos), b: copy(ship.pos), ttl: 0.8 });
-  for (const h of s.hangars) h.items = h.items.filter((it) => it.shipId !== ship.id);
+  removeFromHangars(s, ship.id);
   s.stats.shipsLost++;
   queueRebuild(s, ship);
   emit(s, 'ShipLost', { cls: ship.cls, cause });
