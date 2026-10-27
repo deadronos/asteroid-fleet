@@ -21,7 +21,7 @@ import { moveShip as moveOnBoard } from './hangar';
 import { buyResearch as buyNode, lvl } from './research';
 import { bind, createShip, emit, focused, maxEnergy, newGame } from './state';
 import { executeJump } from './tick';
-import { dematerialise, materialise, runBackground } from './background';
+import { RETURN_GRACE_S, dematerialise, materialise, runBackground } from './background';
 import type {
   GameState,
   CarrierStance,
@@ -354,6 +354,11 @@ function settleOp(s: Sim, t: number): { credits: number; rebuilt: number } {
   dematerialise(s);
   const r = runBackground(s, t, { efficiency: OFFLINE_EFFICIENCY, events: false });
   s.carrier.shield = 1;
+  // Never come back to an imminent wave.
+  if (s.systems[s.systemId].tier > 1 && s.wave.timer < RETURN_GRACE_S) {
+    s.wave.timer = RETURN_GRACE_S;
+    s.wave.warning = false;
+  }
   materialise(s);
   emit(s, 'WelcomeBack', { credits: Math.round(r.credits) });
   return { credits: r.credits, rebuilt: r.rebuilt };

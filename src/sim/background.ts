@@ -7,12 +7,15 @@
 // the same model over the time away (Tier C).
 
 import { WAVE_INTERVAL, refineRate } from './config';
-import { destroyShip } from './ctx';
+import { queueRebuild } from './automation';
 import { heatFactor, waveWarning } from './combat';
 import { onSphere, rand, randRange } from './math';
 import { lvl, reserveDefs } from './research';
 import { createShip, emit, h2Storm, maxEnergy, solarRate, upkeepRate } from './state';
-import type { ShipClass, Sim } from './types';
+import type { Ship, ShipClass, Sim } from './types';
+
+/** Seconds before the next wave when a carrier comes back from offline, at least. */
+export const RETURN_GRACE_S = 60;
 
 /** Seconds per background step. */
 export const BG_DT = 1;
@@ -149,7 +152,7 @@ function timers(s: Sim, dt: number, ev: boolean): number {
   }
   if (w.timer <= 0) {
     w.warning = false;
-    lost = rollWave(s, w.size);
+    lost = rollWave(s, w.size, ev);
     if (ev) emit(s, 'WaveRepelled', {});
     w.timer = WAVE_INTERVAL(sys.tier) * randRange(s, 0.8, 1.2);
   }
@@ -173,7 +176,7 @@ function timers(s: Sim, dt: number, ev: boolean): number {
  * cannot hold off takes one ship, capped at the loss buffer and taken from it in
  * `BUFFER_ORDER`. The carrier and barges are never lost here.
  */
-function rollWave(s: Sim, size: number): number {
+function rollWave(s: Sim, size: number, ev: boolean): number {
   let defence = 0;
   for (const x of s.ships) if (x.cls === 'fighter' && x.mode !== 'docked') defence++;
   const p = size / (size + 2 * defence + 1);
@@ -192,12 +195,24 @@ function rollWave(s: Sim, size: number): number {
       const x = s.ships[i];
       if (x.cls !== cls) continue;
       s.ships.splice(i, 1);
-      destroyShip(s, x, 'destroyed');
+      lose(s, x, ev);
       lost++;
     }
   }
-  s.stats.piratesKilled += size;
+  // Pirates that got a hit in escaped; the rest were shot down.
+  s.stats.piratesKilled += size - hits;
   return lost;
+}
+
+/**
+ * `destroyShip` without the map: no explosion fx (nothing ticks fx in the background, so
+ * they would pile up and replay on `materialise`), and `ShipLost` only when events are on.
+ */
+function lose(s: Sim, ship: Ship, ev: boolean) {
+  for (const h of s.hangars) h.items = h.items.filter((it) => it.shipId !== ship.id);
+  s.stats.shipsLost++;
+  queueRebuild(s, ship);
+  if (ev) emit(s, 'ShipLost', { cls: ship.cls, cause: 'destroyed' });
 }
 
 /** Free reserve rebuilds, as in `reserves`. */

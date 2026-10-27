@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  RETURN_GRACE_S,
   bottleneckYield,
   dematerialise,
   lossBuffer,
@@ -7,7 +8,7 @@ import {
   runBackground,
   stepBackground,
 } from './background';
-import { order } from './actions';
+import { order, settleOffline } from './actions';
 import { newGame, bind, stateOf } from './state';
 import { stepOp, stepSim } from './tick';
 import { game } from './testing';
@@ -145,5 +146,22 @@ describe('Tier A / Tier B handover', () => {
 
   it('a round trip is deterministic', () => {
     expect(roundTrip()).toBe(roundTrip());
+  });
+});
+
+describe('Tier C', () => {
+  it('an 8 h settle on the frontier leaves no fx, no ShipLost and a grace period', () => {
+    const s = frontier(5);
+    const g = stateOf(s);
+    g.events.length = 0;
+    const lostBefore = s.stats.shipsLost;
+    const t0 = performance.now();
+    settleOffline(g, 8 * 3600);
+    expect(performance.now() - t0).toBeLessThan(2000);
+    expect(s.stats.shipsLost).toBeGreaterThan(lostBefore);
+    expect(s.fx).toEqual([]);
+    expect(g.events.some((e) => e.kind === 'ShipLost')).toBe(false);
+    expect(s.wave.timer).toBeGreaterThanOrEqual(RETURN_GRACE_S);
+    expect(s.wave.warning).toBe(false);
   });
 });
