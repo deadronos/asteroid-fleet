@@ -67,6 +67,17 @@ export async function engineReady(page: Page, timeout = 60_000): Promise<void> {
     .toBe(true);
 }
 
+/**
+ * Leave the app and come back to the same URL, which is what a reload is for the save. A plain
+ * `page.reload()` on a busy page (software GL, sim worker, pending save) intermittently fails
+ * with net::ERR_ABORTED on CI; going through about:blank lets the heavy renderer unload first.
+ */
+export async function reopenApp(page: Page): Promise<void> {
+  const url = page.url();
+  await page.goto('about:blank');
+  await page.goto(url);
+}
+
 /** The worker's exact state, through the engine's debug handle, flattened to its one operation. */
 export async function simState(page: Page): Promise<Sim> {
   await engineReady(page);

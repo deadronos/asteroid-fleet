@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { engineReady } from './helpers';
+import { engineReady, reopenApp } from './helpers';
 
 test('app loads, renders the canvas, and opens settings without console errors', async ({
   page,
@@ -65,7 +65,7 @@ test('saving goes through the worker and survives a reload', async ({ page }) =>
   const saved = await state();
   await page.getByRole('button', { name: 'Save now' }).click();
   await expect(page.getByText('Saved.')).toBeVisible();
-  await page.reload();
+  await reopenApp(page);
   const loaded = await state();
   expect(loaded.seed).toBe(saved.seed);
   expect(loaded.time).toBeGreaterThanOrEqual(saved.time);

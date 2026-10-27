@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { DOCK_RADIUS } from '../src/sim/config';
 import type { Sim } from '../src/sim/types';
-import { makeGame, openApp, run, seedSave, simState } from './helpers';
+import { makeGame, openApp, reopenApp, run, seedSave, simState } from './helpers';
 
 // Flows that rewrite saves or core state. They start from saves built with the real sim and
 // assert on structure (what resets, what persists), not on balance numbers or log strings.
@@ -65,7 +65,7 @@ test.describe('prestige and research', () => {
     await page.getByRole('tab', { name: 'Save Management' }).click();
     await page.getByRole('button', { name: 'Save now' }).click();
     await expect(page.getByText('Saved.')).toBeVisible();
-    await page.reload();
+    await reopenApp(page);
     await expect.poll(async () => (await simState(page)).lifetime.prestiges).toBe(1);
     const reloaded = await simState(page);
     expect(levels(reloaded)).toBe(levels(bought));
