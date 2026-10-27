@@ -107,6 +107,11 @@ describe('Modal', () => {
     await fire(bg, 'click');
     expect(closed).toBe(0);
     await fire(bg, 'mousedown');
+    await fire(dialog, 'mouseup');
+    await fire(bg, 'click');
+    expect(closed).toBe(0);
+    await fire(bg, 'mousedown');
+    await fire(bg, 'mouseup');
     await fire(bg, 'click');
     expect(closed).toBe(1);
     await act(async () => root.unmount());

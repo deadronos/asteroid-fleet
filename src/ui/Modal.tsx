@@ -22,7 +22,7 @@ export function Modal({
 }) {
   const titleId = useId();
   const ref = useRef<HTMLDivElement>(null);
-  const downOnBackdrop = useRef(false);
+  const press = useRef({ down: false, up: false });
   const onCloseRef = useRef(onClose);
   useEffect(() => {
     onCloseRef.current = onClose;
@@ -80,11 +80,12 @@ export function Modal({
   return (
     <div
       className="modal-bg"
-      onMouseDown={(e) => (downOnBackdrop.current = e.target === e.currentTarget)}
+      onMouseDown={(e) => (press.current = { down: e.target === e.currentTarget, up: false })}
+      onMouseUp={(e) => (press.current.up = e.target === e.currentTarget)}
       onClick={(e) => {
-        // A drag that starts inside the dialog and ends on the backdrop is not a backdrop click.
-        if (e.target === e.currentTarget && downOnBackdrop.current) onClose();
-        downOnBackdrop.current = false;
+        // A drag between dialog and backdrop (either way) is not a backdrop click.
+        if (e.target === e.currentTarget && press.current.down && press.current.up) onClose();
+        press.current = { down: false, up: false };
       }}
     >
       <div
