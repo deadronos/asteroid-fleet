@@ -1,6 +1,7 @@
 import { shipCost } from './actions';
 import { firstFit } from './hangar';
 import { lvl } from './research';
+import { shipBanned } from './modifiers';
 import { createShip, emit } from './state';
 import { SHIP_CLASSES, type Sim, type Ship, type ShipClass } from './types';
 
@@ -57,6 +58,10 @@ export function automation(s: Sim, dt: number) {
     // Oldest loss first; stop at the first one we cannot pay for, so order holds.
     while (a.rebuildQueue.length > 0) {
       const next = a.rebuildQueue[0];
+      if (shipBanned(s, next.cls)) {
+        a.rebuildQueue.shift(); // a modifier forbids it: it would block the queue forever
+        continue;
+      }
       const home = s.hangars.some((h) => h.id === next.hangarId) ? next.hangarId : s.hangars[0].id;
       const fits = s.hangars.some((h) => firstFit(s, h, next.cls) >= 0);
       if (!fits) {

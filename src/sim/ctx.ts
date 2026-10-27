@@ -20,6 +20,7 @@ import { compileCards, firing, type CompiledCards } from './cards';
 import { effectiveStance } from './doctrine';
 import { carrierStorage } from './hangar';
 import { copy, dist, dist2, moveToward } from './math';
+import { admiraltyEffect } from './admiralty';
 import { lvl, repeatEffect } from './research';
 import { emit } from './state';
 import { PointGrid } from './spatial';
@@ -299,7 +300,11 @@ export function fighterDamage(s: Sim, c: Ctx, ship: Ship): number {
 }
 
 export function miningRate(s: Sim, c: Ctx, ship: Ship): number {
-  let r = MINING_RATE * (1 + 0.15 * lvl(s, 'yield')) * (1 + repeatEffect(s, 'deepYield'));
+  let r =
+    MINING_RATE *
+    (1 + 0.15 * lvl(s, 'yield')) *
+    (1 + repeatEffect(s, 'deepYield')) *
+    (1 + admiraltyEffect(s, 'admYield'));
   if (lvl(s, 'droneSwarm') > 0) {
     const h = c.hangarOf.get(ship.id);
     const n = h ? hangarInfo(c, h).drones : 0;

@@ -18,7 +18,9 @@ import {
 } from './config';
 import { cardSlots, checkCard, nextCardId } from './cards';
 import { autoBuyUnlocked, autoRebuildUnlocked, engagementUnlocked } from './automation';
+import { CHALLENGES, shipBanned } from './modifiers';
 import { moveShip as moveOnBoard } from './hangar';
+import { buyAdmiralty } from './admiralty';
 import { buyResearch as buyNode, lvl, RESEARCH_BY_ID } from './research';
 import { bind, createShip, emit, focused, jumpCost, maxEnergy, newGame } from './state';
 import { executeJump } from './tick';
@@ -33,6 +35,8 @@ import type {
   HangarType,
   HullId,
   ModuleId,
+  ModifierId,
+  ChallengeId,
   RuleCard,
   ShipClass,
   Stance,
@@ -64,6 +68,7 @@ export type Order =
   | { type: 'setPower'; mode: Sim['powerMode'] }
   | { type: 'setCarrierStance'; stance: CarrierStance }
   | { type: 'buyResearch'; id: string }
+  | { type: 'buyAdmiralty'; id: string }
   | {
       type: 'setAutomation';
       patch: Partial<Pick<Sim['automation'], 'autoBuy' | 'autoRebuild' | 'creditFloor'>>;
@@ -94,6 +99,8 @@ export function order(s: Sim, c: Order): string | null {
   switch (c.type) {
     case 'buyShip': {
       if (!s.unlocked.includes(c.cls)) return 'Not unlocked yet';
+      const banned = shipBanned(s, c.cls);
+      if (banned) return banned;
       const cost = shipCost(s, c.cls);
       if (s.credits < cost) return 'Not enough credits';
       const ship = createShip(s, c.cls, c.hangarId, c.start);
@@ -291,6 +298,8 @@ export function order(s: Sim, c: Order): string | null {
       s.carrier.refinery++;
       return null;
     }
+    case 'buyAdmiralty':
+      return buyAdmiralty(s, c.id) ? null : 'Not enough Marks';
     case 'buyResearch':
       return buyNode(s, c.id) ? null : 'Cannot research that yet';
     case 'setAutomation': {
@@ -329,7 +338,11 @@ export function researchPayout(s: Pick<GameState, 'stats'>): number {
   return Math.floor(Math.sqrt(s.stats.oreValueDelivered / RP_DIVISOR)) * s.stats.furthestTier;
 }
 
-export function prestige(s: GameState, hull?: HullId): GameState {
+export function prestige(
+  s: GameState,
+  hull?: HullId,
+  run?: { modifiers: ModifierId[]; challenge: ChallengeId },
+): GameState {
   const rp = researchPayout(s);
   const next = newGame(s.seed + s.lifetime.prestiges + 1, {
     research: s.research + rp,
@@ -345,12 +358,31 @@ export function prestige(s: GameState, hull?: HullId): GameState {
       researchEarned: s.lifetime.researchEarned + rp,
     },
     marks: s.marks,
+    challengesDone: [...s.challengesDone],
+    modifiers: run?.modifiers,
+    challenge: run?.challenge,
+    admiralty: { ...s.admiralty },
     doctrine: structuredClone(s.doctrine),
     alerts: structuredClone(s.alerts),
     cards: structuredClone(s.cards),
     automation: structuredClone(s.automation),
   });
   emit(focused(next), 'Prestiged', { research: rp });
+  return next;
+}
+
+// ---------- challenges ----------
+
+/**
+ * Start a challenge run (#71): a prestige reset (it banks the run's RP like any other) whose new
+ * run carries the challenge's modifiers. A plain prestige or Admiralty reset drops them again.
+ * Calling it while a challenge is active restarts that attempt.
+ */
+export function startChallenge(s: GameState, id: ChallengeId, hull?: HullId): GameState | null {
+  const def = CHALLENGES[id];
+  if (!def) return null;
+  const next = prestige(s, hull, { modifiers: [...def.modifiers], challenge: id });
+  emit(focused(next), 'ChallengeStarted', { challenge: id });
   return next;
 }
 
@@ -393,6 +425,8 @@ export function admiralty(s: GameState): GameState {
     hullClass: focused(s).carrier.hullClass,
     alerts: structuredClone(s.alerts),
     marks: s.marks + marks,
+    challengesDone: [...s.challengesDone],
+    admiralty: { ...s.admiralty },
     doctrine: structuredClone(s.doctrine),
     cards: structuredClone(s.cards),
     automation: structuredClone(s.automation),

@@ -9,7 +9,7 @@ const BUDGET = {
   // Everything index.html loads before the first frame (entry + modulepreloads + css).
   // The scene (three.js + r3f), research tree and settings menu are lazy chunks that load
   // right after first paint (#41), so this covers just the HUD shell: ~101 kB + headroom.
-  initial: 116 * KB, // was 115; main had 0.1 kB left before the Admiralty panel (#68)
+  initial: 117 * KB, // was 116; challenge runs panel (#71). Was 115 before the Admiralty panel (#68)
   // Any single JS chunk; three.js is the largest.
   chunk: 200 * KB,
   // Worst-case download: everything except the sim you don't run. The sim ships twice, as the

@@ -11,7 +11,15 @@ import {
   type Branch,
 } from '../sim/research';
 import { MILESTONES, carrierSlots } from '../sim/milestones';
-import { SHIP_CLASSES, type HullId, type ShipClass } from '../sim/types';
+import { SHIP_CLASSES, type ChallengeId, type HullId, type ShipClass } from '../sim/types';
+import { CHALLENGES, CHALLENGE_IDS, MODIFIERS, challengeProgress } from '../sim/modifiers';
+import {
+  ADMIRALTY_UPGRADES,
+  admiraltyCost,
+  admiraltyEffect,
+  admiraltyLevel,
+  canBuyAdmiralty,
+} from '../sim/admiralty';
 import { fmt } from './format';
 
 const GLOBAL: Branch[] = ['Logistics', 'Mining', 'Combat', 'Carrier', 'Reserves', 'Automation'];
@@ -41,6 +49,8 @@ export function ResearchPanel() {
   const s = useGame();
   const [confirm, setConfirm] = useState(false);
   const [confirmAdm, setConfirmAdm] = useState(false);
+  const [confirmChallenge, setConfirmChallenge] = useState<ChallengeId | null>(null);
+  const progress = challengeProgress(s);
   const marks = marksPayout(s);
   const current = s.carrier.hullClass;
   const [hull, setHull] = useState<HullId | null>(null);
@@ -168,6 +178,73 @@ export function ResearchPanel() {
             <button onClick={() => setConfirmAdm(false)}>Cancel</button>
           </div>
         )}
+      </div>
+      <div className="prestige-box" aria-label="Challenge runs">
+        <div className="hint" style={{ margin: 0 }}>
+          Challenge runs
+        </div>
+        {s.modifiers.length > 0 && (
+          <p className="hint">
+            Active modifiers: {s.modifiers.map((m) => MODIFIERS[m].name).join(', ')}.
+            {s.challenge && progress !== null && ` Goal ${Math.floor(progress * 100)}% delivered.`}
+          </p>
+        )}
+        {CHALLENGE_IDS.map((id) => {
+          const def = CHALLENGES[id];
+          const done = s.challengesDone.includes(id);
+          return (
+            <div className="row" key={id}>
+              <div className="grow">
+                <b>{def.name}</b>
+                {done && ' (complete)'}
+                <div className="hint" style={{ margin: 0 }}>
+                  {def.blurb} Deliver {fmt(def.goal)} ore value with{' '}
+                  {def.modifiers.map((m) => MODIFIERS[m].name.toLowerCase()).join(' + ')}. Pays +
+                  {def.marks} Marks and +{Math.round(def.oreBonus * 100)}% ore value for good.
+                </div>
+              </div>
+              {confirmChallenge === id ? (
+                <>
+                  <button
+                    onClick={() => {
+                      engine.doChallenge(id, pick);
+                      setConfirmChallenge(null);
+                    }}
+                  >
+                    Reset and start
+                  </button>
+                  <button onClick={() => setConfirmChallenge(null)}>Cancel</button>
+                </>
+              ) : (
+                <button disabled={done} onClick={() => setConfirmChallenge(id)}>
+                  {s.challenge === id ? 'Restart…' : 'Start…'}
+                </button>
+              )}
+            </div>
+          );
+        })}
+        <p className="hint">Starting a challenge resets the operation like a prestige.</p>
+      </div>
+      <div className="branch">
+        <h3>
+          Admiralty shop <span className="hint">{fmt(s.marks)} Marks</span>
+        </h3>
+        {ADMIRALTY_UPGRADES.map((u) => (
+          <div className="row" key={u.id}>
+            <div className="grow">
+              <b>{u.name}</b>
+              <div className="hint" style={{ margin: 0 }}>
+                {u.desc} · level {fmt(admiraltyLevel(s, u.id))}: {u.label(admiraltyEffect(s, u.id))}
+              </div>
+            </div>
+            <button
+              disabled={!canBuyAdmiralty(s, u.id)}
+              onClick={() => engine.dispatch({ type: 'buyAdmiralty', id: u.id })}
+            >
+              {fmt(admiraltyCost(s, u.id))} Marks
+            </button>
+          </div>
+        ))}
       </div>
       <div className="prestige-box">
         <Pair

@@ -1,4 +1,5 @@
 import { HANGAR_TYPES, SHIP_STATS } from '../sim/config';
+import { CHALLENGES } from '../sim/modifiers';
 import type { LossCause, Severity, SimEvent, SimEventKind } from '../sim/types';
 
 const CAUSE: Record<LossCause, string> = {
@@ -71,6 +72,10 @@ export function formatEvent(ev: SimEvent): string {
       return `Operation reset. +${ev.data.research} research points.`;
     case 'Admiralty':
       return `Admiralty reset. +${ev.data.marks} Admiralty Marks.`;
+    case 'ChallengeStarted':
+      return `Challenge begun: ${CHALLENGES[ev.data.challenge].name}.`;
+    case 'ChallengeComplete':
+      return `Challenge complete: ${CHALLENGES[ev.data.challenge].name}. +${ev.data.marks} Admiralty Marks and a permanent bonus.`;
     case 'WelcomeBack':
       return `Welcome back. The fleet earned ${ev.data.credits} credits while you were away.`;
     case 'Legacy':
