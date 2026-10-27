@@ -3,11 +3,34 @@ import { engine, useGame } from '../game/engine';
 import { carrierChoices } from './inbox';
 import { carrierForKey, ignoresHotkey } from './carriers';
 import { fmt } from './format';
+import { deepEqual } from './equal';
 
 /** Carrier tabs, hotkeys 1–9 and the cut that hides a swap. Hidden with a single carrier. */
 export function CarrierBar() {
-  const s = useGame();
-  const carriers = engine.carriers;
+  // Rows hold only what is drawn, so an idle tick that changes nothing visible skips the render.
+  const bar = useGame(
+    (s) => {
+      const carriers = engine.carriers;
+      const labels = carrierChoices(carriers, s.systems);
+      return {
+        cuts: engine.cuts,
+        rows: carriers.map((c, i) => {
+          const badge = engine.unseen.get(c.id);
+          return {
+            id: c.id,
+            label: labels[i].label,
+            on: c.id === engine.focusedCarrierId,
+            hull: Math.round(c.hull * 100),
+            energy: Math.floor(c.energy),
+            income: fmt(c.income),
+            positive: c.income >= 0,
+            badge: badge ? { severity: badge.severity, count: badge.count } : null,
+          };
+        }),
+      };
+    },
+    deepEqual,
+  );
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -19,14 +42,12 @@ export function CarrierBar() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  if (carriers.length < 2) return null;
-  const labels = carrierChoices(carriers, s.systems);
+  if (bar.rows.length < 2) return null;
   return (
     <>
       <nav className="carrier-bar" aria-label="Carriers">
-        {carriers.map((c, i) => {
-          const on = c.id === engine.focusedCarrierId;
-          const badge = engine.unseen.get(c.id);
+        {bar.rows.map((c, i) => {
+          const { on, badge } = c;
           return (
             <button
               key={c.id}
@@ -35,12 +56,11 @@ export function CarrierBar() {
               aria-pressed={on}
               onClick={() => engine.focusCarrier(c.id)}
             >
-              <span className="k">{i < 9 ? i + 1 : ''}</span> {labels[i].label}
+              <span className="k">{i < 9 ? i + 1 : ''}</span> {c.label}
               <span className="sub">
                 {' '}
-                hull {Math.round(c.hull * 100)}% · energy {Math.floor(c.energy)} ·{' '}
-                {c.income >= 0 ? '+' : ''}
-                {fmt(c.income)}/s
+                hull {c.hull}% · energy {c.energy} · {c.positive ? '+' : ''}
+                {c.income}/s
               </span>
               {badge && (
                 <b
@@ -55,7 +75,7 @@ export function CarrierBar() {
         })}
       </nav>
       {/* Remounting restarts the animation on every switch. */}
-      {engine.cuts > 0 && <div key={engine.cuts} className="warp-cut" aria-hidden="true" />}
+      {bar.cuts > 0 && <div key={bar.cuts} className="warp-cut" aria-hidden="true" />}
     </>
   );
 }

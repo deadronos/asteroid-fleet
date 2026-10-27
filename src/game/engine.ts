@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from 'react';
+import { useRef, useSyncExternalStore } from 'react';
 import type { OfflineReport, Order } from '../sim/actions';
 import { focused, focusOp, newGame } from '../sim/state';
 import type {
@@ -436,10 +436,31 @@ export const engine = new Engine();
 // Handy for debugging and balancing from the browser console.
 (globalThis as unknown as { __fleet: Engine }).__fleet = engine;
 
-/** Re-render on UI ticks; read `engine.view` directly inside the component. */
-export function useGame(): Sim {
-  useSyncExternalStore(engine.subscribe, engine.getVersion);
-  return engine.view;
+/**
+ * Re-render on UI ticks. With a selector the component re-renders only when the selected value
+ * changes under `equals` (the mirror is mutated in place, so the selector must return primitives
+ * or fresh derived data compared with a structural `equals`). Without one it re-renders every tick
+ * and returns `engine.view`.
+ */
+export function useGame(): Sim;
+export function useGame<T>(selector: (s: Sim) => T, equals?: (a: T, b: T) => boolean): T;
+export function useGame<T>(
+  selector?: (s: Sim) => T,
+  equals: (a: T, b: T) => boolean = Object.is,
+): Sim | T {
+  const cache = useRef<{ version: number; selector: (s: Sim) => T; value: T } | null>(null);
+  const getSnapshot = () => {
+    if (!selector) return engine.getVersion() as unknown as T;
+    const prev = cache.current;
+    const version = engine.getVersion();
+    if (prev && prev.version === version && prev.selector === selector) return prev.value;
+    const value = selector(engine.view);
+    const next = prev && equals(prev.value, value) ? prev.value : value;
+    cache.current = { version, selector, value: next };
+    return next;
+  };
+  const snap = useSyncExternalStore(engine.subscribe, getSnapshot);
+  return selector ? snap : engine.view;
 }
 
 export function lerpPos(id: number, cur: Vec3, a: number, out: Vec3): Vec3 {
