@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { engineReady } from './helpers';
 
 test('app loads, renders the canvas, and opens settings without console errors', async ({
   page,
@@ -43,8 +44,9 @@ test('app loads, renders the canvas, and opens settings without console errors',
 
 test('saving goes through the worker and survives a reload', async ({ page }) => {
   // `__fleet` is the engine's debug handle; page.evaluate can't close over helpers.
-  const state = () =>
-    page.evaluate(async () => {
+  const state = async () => {
+    await engineReady(page);
+    return page.evaluate(async () => {
       const f = (
         globalThis as unknown as {
           __fleet: { fullState(): Promise<{ time: number; seed: number }> };
@@ -52,16 +54,19 @@ test('saving goes through the worker and survives a reload', async ({ page }) =>
       ).__fleet;
       return f.fullState();
     });
+  };
   await page.goto('./');
   await page.getByRole('button', { name: 'Take command' }).click();
   // CI renders in software and starts slowly; any sim progress is enough here.
-  await expect.poll(async () => (await state()).time, { timeout: 20_000 }).toBeGreaterThan(0);
+  await expect.poll(async () => (await state()).time, { timeout: 30_000 }).toBeGreaterThan(0);
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('tab', { name: 'Save Management' }).click();
   // Read before saving: the written save is at least this far along.
   const saved = await state();
   await page.getByRole('button', { name: 'Save now' }).click();
   await expect(page.getByText('Saved.')).toBeVisible();
+  // Reloading while the app is still starting aborts the navigation (ERR_ABORTED).
+  await engineReady(page);
   await page.reload();
   const loaded = await state();
   expect(loaded.seed).toBe(saved.seed);

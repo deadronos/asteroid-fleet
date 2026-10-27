@@ -21,7 +21,11 @@ jobs:
       - run: pnpm run format:check
       - run: pnpm run typecheck
       # Balance is opt-in (`pnpm run balance`, BALANCE=1) and must stay out of CI.
-      - run: pnpm test
+      - run: pnpm run test:coverage
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage/lcov.info
       - run: pnpm run build
       - run: pnpm run check:bundle
 
