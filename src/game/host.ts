@@ -52,10 +52,17 @@ export function createSimHost(onMessage: (msg: OutMsg) => void, preferWorker = t
 function createLazyLocalHost(onMessage: (msg: OutMsg) => void): SimHost {
   let inner: SimHost | null = null;
   let queue: InMsg[] | null = [];
-  void import('./localHost').then(({ createLocalHost }) => {
-    inner = createLocalHost(onMessage);
-    for (const m of queue ?? []) inner.post(m);
-    queue = null;
-  });
+  import('./localHost').then(
+    ({ createLocalHost }) => {
+      inner = createLocalHost(onMessage);
+      for (const m of queue ?? []) inner.post(m);
+      queue = null;
+    },
+    (err: unknown) => {
+      console.error('Failed to load the main-thread sim.', err);
+      queue = null;
+      onMessage({ t: 'error', text: 'Could not load the simulation. Reload the page to retry.' });
+    },
+  );
   return { kind: 'local', post: (msg) => (inner ? inner.post(msg) : queue?.push(msg)) };
 }
