@@ -1103,3 +1103,11 @@ label.button:hover {
 .hotkeys dd {
   margin: 0;
 }
+
+@media (prefers-contrast: more) {
+  :root {
+    --line: rgba(160, 200, 255, 0.55);
+    --muted: #b4c4dc;
+    --panel: rgba(4, 8, 16, 0.96);
+  }
+}
