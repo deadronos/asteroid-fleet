@@ -161,3 +161,22 @@ function buyResearchFree(s: Sim, id: string) {
   s.research += 100;
   expect(buyResearch(s, id)).toBe(true);
 }
+
+describe('alert orders (#79)', () => {
+  it('sets and clears fleet and carrier alert modes', () => {
+    const s = game(3);
+    expect(
+      order(s, { type: 'setAlert', scope: 'fleet', kind: 'Warped', mode: 'pause' }),
+    ).toBeNull();
+    expect(s.alerts.fleet.Warped).toBe('pause');
+    expect(order(s, { type: 'setAlert', scope: 0, kind: 'Warped', mode: 'off' })).toBeNull();
+    expect(s.alerts.byCarrier[0]).toEqual({ Warped: 'off' });
+    order(s, { type: 'setAlert', scope: 0, kind: 'Warped', mode: null });
+    expect(s.alerts.byCarrier[0]).toBeUndefined();
+    order(s, { type: 'setAlert', scope: 'fleet', kind: 'Warped', mode: null });
+    expect(s.alerts.fleet.Warped).toBeUndefined();
+    expect(
+      order(s, { type: 'setAlert', scope: 'fleet', kind: 'Legacy', mode: 'toast' }),
+    ).not.toBeNull();
+  });
+});

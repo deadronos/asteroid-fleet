@@ -289,6 +289,11 @@ describe('migrate', () => {
     expect(g.time).toBe(saveV9.time);
   });
 
+  it('gives v10 saves empty alert rules (#79)', () => {
+    const r = migrate(saveV9);
+    expect(r.ok && r.state.alerts).toEqual({ fleet: {}, byCarrier: {} });
+  });
+
   it('rejects a save whose operations are missing or broken', () => {
     const v10 = migrate(saveV9);
     if (!v10.ok) throw new Error('fixture');

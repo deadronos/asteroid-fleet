@@ -1,7 +1,19 @@
+import { useState } from 'react';
 import { engine, useGame } from '../game/engine';
 import { engagementUnlocked } from '../sim/automation';
 import { SHIP_STATS } from '../sim/config';
-import type { Engagement, MiningStance, ShipClass, Stance, UnderFire } from '../sim/types';
+import type {
+  AlertMode,
+  Engagement,
+  MiningStance,
+  ShipClass,
+  SimEventKind,
+  Stance,
+  UnderFire,
+} from '../sim/types';
+import { TOAST_POLICY, resolveAlert } from '../game/toasts';
+import { formatEventKind } from './events';
+import { carrierChoices } from './inbox';
 import { RuleCards } from './RuleCards';
 
 const ENGAGE: [Engagement, string][] = [
@@ -79,6 +91,88 @@ function StanceRow({
   );
 }
 
+const ALERT_LABEL: [AlertMode, string][] = [
+  ['off', 'Off'],
+  ['inbox', 'Inbox'],
+  ['toast', 'Toast'],
+  ['pause', 'Toast + pause'],
+  ['focus', 'Toast + focus'],
+];
+const ALERT_KINDS = (Object.keys(TOAST_POLICY) as SimEventKind[]).filter((k) => k !== 'Legacy');
+
+function AlertRules() {
+  const s = useGame();
+  const choices = carrierChoices(engine.state.ops, s.systems);
+  const [scope, setScope] = useState<'fleet' | number>('fleet');
+  const active = scope === 'fleet' || choices.some((c) => c.id === scope) ? scope : 'fleet';
+  const set = (kind: SimEventKind, raw: string) =>
+    engine.dispatch({
+      type: 'setAlert',
+      scope: active,
+      kind,
+      mode: raw === '' ? null : (raw as AlertMode),
+    });
+  return (
+    <>
+      <h3>Alerts</h3>
+      <p className="hint">
+        Choose what each event does. A carrier&apos;s own setting beats the fleet-wide one. Off
+        hides the event from the inbox too. Unset events use the default.
+      </p>
+      {choices.length > 1 && (
+        <label>
+          Rules for{' '}
+          <select
+            aria-label="Alert scope"
+            value={String(active)}
+            onChange={(e) =>
+              setScope(e.target.value === 'fleet' ? 'fleet' : Number(e.target.value))
+            }
+          >
+            <option value="fleet">Whole fleet</option>
+            {choices.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      <table className="doc">
+        <tbody>
+          {ALERT_KINDS.map((kind) => {
+            const own =
+              active === 'fleet' ? s.alerts.fleet[kind] : s.alerts.byCarrier[active]?.[kind];
+            const inherited = active === 'fleet' ? null : resolveAlert(s.alerts, kind, -1);
+            return (
+              <tr key={kind}>
+                <td>{formatEventKind(kind)}</td>
+                <td>
+                  <select
+                    aria-label={formatEventKind(kind)}
+                    className={own === undefined ? 'inherit' : ''}
+                    value={own ?? ''}
+                    onChange={(e) => set(kind, e.target.value)}
+                  >
+                    <option value="">
+                      {active === 'fleet' ? 'default' : `inherit${inherited ? '' : ''}`}
+                    </option>
+                    {ALERT_LABEL.map(([m, l]) => (
+                      <option key={m} value={m}>
+                        {l}
+                      </option>
+                    ))}
+                  </select>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </>
+  );
+}
+
 export function DoctrinePanel() {
   const s = useGame();
   return (
@@ -132,6 +226,7 @@ export function DoctrinePanel() {
           ))}
         </tbody>
       </table>
+      <AlertRules />
       <RuleCards />
     </>
   );

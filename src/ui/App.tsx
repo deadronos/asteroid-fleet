@@ -7,6 +7,7 @@ import { SHIP_CLASSES } from '../sim/types';
 import { CarrierPanel } from './CarrierPanel';
 import { DoctrinePanel } from './DoctrinePanel';
 import { downloadFile } from './download';
+import { resolveAlert } from '../game/toasts';
 import { formatEvent, toneClass } from './events';
 import {
   activeCarrier,
@@ -81,7 +82,9 @@ export function LogPanel({
     carrier,
     choices.map((c) => c.id),
   );
-  const rows = filterEvents(mergeForInbox(s.log), selected, severity);
+  const rows = filterEvents(mergeForInbox(s.log), selected, severity).filter(
+    (ev) => resolveAlert(s.alerts, ev.kind, ev.carrierId) !== 'off',
+  );
   return (
     <>
       <h3>This run</h3>

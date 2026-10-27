@@ -8,7 +8,7 @@ import { MODES, PUMP_MS, type Frame, type OutMsg } from './protocol';
 import { applySnapshot } from './snapshot';
 import { allowSaveOverwrite, loadGame, saveGame, saveOverwriteBlocked } from './save';
 import { getActiveSlot, writeSlot } from './slots';
-import { offerToasts, ToastQueue } from './toasts';
+import { alertActions, offerToasts, ToastQueue } from './toasts';
 
 const AUTOSAVE_MS = 15000;
 
@@ -46,6 +46,8 @@ class Engine {
    * `focusOp` until carrier switching (#77) posts this id to the worker.
    */
   focusedCarrierId = 0;
+  /** Bus ids whose pause or focus rule already fired. */
+  private alertSeen = new Set<number>();
   /** Recent events from the sim, newest first; a merged event replaces its earlier copy. */
   events: BusEvent[] = [];
   /** Shown when the stored save could not be loaded. Autosave stays off. */
@@ -139,7 +141,11 @@ class Engine {
         if (msg.epoch !== this.epoch) return;
         const ids = new Set(msg.events.map((e) => e.id));
         this.events = [...msg.events, ...this.events.filter((e) => !ids.has(e.id))].slice(0, 50);
-        if (offerToasts(this.toasts, msg.events, this.focusedCarrierId)) this.emit();
+        const rules = this.state.alerts;
+        const act = alertActions(msg.events, rules, this.alertSeen);
+        if (act.focus !== null) this.focusCarrier(act.focus);
+        if (act.pause && !this.paused) this.togglePause();
+        if (offerToasts(this.toasts, msg.events, this.focusedCarrierId, rules)) this.emit();
         return;
       }
       case 'error':
@@ -278,6 +284,7 @@ class Engine {
   replace(state: GameState) {
     this.epoch += 1;
     this.toasts.clear();
+    this.alertSeen.clear();
     this.events = [];
     this.saveNotice = null;
     this.saveBackupFailed = false;

@@ -28,6 +28,17 @@ export interface Doctrine {
   byClass: Partial<Record<ShipClass, Partial<Stance>>>;
 }
 
+/** What an event kind does when it arrives. `pause` and `focus` also toast. */
+export type AlertMode = 'off' | 'inbox' | 'toast' | 'pause' | 'focus';
+export const ALERT_MODES: AlertMode[] = ['off', 'inbox', 'toast', 'pause', 'focus'];
+export type AlertOverrides = Partial<Record<SimEventKind, AlertMode>>;
+
+/** Alert rules: fleet-wide, with per-carrier overrides (most specific wins). A missing kind uses the built-in policy. */
+export interface AlertRules {
+  fleet: AlertOverrides;
+  byCarrier: Record<number, AlertOverrides>;
+}
+
 export type ModuleId = 'laser' | 'drill' | 'tractor' | 'shield' | 'compressor';
 
 export type HangarType = 'launch' | 'drydock' | 'cargo' | 'fabricator';
@@ -385,6 +396,7 @@ export interface GameState {
   /** Depletion records of systems left behind, keyed by system id. */
   fields: Record<number, FieldRecord>;
   doctrine: Doctrine;
+  alerts: AlertRules;
   /** Rule cards in priority order (within a scope level). */
   cards: RuleCard[];
   automation: Automation;

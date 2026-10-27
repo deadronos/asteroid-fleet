@@ -34,7 +34,7 @@ import type {
 } from './types';
 
 /** Bump together with a `migrations[n]` step and a fixture. See README "Save migrations". */
-export const SAVE_VERSION = 10;
+export const SAVE_VERSION = 11;
 
 /** Every `Operation` field. The `satisfies` below fails to compile when one is missing. */
 export const OP_KEYS = [
@@ -136,6 +136,12 @@ class SimView implements Sim {
   }
   set fields(v) {
     this.g.fields = v;
+  }
+  get alerts() {
+    return this.g.alerts;
+  }
+  set alerts(v) {
+    this.g.alerts = v;
   }
   get doctrine() {
     return this.g.doctrine;
@@ -666,6 +672,7 @@ interface Carry {
   discovered: number[];
   lifetime: GameState['lifetime'];
   doctrine?: GameState['doctrine'];
+  alerts?: GameState['alerts'];
   cards?: GameState['cards'];
   automation?: GameState['automation'];
 }
@@ -741,6 +748,7 @@ export function newGame(seed = 1337, carry?: Carry): GameState {
       fleet: { ...DEFAULT_STANCE },
       byClass: { drone: { mining: 'safe' } },
     },
+    alerts: carry?.alerts ?? { fleet: {}, byCarrier: {} },
     cards: carry?.cards ?? [],
     automation: carry?.automation
       ? { ...carry.automation, rebuildQueue: [], timer: 0 }

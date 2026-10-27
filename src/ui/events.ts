@@ -1,5 +1,5 @@
 import { HANGAR_TYPES, SHIP_STATS } from '../sim/config';
-import type { LossCause, Severity, SimEvent } from '../sim/types';
+import type { LossCause, Severity, SimEvent, SimEventKind } from '../sim/types';
 
 const CAUSE: Record<LossCause, string> = {
   destroyed: 'destroyed',
@@ -79,4 +79,10 @@ export function formatEvent(ev: SimEvent): string {
 /** CSS tone class for a severity; `critical` reuses the old red `bad` tone. */
 export function toneClass(sev: Severity): string {
   return `tone-${sev === 'critical' ? 'bad' : sev}`;
+}
+
+/** Short settings label for an event kind: `PirateWaveIncoming` reads "Pirate wave incoming". */
+export function formatEventKind(kind: SimEventKind): string {
+  const words = kind.replace(/([a-z])([A-Z0-9])/g, '$1 $2').toLowerCase();
+  return words.charAt(0).toUpperCase() + words.slice(1);
 }
