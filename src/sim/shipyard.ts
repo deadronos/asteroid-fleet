@@ -26,8 +26,9 @@ export function refit(s: Sim, to: HullId): string | null {
   if (to === from) return null;
   if (s.warp) return 'Cancel the warp first';
   if (s.credits < REFIT_COST) return 'Not enough credits';
-  s.credits -= REFIT_COST;
 
+  const saved = structuredClone(s.hangars);
+  const savedHome = new Map(s.ships.map((x) => [x.id, x.hangarId]));
   const bonus = lvl(s, 'slots');
   const displaced: number[] = [];
   s.hangars.forEach((h, i) => {
@@ -39,6 +40,7 @@ export function refit(s: Sim, to: HullId): string | null {
     h.items = h.items.filter((it) => !displaced.includes(it.shipId));
   });
 
+  const sell: number[] = [];
   for (const id of displaced) {
     const ship = s.ships.find((x) => x.id === id);
     if (!ship) continue;
@@ -52,15 +54,33 @@ export function refit(s: Sim, to: HullId): string | null {
       break;
     }
     if (!placed) {
-      s.credits += Math.round(SHIP_STATS[ship.cls].cost * 0.5);
-      s.ships = s.ships.filter((x) => x.id !== id);
+      if (ship.mode !== 'docked') {
+        // A ship in flight cannot be sold; make the player recall it first.
+        saved.forEach((h, i) => Object.assign(s.hangars[i], h));
+        for (const x of s.ships) x.hangarId = savedHome.get(x.id) ?? x.hangarId;
+        return 'Recall launched ships first: they no longer fit';
+      }
+      sell.push(ship.id);
     }
   }
+  for (const id of sell) {
+    const ship = s.ships.find((x) => x.id === id)!;
+    s.credits += Math.round(SHIP_STATS[ship.cls].cost * 0.5);
+    s.ships = s.ships.filter((x) => x.id !== id);
+    for (const x of s.ships) {
+      if (x.bargeId === id) x.bargeId = -1;
+      if (x.escortId === id) x.escortId = -1;
+      if (x.targetId === id) x.targetId = -1;
+    }
+    for (const p of s.pirates) if (p.targetId === id) p.targetId = -2;
+  }
+  s.credits -= REFIT_COST;
 
   const c = s.carrier;
-  c.hull = (c.hull / c.maxHull) * HULLS[to].hull;
-  c.maxHull = HULLS[to].hull;
+  const frac = c.hull / c.maxHull;
   c.hullClass = to;
+  c.maxHull = HULLS[to].hull;
+  c.hull = frac * c.maxHull;
   c.energy = Math.min(c.energy, maxEnergy(s));
   return null;
 }

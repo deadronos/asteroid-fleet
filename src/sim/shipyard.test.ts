@@ -64,4 +64,33 @@ describe('shipyard refit (#66)', () => {
     expect(s.ships.length).toBe(6);
     expect(s.hangars[1].items.length).toBe(2);
   });
+
+  it('refuses when a launched ship would not fit, and sells nothing', () => {
+    const s = yard();
+    for (let i = 0; i < 6; i++) createShip(s, 'drone', 1, i);
+    for (let i = 0; i < 4; i++) createShip(s, 'drone', 2, i);
+    const flying = s.hangars[0].items.at(-1)!.shipId;
+    s.ships.find((x) => x.id === flying)!.mode = 'idle';
+    const credits = s.credits;
+    expect(order(s, { type: 'refit', hull: 'mining' })).toMatch(/Recall/);
+    expect(s.credits).toBe(credits);
+    expect(s.ships.length).toBe(10);
+    expect(s.carrier.hullClass).toBe('standard');
+    expect(s.hangars.map((h) => h.slots)).toEqual([6, 6]);
+  });
+
+  it('clears references to a sold ship', () => {
+    const s = yard();
+    for (let i = 0; i < 4; i++) createShip(s, 'drone', 2, i);
+    createShip(s, 'barge', 1, 2);
+    createShip(s, 'drone', 1, 0);
+    const barge = s.ships.find((x) => x.cls === 'barge')!;
+    const drone = s.ships.at(-1)!;
+    drone.bargeId = barge.id;
+    drone.targetId = barge.id;
+    expect(order(s, { type: 'refit', hull: 'mining' })).toBeNull();
+    expect(s.ships.some((x) => x.id === barge.id)).toBe(false);
+    expect(drone.bargeId).toBe(-1);
+    expect(drone.targetId).toBe(-1);
+  });
 });
