@@ -2,22 +2,18 @@ import { useGLTF } from '@react-three/drei';
 import { useFrame, type ThreeEvent } from '@react-three/fiber';
 import { Suspense, useMemo, useRef } from 'react';
 import * as THREE from 'three';
-import { engine, lerpPos } from '../game/engine';
 import { SHIP_STATS } from '../sim/config';
-import { SHIP_CLASSES, type Vec3 } from '../sim/types';
 import { shipGeometry } from './geometry';
 import { focus } from './focus';
-import { heading, pruneHeadings, stepLength } from './heading';
+import { CLASSES, fleetFrame } from './frameState';
 import { SHIP_LENGTH, SHIP_MODEL, bakeModel, modelUrl, type ModelClass } from './models';
 
 // Sized for the 1000-ship sim cap; the buffers are allocated once per layer.
 const MAX_PER_CLASS = 1000;
 const MAX_TRAILS = 2048;
-const CLASSES: ModelClass[] = [...SHIP_CLASSES, 'pirate'];
 const URLS = CLASSES.map((c) => modelUrl(SHIP_MODEL[c]));
 
 const dummy = new THREE.Object3D();
-const tmp: Vec3 = { x: 0, y: 0, z: 0 };
 const camPos = new THREE.Vector3();
 
 const classColor = (cls: ModelClass) => (cls === 'pirate' ? '#ff3b3b' : SHIP_STATS[cls].color);
@@ -43,34 +39,33 @@ function ShipLayer({
   const farGeo = useMemo(() => shipGeometry(cls), [cls]);
   const color = classColor(cls);
 
+  const ci = CLASSES.indexOf(cls);
   useFrame(({ camera }) => {
     const nm = near.current;
     const fm = far.current;
     if (!fm) return;
-    const s = engine.view;
-    const a = engine.alpha();
+    const f = fleetFrame;
     const lod2 = model ? lodDistance * lodDistance : -1;
     camPos.copy(camera.position);
+    const list = f.bucket[ci];
+    const total = Math.min(f.bucketLen[ci], MAX_PER_CLASS);
     let nn = 0;
     let nf = 0;
-    const list = cls === 'pirate' ? s.pirates : s.ships;
-    for (const e of list) {
-      if (cls !== 'pirate') {
-        const sh = e as (typeof s.ships)[number];
-        if (sh.cls !== cls || sh.mode === 'docked') continue;
-      }
-      if (nn + nf >= MAX_PER_CLASS) break;
-      lerpPos(e.id, e.pos, a, tmp);
-      const h = heading(e.id, e.pos);
-      dummy.position.set(tmp.x, tmp.y, tmp.z);
-      dummy.lookAt(tmp.x + h.x, tmp.y + h.y, tmp.z + h.z);
+    for (let k = 0; k < total; k++) {
+      const i = list[k];
+      const o = i * 3;
+      const x = f.pos[o];
+      const y = f.pos[o + 1];
+      const z = f.pos[o + 2];
+      dummy.position.set(x, y, z);
+      dummy.lookAt(x + f.hdg[o], y + f.hdg[o + 1], z + f.hdg[o + 2]);
       dummy.updateMatrix();
       const d2 = camPos.distanceToSquared(dummy.position);
       if (nm && d2 < lod2) {
-        nearIds[nn] = e.id;
+        nearIds[nn] = f.ids[i];
         nm.setMatrixAt(nn++, dummy.matrix);
       } else {
-        farIds[nf] = e.id;
+        farIds[nf] = f.ids[i];
         fm.setMatrixAt(nf++, dummy.matrix);
       }
     }
@@ -154,28 +149,25 @@ function Trails() {
   useFrame(() => {
     const m = mesh.current;
     if (!m) return;
-    const s = engine.view;
-    const a = engine.alpha();
-    pruneHeadings();
-    let n = 0;
-    const put = (id: number, pos: Vec3, cls: ModelClass) => {
-      if (n >= MAX_TRAILS) return;
-      lerpPos(id, pos, a, tmp);
-      const h = heading(id, pos);
+    const f = fleetFrame;
+    const n = Math.min(f.count, MAX_TRAILS);
+    for (let i = 0; i < n; i++) {
+      const o = i * 3;
+      const cls = CLASSES[f.cls[i]];
       const half = SHIP_LENGTH[cls] * 0.5;
+      const hx = f.hdg[o];
+      const hy = f.hdg[o + 1];
+      const hz = f.hdg[o + 2];
       // Length follows speed; a short stub stays as the idle engine glow.
-      const len = Math.min(half * 4, 0.4 + stepLength(id, pos) * 4);
+      const len = Math.min(half * 4, 0.4 + f.step[i] * 4);
       const w = half * 0.22;
-      dummy.position.set(tmp.x - h.x * half, tmp.y - h.y * half, tmp.z - h.z * half);
-      dummy.lookAt(dummy.position.x + h.x, dummy.position.y + h.y, dummy.position.z + h.z);
+      dummy.position.set(f.pos[o] - hx * half, f.pos[o + 1] - hy * half, f.pos[o + 2] - hz * half);
+      dummy.lookAt(dummy.position.x + hx, dummy.position.y + hy, dummy.position.z + hz);
       dummy.scale.set(w, w, len);
       dummy.updateMatrix();
-      m.setMatrixAt(n, dummy.matrix);
-      m.setColorAt(n, TRAIL_COLOR[cls]);
-      n++;
-    };
-    for (const sh of s.ships) if (sh.mode !== 'docked') put(sh.id, sh.pos, sh.cls);
-    for (const p of s.pirates) put(p.id, p.pos, 'pirate');
+      m.setMatrixAt(i, dummy.matrix);
+      m.setColorAt(i, TRAIL_COLOR[cls]);
+    }
     dummy.scale.setScalar(1);
     m.count = n;
     m.instanceMatrix.needsUpdate = true;

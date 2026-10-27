@@ -11,9 +11,18 @@ export function pruneHeadings() {
   for (const id of headings.keys()) if (!engine.prev.has(id)) headings.delete(id);
 }
 
-/** Smoothed unit direction of travel, from the last two sim snapshots. */
-export function heading(id: number, cur: Vec3): THREE.Vector3 {
-  const prev = engine.prev.get(id);
+/**
+ * Smoothed unit direction of travel, from the last two sim snapshots, written to
+ * `out[o..o+2]`. Call once per entity per frame. The step is the equivalent of two
+ * 0.25 lerps, which is what the ship layer and its trail used to apply between them.
+ */
+export function advanceHeading(
+  id: number,
+  cur: Vec3,
+  prev: Vec3 | undefined,
+  out: Float32Array,
+  o: number,
+) {
   let h = headings.get(id);
   if (!h) {
     h = new THREE.Vector3(0, 0, 1);
@@ -21,14 +30,9 @@ export function heading(id: number, cur: Vec3): THREE.Vector3 {
   }
   if (prev) {
     tmpV.set(cur.x - prev.x, cur.y - prev.y, cur.z - prev.z);
-    if (tmpV.lengthSq() > 1e-6) h.lerp(tmpV.normalize(), 0.25).normalize();
+    if (tmpV.lengthSq() > 1e-6) h.lerp(tmpV.normalize(), 0.4375).normalize();
   }
-  return h;
-}
-
-/** Distance moved between the last two sim snapshots (0 for new ships). */
-export function stepLength(id: number, cur: Vec3): number {
-  const prev = engine.prev.get(id);
-  if (!prev) return 0;
-  return Math.hypot(cur.x - prev.x, cur.y - prev.y, cur.z - prev.z);
+  out[o] = h.x;
+  out[o + 1] = h.y;
+  out[o + 2] = h.z;
 }

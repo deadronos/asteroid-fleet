@@ -9,7 +9,7 @@ type Win = {
     fullState(): Promise<{ nextId: number; ops: { ships: Record<string, unknown>[] }[] }>;
     replace(s: unknown): void;
   };
-  __render?: { calls: number; triangles: number };
+  __render?: { frame: number; calls: number; triangles: number };
 };
 
 /** Replaces the fleet with `count` ships spread around the carrier, cycling classes. */
@@ -36,18 +36,18 @@ async function spawnFleet(page: Page, count: number) {
   }, count);
 }
 
-/** Frames rendered per second, counted from the stats object RenderStats replaces each frame. */
+/** Frames rendered per second, counted from the frame number RenderStats bumps each frame. */
 function renderRate(page: Page, ms = 2000) {
   return page.evaluate(
     (ms) =>
       new Promise<number>((done) => {
         const w = globalThis as unknown as Win;
-        let last = w.__render;
+        let last = w.__render?.frame;
         let n = 0;
         const t0 = performance.now();
         const tick = () => {
-          if (w.__render !== last) {
-            last = w.__render;
+          if (w.__render?.frame !== last) {
+            last = w.__render?.frame;
             n++;
           }
           if (performance.now() - t0 < ms) requestAnimationFrame(tick);

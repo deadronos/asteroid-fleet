@@ -25,23 +25,35 @@ export function FrameCap({ fps }: { fps: number }) {
   return null;
 }
 
+export interface RenderStatsData {
+  /** Frames rendered so far; the object itself is reused. */
+  frame: number;
+  calls: number;
+  triangles: number;
+  otherCarriers: number;
+}
+
+const stats: RenderStatsData = { frame: 0, calls: 0, triangles: 0, otherCarriers: 0 };
+
 /** Draw calls and triangles per frame, summed over all passes, and the extra carriers drawn, on `__render`. */
 export function RenderStats() {
   const gl = useThree((s) => s.gl);
   const scene = useThree((s) => s.scene);
   useEffect(() => {
     gl.info.autoReset = false;
+    (globalThis as unknown as { __render: RenderStatsData }).__render = stats;
     return () => {
       gl.info.autoReset = true;
     };
   }, [gl]);
   useFrame(() => {
     const r = gl.info.render;
-    (globalThis as unknown as { __render: object }).__render = {
-      calls: r.calls,
-      triangles: r.triangles,
-      otherCarriers: scene.children.filter((c) => c.name === 'otherCarrier').length,
-    };
+    let others = 0;
+    for (const c of scene.children) if (c.name === 'otherCarrier') others++;
+    stats.frame++;
+    stats.calls = r.calls;
+    stats.triangles = r.triangles;
+    stats.otherCarriers = others;
     gl.info.reset();
   });
   return null;

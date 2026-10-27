@@ -13,21 +13,21 @@ import {
 import * as THREE from 'three';
 import { CameraRig } from './CameraRig';
 import { easeFactor, focus, isDoubleMiss, shortestArc } from './focus';
-import { engine, lerpCarrier, lerpPos } from '../game/engine';
+import { engine, lerpCarrier } from '../game/engine';
 import { OTHER_ROW } from '../game/snapshot';
 import { COVER_RADIUS, H2_STORM_RADIUS, SHIP_STATS, WARP_CHARGE } from '../sim/config';
 import { gasGiantPos } from '../sim/state';
-import { SHIP_CLASSES, type Sim, type Vec3 } from '../sim/types';
+import { SHIP_CLASSES, type Vec3 } from '../sim/types';
 import { AsteroidField } from './AsteroidField';
 import { Containers } from './Containers';
 import { Fleet } from './Fleet';
+import { CLASSES, FleetPass, asteroidById, fleetFrame } from './frameState';
 import { GAS_FRAG, GAS_VERT, NEBULA_FRAG, NEBULA_VERT } from './geometry';
 import { FrameCap, RenderStats } from './RenderLoop';
 
 const Effects = lazy(() => import('./Effects'));
 
 const dummy = new THREE.Object3D();
-const tmp: Vec3 = { x: 0, y: 0, z: 0 };
 /** Re-renders only when the system changes, not on every 5 Hz UI tick. */
 function useSystemId(): number {
   return useSyncExternalStore(engine.subscribe, () => engine.view.systemId);
@@ -57,8 +57,21 @@ const WARP_RING_COLOR = new THREE.Color('#9b7bff').multiplyScalar(4);
 /** How fast the hull turns toward its heading, per second (see `easeFactor`). */
 const TURN_RATE = 0.8;
 
-const rocks = new Map<number, Vec3>();
-const beamFrom: Vec3 = { x: 0, y: 0, z: 0 };
+function pushSeg(
+  pos: THREE.BufferAttribute,
+  col: THREE.BufferAttribute,
+  n: number,
+  px: number,
+  py: number,
+  pz: number,
+  q: Vec3,
+  c: THREE.Color,
+) {
+  pos.setXYZ(n * 2, px, py, pz);
+  pos.setXYZ(n * 2 + 1, q.x, q.y, q.z);
+  col.setXYZ(n * 2, c.r, c.g, c.b);
+  col.setXYZ(n * 2 + 1, c.r * 0.3, c.g * 0.3, c.b * 0.3);
+}
 
 function Beams() {
   const geo = useMemo(() => {
@@ -69,29 +82,32 @@ function Beams() {
   }, []);
   useFrame(() => {
     const s = engine.view;
-    const a = engine.alpha();
+    const f = fleetFrame;
     const pos = geo.getAttribute('position') as THREE.BufferAttribute;
     const col = geo.getAttribute('color') as THREE.BufferAttribute;
     let n = 0;
-    const push = (p: Vec3, q: Vec3, c: THREE.Color) => {
-      if (n >= MAX_SEG) return;
-      pos.setXYZ(n * 2, p.x, p.y, p.z);
-      pos.setXYZ(n * 2 + 1, q.x, q.y, q.z);
-      col.setXYZ(n * 2, c.r, c.g, c.b);
-      col.setXYZ(n * 2 + 1, c.r * 0.3, c.g * 0.3, c.b * 0.3);
-      n++;
-    };
-    rocks.clear();
-    for (const r of s.asteroids) rocks.set(r.id, r.pos);
-    for (const sh of s.ships) {
+    const rocks = asteroidById(s.asteroids);
+    for (let k = 0; k < s.ships.length && n < MAX_SEG; k++) {
+      const sh = s.ships[k];
       if (sh.mode !== 'mining') continue;
       const r = rocks.get(sh.targetId);
-      if (!r) continue;
-      push(lerpPos(sh.id, sh.pos, a, beamFrom), r, BEAM_COLORS.mine);
+      const i = f.shipEntity[k];
+      if (!r || i < 0) continue;
+      pushSeg(
+        pos,
+        col,
+        n++,
+        f.pos[i * 3],
+        f.pos[i * 3 + 1],
+        f.pos[i * 3 + 2],
+        r.pos,
+        BEAM_COLORS.mine,
+      );
     }
-    for (const f of s.fx) {
-      const c = BEAM_COLORS[f.kind];
-      if (c) push(f.a, f.b, c);
+    for (const fx of s.fx) {
+      if (n >= MAX_SEG) break;
+      const c = BEAM_COLORS[fx.kind];
+      if (c) pushSeg(pos, col, n++, fx.a.x, fx.a.y, fx.a.z, fx.b, c);
     }
     geo.setDrawRange(0, n * 2);
     pos.needsUpdate = true;
@@ -429,9 +445,20 @@ const ICON_COLORS: Record<string, THREE.Color> = {
   vein: new THREE.Color('#5affef').multiplyScalar(2.2),
 };
 
-function veinPos(s: Sim, id: number): Vec3 | null {
-  for (const a of s.asteroids) if (a.id === id) return a.ore > 0 ? a.pos : null;
-  return null;
+/** Icon colour per render class index, in `CLASSES` order. */
+const CLASS_ICON = CLASSES.map((c) => ICON_COLORS[c]);
+const MAX_ICONS = 2048;
+
+function icon(
+  pos: THREE.BufferAttribute,
+  col: THREE.BufferAttribute,
+  n: number,
+  p: Vec3,
+  c: THREE.Color,
+): number {
+  pos.setXYZ(n, p.x, p.y, p.z);
+  col.setXYZ(n, c.r, c.g, c.b);
+  return n + 1;
 }
 
 function Tactical({ on }: { on: boolean }) {
@@ -445,30 +472,27 @@ function Tactical({ on }: { on: boolean }) {
   useFrame(() => {
     if (!on) return;
     const s = engine.view;
-    const a = engine.alpha();
+    const f = fleetFrame;
     const pos = geo.getAttribute('position') as THREE.BufferAttribute;
     const col = geo.getAttribute('color') as THREE.BufferAttribute;
-    let n = 0;
-    const put = (p: Vec3, c: THREE.Color) => {
-      pos.setXYZ(n, p.x, p.y, p.z);
-      col.setXYZ(n, c.r, c.g, c.b);
-      n++;
-    };
-    lerpCarrier(a, carrierAt);
-    put(carrierAt, ICON_COLORS.carrier);
-    for (const sh of s.ships)
-      if (sh.mode !== 'docked' && n < 2048)
-        put(lerpPos(sh.id, sh.pos, a, tmp), ICON_COLORS[sh.cls]);
-    for (const p of s.pirates) if (n < 2048) put(lerpPos(p.id, p.pos, a, tmp), ICON_COLORS.pirate);
-    for (const c of s.containers) if (n < 2048) put(c.pos, ICON_COLORS.container);
+    lerpCarrier(engine.alpha(), carrierAt);
+    let n = icon(pos, col, 0, carrierAt, ICON_COLORS.carrier);
+    for (let i = 0; i < f.count && n < MAX_ICONS; i++) {
+      const c = CLASS_ICON[f.cls[i]];
+      pos.setXYZ(n, f.pos[i * 3], f.pos[i * 3 + 1], f.pos[i * 3 + 2]);
+      col.setXYZ(n++, c.r, c.g, c.b);
+    }
+    for (const c of s.containers)
+      if (n < MAX_ICONS) n = icon(pos, col, n, c.pos, ICON_COLORS.container);
     // Scout reconnaissance: charted hazards and rich veins.
     for (const i of s.recon.hazards) {
       const h = s.hazards[i];
-      if (h && n < 2048) put(h.pos, ICON_COLORS.hazard);
+      if (h && n < MAX_ICONS) n = icon(pos, col, n, h.pos, ICON_COLORS.hazard);
     }
+    const rocks = asteroidById(s.asteroids);
     for (const id of s.recon.veins) {
-      const v = veinPos(s, id);
-      if (v && n < 2048) put(v, ICON_COLORS.vein);
+      const v = rocks.get(id);
+      if (v && v.ore > 0 && n < MAX_ICONS) n = icon(pos, col, n, v.pos, ICON_COLORS.vein);
     }
     geo.setDrawRange(0, n);
     pos.needsUpdate = true;
@@ -525,6 +549,7 @@ export const Scene = memo(function Scene({
       <Containers />
       <Carrier />
       <OtherCarriers />
+      <FleetPass />
       <Fleet lodDistance={quality === 'high' ? 120 : 70} />
       <Beams />
       <Explosions />
@@ -532,9 +557,9 @@ export const Scene = memo(function Scene({
       <RenderStats />
       {quality === 'low' && <FrameCap fps={fpsCap} />}
       <CameraRig tactical={tactical} onAutoTactical={onAuto} />
-      {quality === 'high' && (
+      {quality === 'high' && bloom && (
         <Suspense fallback={null}>
-          <Effects bloom={bloom} />
+          <Effects />
         </Suspense>
       )}
     </Canvas>
