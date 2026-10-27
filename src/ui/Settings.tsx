@@ -21,6 +21,7 @@ import {
 import type { GameState } from '../sim/types';
 import { downloadFile } from './download';
 import { Modal } from './Modal';
+import { Tabs } from './Tabs';
 
 type Tab = 'ui' | 'visuals' | 'audio' | 'saves';
 const TABS: [Tab, string][] = [
@@ -366,18 +367,14 @@ export function SettingsMenu({ onClose, onHelp }: { onClose: () => void; onHelp:
   const [tab, setTab] = useState<Tab>('ui');
   return (
     <Modal title="Settings" className="settings" onClose={onClose}>
-      <div className="tabs" role="tablist">
-        {TABS.map(([id, label]) => (
-          <button
-            key={id}
-            role="tab"
-            aria-selected={tab === id}
-            className={tab === id ? 'on' : ''}
-            onClick={() => setTab(id)}
-          >
-            {label}
-          </button>
-        ))}
+      <div className="tabs">
+        <Tabs
+          tabs={TABS}
+          value={tab}
+          onSelect={setTab}
+          idPrefix="settings-tab"
+          label="Settings sections"
+        />
       </div>
       <div className="settings-body">
         {tab === 'ui' && <UiTab onHelp={onHelp} />}

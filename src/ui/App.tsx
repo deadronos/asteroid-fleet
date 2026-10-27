@@ -26,6 +26,7 @@ import { useStackLayout } from './layout';
 import { fmt, formatSimTime } from './format';
 import { GearButton } from './GearButton';
 import { Modal } from './Modal';
+import { Tabs } from './Tabs';
 
 // Not needed for the first frame: the scene (three.js + r3f), the research tree
 // and the settings menu load as separate chunks right after first paint.
@@ -335,7 +336,7 @@ export function App() {
   }, []);
 
   return (
-    <div className="app">
+    <div className="app" id="app-root" tabIndex={-1}>
       <div className="canvas-wrap">
         <SceneBoundary>
           <Suspense fallback={null}>
@@ -361,40 +362,18 @@ export function App() {
       <GearButton onClick={() => setMenu(true)} />
       <div className={`side ${collapsed ? 'collapsed' : ''}`}>
         <div className="tabs">
-          <div
-            className="tablist"
-            role="tablist"
-            aria-label="Panels"
-            onKeyDown={(e) => {
-              const step = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
-              const edge = e.key === 'Home' ? 0 : e.key === 'End' ? TABS.length - 1 : null;
-              if (!step && edge === null) return;
-              e.preventDefault();
-              const i = TABS.findIndex(([id]) => id === tab);
-              const next = edge ?? (i + step + TABS.length) % TABS.length;
-              setTab(TABS[next][0]);
+          <Tabs
+            tabs={TABS}
+            value={tab}
+            idPrefix="side-tab"
+            label="Panels"
+            controls={collapsed ? undefined : 'side-panel'}
+            highlight={!collapsed}
+            onSelect={(id) => {
+              setTab(id);
               setCollapsed(false);
-              document.getElementById(`side-tab-${TABS[next][0]}`)?.focus();
             }}
-          >
-            {TABS.map(([id, label]) => (
-              <button
-                key={id}
-                id={`side-tab-${id}`}
-                role="tab"
-                aria-selected={tab === id}
-                aria-controls={collapsed ? undefined : 'side-panel'}
-                tabIndex={tab === id ? 0 : -1}
-                className={tab === id && !collapsed ? 'on' : ''}
-                onClick={() => {
-                  setTab(id);
-                  setCollapsed(false);
-                }}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          />
           <button
             className="collapse-btn"
             aria-expanded={!collapsed}

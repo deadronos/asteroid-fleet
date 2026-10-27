@@ -59,7 +59,8 @@ export function Modal({
     document.addEventListener('keydown', onKey);
     return () => {
       document.removeEventListener('keydown', onKey);
-      if (opener?.isConnected) opener.focus();
+      // The opener may have unmounted (Settings -> Help); fall back to the app root.
+      (opener?.isConnected ? opener : document.getElementById('app-root'))?.focus();
     };
   }, []);
 
