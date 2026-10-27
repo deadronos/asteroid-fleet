@@ -145,12 +145,15 @@ export function ResearchPanel() {
           b="Prestige now pays"
           bv={`+${rp} RP`}
         />
-        <p className="hint">
-          RP = ⌊√(ore value delivered ÷ {fmt(RP_DIVISOR)})⌋ × furthest zone tier. This run:{' '}
-          {fmt(s.stats.oreValueDelivered)} delivered, furthest {TIER_NAMES[tier]} (×{tier}).
-          Prestige resets credits, ships, slots and position; research, unlocked ships and rules,
-          doctrine and discovered systems persist.
-        </p>
+        <details>
+          <summary className="hint">How RP works</summary>
+          <p className="hint">
+            RP = ⌊√(ore value delivered ÷ {fmt(RP_DIVISOR)})⌋ × furthest zone tier. This run:{' '}
+            {fmt(s.stats.oreValueDelivered)} delivered, furthest {TIER_NAMES[tier]} (×{tier}).
+            Prestige resets credits, ships, slots and position; research, unlocked ships and rules,
+            doctrine and discovered systems persist.
+          </p>
+        </details>
         {!confirm ? (
           <button disabled={rp <= 0} onClick={() => setConfirm(true)}>
             Prestige…
@@ -185,10 +188,13 @@ export function ResearchPanel() {
       </div>
       <div className="prestige-box">
         <Pair a="Admiralty Marks" av={fmt(s.marks)} b="Admiralty now pays" bv={`+${fmt(marks)}`} />
-        <p className="hint">
-          Marks = ⌊√(lifetime RP ÷ {MARKS_DIVISOR})⌋ minus Marks paid. Resets research and
-          discovered systems; automation and hulls stay.
-        </p>
+        <details>
+          <summary className="hint">How Marks work</summary>
+          <p className="hint">
+            Marks = ⌊√(lifetime RP ÷ {MARKS_DIVISOR})⌋ minus Marks paid. Resets research and
+            discovered systems; automation and hulls stay.
+          </p>
+        </details>
         {!confirmAdm ? (
           <button disabled={marks <= 0} onClick={() => setConfirmAdm(true)}>
             Admiralty reset…

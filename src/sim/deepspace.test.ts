@@ -26,7 +26,7 @@ describe('deep space unlocks', () => {
   it('gates the fabrication bay behind tier 3', () => {
     const s = game(3);
     s.credits = 1e6;
-    expect(order(s, { type: 'buyHangar', hangarType: 'fabricator' })).toMatch(/deep space/);
+    expect(order(s, { type: 'buyHangar', hangarType: 'fabricator' })).toMatch(/deep space/i);
     enterSystem(s, deepSystem(s));
     expect(s.stats.furthestTier).toBe(3);
     expect(order(s, { type: 'buyHangar', hangarType: 'fabricator' })).toBeNull();

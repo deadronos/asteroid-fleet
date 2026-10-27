@@ -34,6 +34,7 @@ import {
   stateOf,
 } from './state';
 import { RETROFIT_COST, lifetimeResearch, marksPayout, researchPayout, shipCost } from './costs';
+import { warpBlocked } from './warpReason';
 import { executeJump } from './tick';
 import { addRoute, removeRoute, routeTick } from './routes';
 import { refit } from './shipyard';
@@ -277,13 +278,12 @@ export function order(s: Sim, c: Order): string | null {
       return null;
     }
     case 'warp': {
-      if (s.warp) return 'Already charging a jump';
+      const blocked = warpBlocked(s, c.systemId);
+      if (blocked) return blocked;
       const from = s.systems[s.systemId];
       const to = s.systems[c.systemId];
-      if (!to || !to.discovered || to.id === from.id) return 'Unknown system';
       const cost = jumpCost(s, from.distance, to.distance);
-      const pay = warpPayment(cost, s.carrier.energy, s.carrier.h2);
-      if (!pay) return `Needs ${cost} energy (or H2 to cover the gap)`;
+      const pay = warpPayment(cost, s.carrier.energy, s.carrier.h2)!;
       s.carrier.energy -= pay.energy;
       s.carrier.h2 -= pay.h2;
       const total =

@@ -12,6 +12,7 @@ import {
   TIER_NAMES,
   warpPayment,
 } from '../sim/config';
+import { warpBlocked } from '../sim/warpReason';
 import { admiraltyEffect } from '../sim/admiralty';
 import { lvl, repeatEffect } from '../sim/research';
 import { jumpCost, refineThroughput, solarRate, upkeep } from '../sim/state';
@@ -192,6 +193,7 @@ export function CarrierPanel() {
         const here = o.id === s.systemId;
         const cost = jumpCost(s, sys.distance, o.distance);
         const pay = warpPayment(cost, s.carrier.energy, s.carrier.h2);
+        const blocked = here ? null : !o.discovered ? 'Not discovered yet' : warpBlocked(s, o.id);
         return (
           <div key={o.id} className={`sys ${here ? 'here' : ''} ${o.discovered ? '' : 'unknown'}`}>
             <span className={`tier t${o.tier}`}>{TIER_NAMES[o.tier]}</span>
@@ -210,9 +212,12 @@ export function CarrierPanel() {
               <span className="tone-good">here</span>
             ) : (
               <button
-                disabled={!o.discovered || !!s.warp || !pay}
+                disabled={!!blocked}
                 onClick={() => engine.dispatch({ type: 'warp', systemId: o.id })}
-                title={o.distance < sys.distance ? 'Warp back to a safer system' : 'Warp outward'}
+                title={
+                  blocked ??
+                  (o.distance < sys.distance ? 'Warp back to a safer system' : 'Warp outward')
+                }
               >
                 Warp · {cost} E
                 {pay && pay.h2 > 0 && (

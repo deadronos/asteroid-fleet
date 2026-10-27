@@ -24,3 +24,8 @@ export function marksPayout(s: Pick<GameState, 'stats' | 'lifetime'>): number {
   const total = Math.floor(Math.sqrt(lifetimeResearch(s) / MARKS_DIVISOR));
   return Math.max(0, total - s.lifetime.marksEarned);
 }
+
+/** Why `cost` credits can't be spent now, or null. */
+export function creditsShort(s: Sim, cost: number): string | null {
+  return s.credits < cost ? `Need ${Math.ceil(cost)} credits` : null;
+}

@@ -100,7 +100,7 @@ describe('fitting modules', () => {
     );
     s.stats.furthestTier = 1;
     expect(order(s, { type: 'fitModule', shipId: ship.id, slot: 0, module: 'shield' })).toMatch(
-      /frontier/,
+      /frontier/i,
     );
     ship.mode = 'idle';
     expect(order(s, { type: 'fitModule', shipId: ship.id, slot: 0, module: 'tractor' })).toBe(
