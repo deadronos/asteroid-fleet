@@ -1,5 +1,5 @@
 import type { Command, OfflineReport } from '../sim/actions';
-import type { Carrier, Fx, GameState, Operation, ShipMode, Warp } from '../sim/types';
+import type { Carrier, HullId, Fx, GameState, Operation, ShipMode, Warp } from '../sim/types';
 import type { BusEvent } from './events';
 import type { UiSnapshot } from './snapshot';
 
@@ -31,7 +31,7 @@ export type InMsg =
   | { t: 'cmd'; cmd: Command }
   | { t: 'speed'; v: number }
   | { t: 'pause'; v: boolean }
-  | { t: 'prestige' }
+  | { t: 'prestige'; hull?: HullId }
   | { t: 'replace'; state: GameState; epoch: number }
   | { t: 'snapshot'; id: number };
 

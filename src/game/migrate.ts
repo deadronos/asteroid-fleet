@@ -102,6 +102,14 @@ export const migrations: Record<number, Migration> = {
     save.ops = [op];
     return save;
   },
+  // v11: hull classes (#65). Everyone keeps the standard carrier; later hulls unlock from prestige 1.
+  10: (save) => {
+    save.hulls = ['standard'];
+    if (Array.isArray(save.ops))
+      for (const op of save.ops)
+        if (isRecord(op) && isRecord(op.carrier)) op.carrier.hullClass ??= 'standard';
+    return save;
+  },
 };
 
 const LEGACY_TONE: Record<string, Severity> = {
@@ -176,6 +184,7 @@ function validateSave(save: SaveBlob): MigrateResult {
   if (!Array.isArray(save.cards)) save.cards = [];
   if (!Array.isArray(save.unlockedRules)) save.unlockedRules = [];
   if (!Array.isArray(save.events)) save.events = [];
+  if (!Array.isArray(save.hulls) || !save.hulls.includes('standard')) save.hulls = ['standard'];
 
   if (typeof save.credits !== 'number' || !Number.isFinite(save.credits))
     return { ok: false, reason: 'corrupt' };

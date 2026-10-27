@@ -3,6 +3,7 @@ import {
   type ActionKind,
   type ConditionKind,
   type HangarType,
+  type HullId,
   type ModuleId,
   type RuleCard,
   type RuleId,
@@ -409,7 +410,8 @@ export const SHIELD_ENERGY_PER_DMG = 1.2;
 export const SHIELD_REGEN = 0.03; // per second
 export const SHIELD_REGEN_ENERGY = 4; // energy/s while regenerating
 export const WARP_CHARGE = 15;
-export const warpCost = (from: number, to: number) => 250 + 150 * Math.abs(from - to);
+export const warpCost = (from: number, to: number, mult = 1) =>
+  Math.round((250 + 150 * Math.abs(from - to)) * mult);
 // Emergency warp fuel: H2 per missing energy. Fusion yields 50 energy per H2 (0.02 H2/energy),
 // so burning H2 at the drive (0.1 H2/energy) is 5x worse and the reactor stays the efficient path.
 export const WARP_H2_PER_ENERGY = 0.1;
@@ -420,6 +422,101 @@ export const warpPayment = (cost: number, energy: number, h2: number) => {
   const need = Math.ceil(gap * WARP_H2_PER_ENERGY);
   return h2 + 1e-9 < need ? null : { energy: e, h2: need };
 };
+
+// ---------- Hull classes (#65) ----------
+
+export interface HullDef {
+  name: string;
+  blurb: string;
+  /** Hangars a new run starts with, and the slots in each. */
+  start: HangarType[];
+  slots: number;
+  /** Slots in a hangar bought later (before the `slots` research). */
+  newSlots: number;
+  hull: number; // carrier hull points
+  energy: number; // multiplier on the energy pool
+  refinery: number; // multiplier on refinery throughput
+  warpCharge: number; // multiplier on charge time
+  warpCost: number; // multiplier on jump energy
+  shield: number; // multiplier on shield regeneration
+  /** Unlocks once this zone tier has been reached on a run after the first prestige. */
+  tier: 1 | 2 | 3;
+}
+
+export const HULLS: Record<HullId, HullDef> = {
+  standard: {
+    name: 'Standard carrier',
+    blurb: 'Balanced',
+    start: ['launch', 'cargo'],
+    slots: 6,
+    newSlots: 4,
+    hull: 2000,
+    energy: 1,
+    refinery: 1,
+    warpCharge: 1,
+    warpCost: 1,
+    shield: 1,
+    tier: 1,
+  },
+  light: {
+    name: 'Light carrier',
+    blurb: 'Fast, cheap warps; one hangar to start; frail',
+    start: ['launch'],
+    slots: 6,
+    newSlots: 4,
+    hull: 1200,
+    energy: 0.8,
+    refinery: 0.8,
+    warpCharge: 0.5,
+    warpCost: 0.6,
+    shield: 1,
+    tier: 2,
+  },
+  fleet: {
+    name: 'Fleet carrier',
+    blurb: 'Three hangars to start, big energy pool; slow warps',
+    start: ['launch', 'cargo', 'launch'],
+    slots: 6,
+    newSlots: 6,
+    hull: 2600,
+    energy: 1.4,
+    refinery: 1,
+    warpCharge: 1.3,
+    warpCost: 1.3,
+    shield: 1,
+    tier: 2,
+  },
+  mining: {
+    name: 'Mining mothership',
+    blurb: 'Double refinery throughput; small hangars',
+    start: ['launch', 'cargo'],
+    slots: 4,
+    newSlots: 3,
+    hull: 2000,
+    energy: 1.2,
+    refinery: 2,
+    warpCharge: 1.2,
+    warpCost: 1.2,
+    shield: 1,
+    tier: 3,
+  },
+  bastion: {
+    name: 'Bastion',
+    blurb: 'Heavy hull, shields regenerate twice as fast; weak refinery',
+    start: ['launch', 'cargo'],
+    slots: 5,
+    newSlots: 4,
+    hull: 3500,
+    energy: 1.5,
+    refinery: 0.7,
+    warpCharge: 1.5,
+    warpCost: 1.4,
+    shield: 2,
+    tier: 3,
+  },
+};
+
+export const HULL_IDS = Object.keys(HULLS) as HullId[];
 
 // ---------- Pirates ----------
 

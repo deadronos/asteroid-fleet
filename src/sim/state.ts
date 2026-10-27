@@ -2,11 +2,15 @@ import {
   DEFAULT_STANCE,
   ENERGY_MAX,
   HANGAR_UPKEEP,
+  HULLS,
+  HULL_IDS,
   ORE_BY_TIER,
   SHIP_STATS,
   SHIP_UPKEEP,
   SOLAR_RATE,
   STARTER_RULES,
+  refineRate,
+  warpCost,
   ZONE_RULE_UNLOCKS,
   ZONE_UNLOCKS,
 } from './config';
@@ -21,6 +25,7 @@ import type {
   GameState,
   Hangar,
   Hazard,
+  HullId,
   Operation,
   RuleId,
   Ship,
@@ -34,7 +39,7 @@ import type {
 } from './types';
 
 /** Bump together with a `migrations[n]` step and a fixture. See README "Save migrations". */
-export const SAVE_VERSION = 10;
+export const SAVE_VERSION = 11;
 
 /** Every `Operation` field. The `satisfies` below fails to compile when one is missing. */
 export const OP_KEYS = [
@@ -118,6 +123,12 @@ class SimView implements Sim {
   }
   set unlocked(v) {
     this.g.unlocked = v;
+  }
+  get hulls() {
+    return this.g.hulls;
+  }
+  set hulls(v) {
+    this.g.hulls = v;
   }
   get unlockedRules() {
     return this.g.unlockedRules;
@@ -505,6 +516,7 @@ export function enterSystem(s: Sim, id: number) {
     for (const c of ZONE_UNLOCKS[t]) if (!s.unlocked.includes(c)) s.unlocked.push(c);
     for (const rid of ZONE_RULE_UNLOCKS[t]) unlockRule(s, rid);
   }
+  unlockHulls(s);
 }
 
 /** Unlock a preset: its action becomes usable, and its card is dealt once if a slot is free. */
@@ -525,7 +537,33 @@ export function maxHull(s: Sim, cls: ShipClass): number {
 }
 
 export function maxEnergy(s: Sim): number {
-  return ENERGY_MAX * (1 + 0.25 * lvl(s, 'energyCap')) * (1 + repeatEffect(s, 'deepEnergy'));
+  return (
+    ENERGY_MAX *
+    HULLS[s.carrier.hullClass].energy *
+    (1 + 0.25 * lvl(s, 'energyCap')) *
+    (1 + repeatEffect(s, 'deepEnergy'))
+  );
+}
+
+/** Refinery throughput, ore/s: level, hull class and void refining. */
+export function refineThroughput(s: Sim): number {
+  return (
+    refineRate(s.carrier.refinery) *
+    HULLS[s.carrier.hullClass].refinery *
+    (1 + 0.25 * lvl(s, 'voidRefining'))
+  );
+}
+
+/** Jump energy between two system distances, with the hull's multiplier. */
+export function jumpCost(s: Sim, from: number, to: number): number {
+  return warpCost(from, to, HULLS[s.carrier.hullClass].warpCost);
+}
+
+/** Unlock hull classes the run has earned: after the first prestige, by furthest tier. */
+export function unlockHulls(s: Sim) {
+  if (s.lifetime.prestiges < 1) return;
+  for (const id of HULL_IDS)
+    if (HULLS[id].tier <= s.stats.furthestTier && !s.hulls.includes(id)) s.hulls.push(id);
 }
 
 /** Solar recharge in the current system, energy/s, before storm boosts. */
@@ -663,6 +701,8 @@ interface Carry {
   researchLevels: Record<string, number>;
   unlocked: ShipClass[];
   unlockedRules: RuleId[];
+  hulls?: HullId[];
+  hullClass?: HullId;
   discovered: number[];
   lifetime: GameState['lifetime'];
   doctrine?: GameState['doctrine'];
@@ -672,14 +712,18 @@ interface Carry {
 
 export function newGame(seed = 1337, carry?: Carry): GameState {
   const slotsBonus = carry?.researchLevels.slots ?? 0;
+  const hulls = carry?.hulls ?? ['standard'];
+  const hullClass =
+    carry?.hullClass && hulls.includes(carry.hullClass) ? carry.hullClass : 'standard';
+  const hd = HULLS[hullClass];
   const op: Operation = {
     id: 0,
     rng: seed,
     carrier: {
       pos: v3(),
       target: null,
-      hull: 2000,
-      maxHull: 2000,
+      hull: hd.hull,
+      maxHull: hd.hull,
       energy: ENERGY_MAX * 0.6,
       shield: 1,
       ore: 0,
@@ -687,29 +731,29 @@ export function newGame(seed = 1337, carry?: Carry): GameState {
       h2: 0,
       stance: 'followRich',
       refinery: 0,
+      hullClass,
     },
-    hangars: [
-      {
-        id: 1,
-        type: 'launch',
-        slots: 6 + slotsBonus,
-        items: [],
-        stance: {},
-        launchOrder: ['fighter', 'scout', 'drone', 'repair', 'hauler', 'barge', 'harvester'],
-        launchTimer: 0,
-        target: {},
-      },
-      {
-        id: 2,
-        type: 'cargo',
-        slots: 6 + slotsBonus,
-        items: [],
-        stance: {},
-        launchOrder: ['fighter', 'drone', 'hauler', 'barge', 'repair', 'scout', 'harvester'],
-        launchTimer: 0,
-        target: {},
-      },
-    ],
+    hangars: hd.start.map((type, i) => ({
+      id: i + 1,
+      type,
+      slots: hd.slots + slotsBonus,
+      items: [],
+      stance: {},
+      launchOrder:
+        type === 'launch'
+          ? (['fighter', 'scout', 'drone', 'repair', 'hauler', 'barge', 'harvester'] as ShipClass[])
+          : ([
+              'fighter',
+              'drone',
+              'hauler',
+              'barge',
+              'repair',
+              'scout',
+              'harvester',
+            ] as ShipClass[]),
+      launchTimer: 0,
+      target: {},
+    })),
     ships: [],
     pirates: [],
     asteroids: [],
@@ -735,6 +779,7 @@ export function newGame(seed = 1337, carry?: Carry): GameState {
     researchLevels: carry?.researchLevels ?? {},
     unlocked: carry?.unlocked ?? [],
     unlockedRules: [],
+    hulls: [...hulls],
     systems: makeSystems(seed),
     fields: {},
     doctrine: carry?.doctrine ?? {

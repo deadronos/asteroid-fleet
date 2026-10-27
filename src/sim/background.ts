@@ -6,12 +6,20 @@
 // operation and the run-wide state, never on what else was stepped. `settleOffline` plays
 // the same model over the time away (Tier C).
 
-import { WAVE_INTERVAL, refineRate } from './config';
+import { WAVE_INTERVAL } from './config';
 import { queueRebuild } from './automation';
 import { heatFactor, waveWarning } from './combat';
 import { onSphere, rand, randRange } from './math';
-import { lvl, reserveDefs } from './research';
-import { createShip, emit, h2Storm, maxEnergy, solarRate, upkeepRate } from './state';
+import { reserveDefs } from './research';
+import {
+  createShip,
+  emit,
+  h2Storm,
+  maxEnergy,
+  refineThroughput,
+  solarRate,
+  upkeepRate,
+} from './state';
 import type { Ship, ShipClass, Sim } from './types';
 
 /** Seconds before the next wave when a carrier comes back from offline, at least. */
@@ -61,7 +69,7 @@ export function bottleneckYield(s: Sim): number {
   const mined = Math.max(0, s.miningIncomeAvg || 0);
   const c = s.carrier;
   const perOre = c.ore > 0 ? c.oreValue / c.ore : Infinity;
-  const refined = refineRate(c.refinery) * (1 + 0.25 * lvl(s, 'voidRefining')) * perOre;
+  const refined = refineThroughput(s) * perOre;
   // Refining stalls once the pool is empty and solar cannot cover upkeep.
   const powered = c.energy > 0 || energyNet(s) > 0 ? Infinity : 0;
   return Math.min(mined, refined, powered);
