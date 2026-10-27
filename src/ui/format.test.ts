@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fmt } from './format';
+import { fmt, formatSimTime } from './format';
 
 describe('fmt', () => {
   it('prints small values in full', () => {
@@ -20,5 +20,23 @@ describe('fmt', () => {
   it('is safe on non-finite input', () => {
     expect(fmt(Infinity)).toBe('∞');
     expect(fmt(NaN)).toBe('0');
+  });
+});
+
+describe('formatSimTime', () => {
+  it('prints hh:mm:ss below a day of sim time', () => {
+    expect(formatSimTime(0)).toBe('00:00:00');
+    expect(formatSimTime(59)).toBe('00:00:59');
+    expect(formatSimTime(23 * 3600 + 59 * 60 + 59)).toBe('23:59:59');
+  });
+  it('adds the day count instead of wrapping at 24 h', () => {
+    expect(formatSimTime(24 * 3600)).toBe('1d 00:00:00');
+    expect(formatSimTime(2 * 86400 + 3 * 3600 + 4 * 60 + 5)).toBe('2d 03:04:05');
+    expect(formatSimTime(36 * 3600 + 30)).toBe('1d 12:00:30');
+  });
+  it('truncates fractions and clamps bad input to zero', () => {
+    expect(formatSimTime(59.9)).toBe('00:00:59');
+    expect(formatSimTime(-5)).toBe('00:00:00');
+    expect(formatSimTime(Number.NaN)).toBe('00:00:00');
   });
 });

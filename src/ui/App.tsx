@@ -23,7 +23,7 @@ import { CarrierBar } from './CarrierBar';
 import { ignoresHotkey } from './carriers';
 import { Hud } from './Hud';
 import { useStackLayout } from './layout';
-import { fmt } from './format';
+import { fmt, formatSimTime } from './format';
 import { GearButton } from './GearButton';
 
 // Not needed for the first frame: the scene (three.js + r3f), the research tree
@@ -137,7 +137,7 @@ export function LogPanel({
       <div className="log">
         {rows.map((l) => (
           <div key={inboxKey(l)} className={toneClass(l.severity)}>
-            <span className="t">{new Date(l.t * 1000).toISOString().slice(11, 19)}</span>
+            <span className="t">{formatSimTime(l.t)}</span>
             {formatEvent(l)}
             {l.count > 1 && <span className="t">x{l.count}</span>}
           </div>

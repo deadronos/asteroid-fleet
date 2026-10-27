@@ -32,3 +32,18 @@ export function fmt(n: number, digits = 1): string {
   }
   return String(Math.floor(n));
 }
+
+/**
+ * Sim-clock label: hh:mm:ss below a day, then "Xd hh:mm:ss". The log used to
+ * take the UTC clock part of a Date, which wrapped to 00:00:00 after 24 h of
+ * sim time and made rows from different days look out of order (#123).
+ */
+export function formatSimTime(t: number): string {
+  const total = Number.isFinite(t) ? Math.max(0, Math.floor(t)) : 0;
+  const days = Math.floor(total / 86400);
+  const rest = total % 86400;
+  const clock = [Math.floor(rest / 3600), Math.floor((rest % 3600) / 60), rest % 60]
+    .map((n) => String(n).padStart(2, '0'))
+    .join(':');
+  return days > 0 ? `${days}d ${clock}` : clock;
+}
