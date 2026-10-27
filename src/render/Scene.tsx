@@ -21,7 +21,7 @@ import { SHIP_CLASSES, type Vec3 } from '../sim/types';
 import { AsteroidField } from './AsteroidField';
 import { Containers } from './Containers';
 import { Fleet } from './Fleet';
-import { CLASSES, FleetPass, asteroidById, fleetFrame } from './frameState';
+import { CLASSES, FleetPass, MAX_ENTITIES, asteroidById, fleetFrame } from './frameState';
 import { GAS_FRAG, GAS_VERT, NEBULA_FRAG, NEBULA_VERT } from './geometry';
 import { FrameCap, RenderStats } from './RenderLoop';
 
@@ -87,7 +87,7 @@ function Beams() {
     const col = geo.getAttribute('color') as THREE.BufferAttribute;
     let n = 0;
     const rocks = asteroidById(s.asteroids);
-    for (let k = 0; k < s.ships.length && n < MAX_SEG; k++) {
+    for (let k = 0; k < s.ships.length && k < MAX_ENTITIES && n < MAX_SEG; k++) {
       const sh = s.ships[k];
       if (sh.mode !== 'mining') continue;
       const r = rocks.get(sh.targetId);
