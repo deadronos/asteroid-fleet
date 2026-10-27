@@ -11,7 +11,7 @@ import type {
   Stance,
   UnderFire,
 } from '../sim/types';
-import { TOAST_POLICY, resolveAlert } from '../game/toasts';
+import { TOAST_POLICY } from '../game/toasts';
 import { formatEventKind } from './events';
 import { carrierChoices } from './inbox';
 import { RuleCards } from './RuleCards';
@@ -67,7 +67,11 @@ function StanceRow({
           onChange={(e) => set(key, e.target.value)}
           disabled={disabled}
         >
-          {inherited && <option value="">inherit</option>}
+          {inherited && (
+            <option value="" title="Use the setting from the broader scope">
+              inherit
+            </option>
+          )}
           {opts.map(([o, l]) => (
             <option key={String(o)} value={String(o)}>
               {l}
@@ -98,7 +102,28 @@ const ALERT_LABEL: [AlertMode, string][] = [
   ['pause', 'Toast + pause'],
   ['focus', 'Toast + focus'],
 ];
-const ALERT_KINDS = (Object.keys(TOAST_POLICY) as SimEventKind[]).filter((k) => k !== 'Legacy');
+const ALERT_GROUPS: [string, SimEventKind[]][] = [
+  [
+    'Combat',
+    [
+      'PirateWaveIncoming',
+      'PiratesArrived',
+      'WaveRepelled',
+      'ShipLost',
+      'ShipRetreating',
+      'BargeWrecked',
+    ],
+  ],
+  ['Travel', ['WarpCharging', 'WarpCancelled', 'Warped', 'EmergencyJump']],
+  ['Hazards and mining', ['StormStarted', 'StormPassed', 'HazardCharted', 'VeinFound']],
+  ['Fleet', ['CarrierOnline', 'BargeFallback', 'ReserveRebuilt', 'ShipRebuilt', 'HangarInstalled']],
+  ['Progress', ['Prestiged', 'Admiralty', 'ChallengeStarted', 'ChallengeComplete', 'WelcomeBack']],
+];
+const GROUPED = new Set(ALERT_GROUPS.flatMap(([, ks]) => ks));
+const ALERT_OTHER = (Object.keys(TOAST_POLICY) as SimEventKind[]).filter(
+  (k) => k !== 'Legacy' && !GROUPED.has(k),
+);
+if (ALERT_OTHER.length) ALERT_GROUPS.push(['Other', ALERT_OTHER]);
 
 function AlertRules() {
   const s = useGame();
@@ -117,7 +142,8 @@ function AlertRules() {
       <h3>Alerts</h3>
       <p className="hint">
         Choose what each event does. A carrier&apos;s own setting beats the fleet-wide one. Off
-        hides the event from the inbox too. Unset events use the default.
+        hides the event from the inbox too. Unset events use the default; “inherit” means a carrier
+        follows the fleet-wide rule.
       </p>
       {choices.length > 1 && (
         <label>
@@ -138,37 +164,39 @@ function AlertRules() {
           </select>
         </label>
       )}
-      <table className="doc">
-        <tbody>
-          {ALERT_KINDS.map((kind) => {
-            const own =
-              active === 'fleet' ? s.alerts.fleet[kind] : s.alerts.byCarrier[active]?.[kind];
-            const inherited = active === 'fleet' ? null : resolveAlert(s.alerts, kind, -1);
-            return (
-              <tr key={kind}>
-                <td>{formatEventKind(kind)}</td>
-                <td>
-                  <select
-                    aria-label={formatEventKind(kind)}
-                    className={own === undefined ? 'inherit' : ''}
-                    value={own ?? ''}
-                    onChange={(e) => set(kind, e.target.value)}
-                  >
-                    <option value="">
-                      {active === 'fleet' ? 'default' : `inherit${inherited ? '' : ''}`}
-                    </option>
-                    {ALERT_LABEL.map(([m, l]) => (
-                      <option key={m} value={m}>
-                        {l}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+      {ALERT_GROUPS.map(([group, kinds], i) => (
+        <details key={group} open={i === 0}>
+          <summary>{group}</summary>
+          <table className="doc">
+            <tbody>
+              {kinds.map((kind) => {
+                const own =
+                  active === 'fleet' ? s.alerts.fleet[kind] : s.alerts.byCarrier[active]?.[kind];
+                return (
+                  <tr key={kind}>
+                    <td>{formatEventKind(kind)}</td>
+                    <td>
+                      <select
+                        aria-label={formatEventKind(kind)}
+                        className={own === undefined ? 'inherit' : ''}
+                        value={own ?? ''}
+                        onChange={(e) => set(kind, e.target.value)}
+                      >
+                        <option value="">{active === 'fleet' ? 'default' : 'inherit'}</option>
+                        {ALERT_LABEL.map(([m, l]) => (
+                          <option key={m} value={m}>
+                            {l}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </details>
+      ))}
     </>
   );
 }
@@ -181,7 +209,8 @@ export function DoctrinePanel() {
       <p className="hint">
         You never give direct orders. Stances set default behaviour, from broad to specific: fleet
         doctrine, then per ship type, then per hangar. The most specific setting wins; rule cards
-        below override stances while they are active.
+        below override stances while they are active. “Inherit” means: use the broader scope’s
+        setting.
         {!s.unlocked.includes('fighter') && ' Engagement stances unlock in the frontier.'}
       </p>
       <table className="doc">

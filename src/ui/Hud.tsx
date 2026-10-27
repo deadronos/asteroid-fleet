@@ -11,7 +11,12 @@ import { shallowEqual } from './equal';
 function Bar({ v, color }: { v: number; color: string }) {
   return (
     <div className="bar">
-      <i style={{ width: `${Math.max(0, Math.min(1, v)) * 100}%`, background: color }} />
+      <i
+        style={{
+          width: `${Math.max(0, Math.min(1, v)) * 100}%`,
+          background: color,
+        }}
+      />
     </div>
   );
 }
@@ -52,6 +57,7 @@ export function Hud({
       h2: c.h2.toFixed(0),
       heat: heat.toFixed(2),
       heatNum: Math.round(heat * 100) / 100,
+      safe: sys.tier === 1,
       outside: s.ships.filter((x) => x.mode !== 'docked').length,
       sysName: sys.name,
       sysTier: sys.tier,
@@ -103,17 +109,29 @@ export function Hud({
             </span>
           </div>
         )}
-        <div className="chip" title="Ore held by the fleet and carrier raises pirate wave size">
+        <div
+          className="chip"
+          title={
+            h.safe
+              ? 'Safe zone: no raids here. In Frontier and Deep space, ore held by the fleet and carrier raises pirate wave size.'
+              : 'Ore held by the fleet and carrier raises pirate wave size'
+          }
+        >
           <span className="k">Cargo heat</span>
-          <span
-            className="v"
-            style={{
-              color: h.heatNum > 2 ? 'var(--bad)' : h.heatNum > 1.4 ? 'var(--warn)' : 'var(--text)',
-            }}
-          >
-            ×{h.heat}
-          </span>
-          <span className="sub">{h.outside} ships out</span>
+          {h.safe ? (
+            <span className="v">Safe zone</span>
+          ) : (
+            <span
+              className="v"
+              style={{
+                color:
+                  h.heatNum > 2 ? 'var(--bad)' : h.heatNum > 1.4 ? 'var(--warn)' : 'var(--text)',
+              }}
+            >
+              ×{h.heat}
+            </span>
+          )}
+          <span className="sub">{h.safe ? 'no raids' : `${h.outside} ships out`}</span>
         </div>
         <div className="chip">
           <span className="k">System</span>
@@ -182,7 +200,11 @@ function Alerts() {
       };
     if (s.wave.active) return { kind: 'attack', raiders: s.pirates.length };
     if (s.wave.warning)
-      return { kind: 'wave', seconds: Math.ceil(s.wave.timer), size: s.wave.size };
+      return {
+        kind: 'wave',
+        seconds: Math.ceil(s.wave.timer),
+        size: s.wave.size,
+      };
     if (s.storm.active > 0) return { kind: 'storm', gas: s.systems[s.systemId].gasGiant };
     return null;
   }, shallowEqual);

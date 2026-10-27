@@ -23,11 +23,10 @@ import { downloadFile } from './download';
 import { Modal } from './Modal';
 import { Tabs } from './Tabs';
 
-type Tab = 'ui' | 'visuals' | 'audio' | 'saves';
+type Tab = 'ui' | 'visuals' | 'saves';
 const TABS: [Tab, string][] = [
   ['ui', 'UI'],
   ['visuals', 'Visuals'],
-  ['audio', 'Audio'],
   ['saves', 'Save Management'],
 ];
 
@@ -84,7 +83,11 @@ function VisualsTab() {
       <Field label="Quality">
         <select
           value={s.quality}
-          onChange={(e) => updateSettings({ quality: e.target.value === 'low' ? 'low' : 'high' })}
+          onChange={(e) =>
+            updateSettings({
+              quality: e.target.value === 'low' ? 'low' : 'high',
+            })
+          }
         >
           <option value="high">High</option>
           <option value="low">Low (no post effects, capped resolution and frame rate)</option>
@@ -111,33 +114,6 @@ function VisualsTab() {
           ))}
         </select>
       </Field>
-    </>
-  );
-}
-
-function Volume({ label, k }: { label: string; k: 'masterVolume' | 'musicVolume' | 'sfxVolume' }) {
-  const s = useSettings();
-  return (
-    <Field label={`${label} · ${Math.round(s[k] * 100)}%`}>
-      <input
-        type="range"
-        min={0}
-        max={1}
-        step={0.05}
-        value={s[k]}
-        onChange={(e) => updateSettings({ [k]: Number(e.target.value) })}
-      />
-    </Field>
-  );
-}
-
-function AudioTab() {
-  return (
-    <>
-      <p className="hint">The game has no sound yet. These levels are kept for when it does.</p>
-      <Volume label="Master" k="masterVolume" />
-      <Volume label="Music" k="musicVolume" />
-      <Volume label="Effects" k="sfxVolume" />
     </>
   );
 }
@@ -218,7 +194,10 @@ function SavesTab() {
                   const state = await engine.fullState();
                   state.savedAt = Date.now();
                   if (!writeSlot(info.slot, state)) {
-                    setMsg({ text: 'Could not write to browser storage.', bad: true });
+                    setMsg({
+                      text: 'Could not write to browser storage.',
+                      bad: true,
+                    });
                     return;
                   }
                   setActiveSlot(info.slot);
@@ -299,7 +278,11 @@ function SavesTab() {
             onClick={() =>
               navigator.clipboard.writeText(text).then(
                 () => setMsg({ text: 'Copied to clipboard.' }),
-                () => setMsg({ text: 'Copy failed; select the text and copy it.', bad: true }),
+                () =>
+                  setMsg({
+                    text: 'Copy failed; select the text and copy it.',
+                    bad: true,
+                  }),
               )
             }
           >
@@ -332,7 +315,11 @@ function SavesTab() {
             setMsg({ text: 'Saving…' });
             // "Saved." only once storage holds it, so a reload right after keeps it.
             if (await engine.save()) setMsg({ text: 'Saved.' });
-            else setMsg({ text: 'Save failed: storage is unavailable.', bad: true });
+            else
+              setMsg({
+                text: 'Save failed: storage is unavailable.',
+                bad: true,
+              });
           }}
         >
           Save now
@@ -379,7 +366,6 @@ export function SettingsMenu({ onClose, onHelp }: { onClose: () => void; onHelp:
       <div className="settings-body">
         {tab === 'ui' && <UiTab onHelp={onHelp} />}
         {tab === 'visuals' && <VisualsTab />}
-        {tab === 'audio' && <AudioTab />}
         {tab === 'saves' && <SavesTab />}
       </div>
     </Modal>
