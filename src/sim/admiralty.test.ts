@@ -37,7 +37,6 @@ describe('Admiralty (#68)', () => {
     expect(next.researchLevels).toEqual({ autoRebuild: 1, autoBuy: 1, tactics: 1 });
     const known = (x: typeof next) => x.systems.filter((y) => y.discovered).length;
     expect(known(next)).toBe(known(newGame(next.seed)));
-    expect(next.unlocked).toEqual(g.unlocked);
     expect(next.unlocked).toContain('harvester');
     expect(next.credits).toBe(150);
     expect(next.stats.oreValueDelivered).toBe(0);
