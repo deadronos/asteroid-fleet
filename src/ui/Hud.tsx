@@ -11,12 +11,7 @@ import { shallowEqual } from './equal';
 function Bar({ v, color }: { v: number; color: string }) {
   return (
     <div className="bar">
-      <i
-        style={{
-          width: `${Math.max(0, Math.min(1, v)) * 100}%`,
-          background: color,
-        }}
-      />
+      <i style={{ width: `${Math.max(0, Math.min(1, v)) * 100}%`, background: color }} />
     </div>
   );
 }
@@ -200,11 +195,7 @@ function Alerts() {
       };
     if (s.wave.active) return { kind: 'attack', raiders: s.pirates.length };
     if (s.wave.warning)
-      return {
-        kind: 'wave',
-        seconds: Math.ceil(s.wave.timer),
-        size: s.wave.size,
-      };
+      return { kind: 'wave', seconds: Math.ceil(s.wave.timer), size: s.wave.size };
     if (s.storm.active > 0) return { kind: 'storm', gas: s.systems[s.systemId].gasGiant };
     return null;
   }, shallowEqual);

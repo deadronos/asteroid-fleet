@@ -83,11 +83,7 @@ function VisualsTab() {
       <Field label="Quality">
         <select
           value={s.quality}
-          onChange={(e) =>
-            updateSettings({
-              quality: e.target.value === 'low' ? 'low' : 'high',
-            })
-          }
+          onChange={(e) => updateSettings({ quality: e.target.value === 'low' ? 'low' : 'high' })}
         >
           <option value="high">High</option>
           <option value="low">Low (no post effects, capped resolution and frame rate)</option>
@@ -194,10 +190,7 @@ function SavesTab() {
                   const state = await engine.fullState();
                   state.savedAt = Date.now();
                   if (!writeSlot(info.slot, state)) {
-                    setMsg({
-                      text: 'Could not write to browser storage.',
-                      bad: true,
-                    });
+                    setMsg({ text: 'Could not write to browser storage.', bad: true });
                     return;
                   }
                   setActiveSlot(info.slot);
@@ -278,11 +271,7 @@ function SavesTab() {
             onClick={() =>
               navigator.clipboard.writeText(text).then(
                 () => setMsg({ text: 'Copied to clipboard.' }),
-                () =>
-                  setMsg({
-                    text: 'Copy failed; select the text and copy it.',
-                    bad: true,
-                  }),
+                () => setMsg({ text: 'Copy failed; select the text and copy it.', bad: true }),
               )
             }
           >
@@ -315,11 +304,7 @@ function SavesTab() {
             setMsg({ text: 'Saving…' });
             // "Saved." only once storage holds it, so a reload right after keeps it.
             if (await engine.save()) setMsg({ text: 'Saved.' });
-            else
-              setMsg({
-                text: 'Save failed: storage is unavailable.',
-                bad: true,
-              });
+            else setMsg({ text: 'Save failed: storage is unavailable.', bad: true });
           }}
         >
           Save now
