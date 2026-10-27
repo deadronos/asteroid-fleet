@@ -42,6 +42,22 @@ function time(f: () => void, n = 100): number {
 }
 
 describe('UI snapshot', () => {
+  it('lists other carriers in the focused system only', () => {
+    const s = busyGame();
+    const g = stateOf(s);
+    const near = structuredClone(g.ops[0]);
+    near.id = 91;
+    const far = structuredClone(g.ops[0]);
+    far.id = 92;
+    far.systemId = g.ops[0].systemId + 1;
+    g.ops.push(near, far);
+    const { snap } = encodeSnapshot(g, false);
+    expect(snap.others.map((o) => o.id)).toEqual([91]);
+    expect(snap.others[0].pos).toEqual(near.carrier.pos);
+    const live = near.ships.filter((x) => x.mode !== 'docked').length;
+    expect(snap.others[0].ships.length).toBe(live * 4);
+  });
+
   it('rebuilds the exact sim state', () => {
     const s = busyGame();
     expect(s.ships.some((x) => x.station)).toBe(true);

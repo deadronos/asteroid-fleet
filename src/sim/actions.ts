@@ -286,11 +286,9 @@ export function order(s: Sim, c: Order): string | null {
       if (!pay) return `Needs ${cost} energy (or H2 to cover the gap)`;
       s.carrier.energy -= pay.energy;
       s.carrier.h2 -= pay.h2;
-      s.warp = {
-        targetSystem: to.id,
-        charge:
-          WARP_CHARGE * HULLS[s.carrier.hullClass].warpCharge * (1 - 0.15 * lvl(s, 'warpCharge')),
-      };
+      const total =
+        WARP_CHARGE * HULLS[s.carrier.hullClass].warpCharge * (1 - 0.15 * lvl(s, 'warpCharge'));
+      s.warp = { targetSystem: to.id, charge: total, total };
       emit(s, 'WarpCharging', { system: to.name });
       return null;
     }

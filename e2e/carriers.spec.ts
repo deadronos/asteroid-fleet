@@ -78,3 +78,20 @@ test('HUD controls and carrier bar stay clickable when the HUD wraps', async ({ 
   await page.getByRole('button', { name: 'Map' }).click();
   await expect(page.getByRole('heading', { name: 'Star map' })).toBeVisible();
 });
+
+// Two carriers in one system: the second is drawn too (#127).
+test('another carrier in the viewed system is drawn', async ({ page }) => {
+  const s = makeGame(3);
+  const g = stateOf(s);
+  const other = structuredClone(g.ops[0]);
+  other.id = 77;
+  g.ops.push(other);
+  await seedSave(page, s);
+  await openApp(page);
+
+  await expect
+    .poll(() => page.evaluate(() => (globalThis as any).__render?.otherCarriers), {
+      timeout: 30_000,
+    })
+    .toBe(1);
+});

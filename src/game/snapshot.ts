@@ -11,6 +11,7 @@ import {
   type Pirate,
   type Ship,
   type ShipMode,
+  type Vec3,
 } from '../sim/types';
 
 /**
@@ -28,6 +29,16 @@ export interface UiSnapshot {
   focus: FocusPart;
   /** One entry per carrier, in `ops` order, for the carrier bar. */
   carriers: CarrierBrief[];
+  /** Other carriers in the focused carrier's system, for drawing (#127). */
+  others: OtherCarrier[];
+}
+
+/** A non-focused carrier sharing the viewed system: where it is and where its ships are. */
+export interface OtherCarrier {
+  id: number;
+  pos: Vec3;
+  /** Non-docked ships, 4 numbers each: class index, x, y, z. */
+  ships: Float32Array<ArrayBuffer>;
 }
 
 /** What the carrier bar shows about one carrier. */
@@ -96,6 +107,8 @@ const SHIP_ROW = 23 + MAX_MODULES;
 const PIRATE_ROW = 10;
 // id pos×3 ore maxOre value radius respawn
 const ASTEROID_ROW = 9;
+// cls pos×3
+export const OTHER_ROW = 4;
 
 export function encodeSnapshot(
   g: GameState,
@@ -173,6 +186,20 @@ export function encodeSnapshot(
     o += ASTEROID_ROW;
   }
 
+  const others: OtherCarrier[] = [];
+  for (const op of g.ops) {
+    if (op === s || op.systemId !== s.systemId) continue;
+    const live = op.ships.filter((x) => x.mode !== 'docked');
+    const rows = new Float32Array(live.length * OTHER_ROW);
+    live.forEach((x, i) => {
+      rows[i * OTHER_ROW] = clsIndex.get(x.cls)!;
+      rows[i * OTHER_ROW + 1] = x.pos.x;
+      rows[i * OTHER_ROW + 2] = x.pos.y;
+      rows[i * OTHER_ROW + 3] = x.pos.z;
+    });
+    others.push({ id: op.id, pos: { ...op.carrier.pos }, ships: rows });
+  }
+
   const hangars: FocusPart['hangars'] = [];
   for (const h of s.hangars) {
     const items = new Int32Array(h.items.length * 2);
@@ -189,6 +216,7 @@ export function encodeSnapshot(
   focus.asteroids = asteroids;
   return {
     snap: {
+      others,
       global: global as GlobalPart,
       focus: focus as FocusPart,
       carriers: g.ops.map((op) => ({
@@ -204,6 +232,7 @@ export function encodeSnapshot(
       ships.buffer,
       pirates.buffer,
       asteroids.buffer,
+      ...others.map((o) => o.ships.buffer),
       ...hangars.map((h) => h.items.buffer),
     ],
   };

@@ -25,9 +25,10 @@ export function FrameCap({ fps }: { fps: number }) {
   return null;
 }
 
-/** Draw calls and triangles per frame, summed over all passes, on `__render`. */
+/** Draw calls and triangles per frame, summed over all passes, and the extra carriers drawn, on `__render`. */
 export function RenderStats() {
   const gl = useThree((s) => s.gl);
+  const scene = useThree((s) => s.scene);
   useEffect(() => {
     gl.info.autoReset = false;
     return () => {
@@ -39,6 +40,7 @@ export function RenderStats() {
     (globalThis as unknown as { __render: object }).__render = {
       calls: r.calls,
       triangles: r.triangles,
+      otherCarriers: scene.children.filter((c) => c.name === 'otherCarrier').length,
     };
     gl.info.reset();
   });
