@@ -178,7 +178,7 @@ test.describe('offline settlement and save export/import', () => {
     page.on('dialog', (d) => void d.accept());
 
     // Freeze the sim so the exported and re-imported states can be compared exactly.
-    await page.getByTitle('Pause', { exact: true }).click();
+    await page.getByTitle('Pause (Space)').click();
     const original = await simState(page);
     await openSettingsSaves(page);
     await page.getByRole('button', { name: 'Export text' }).click();

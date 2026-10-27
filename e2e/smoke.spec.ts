@@ -86,3 +86,15 @@ test('shows a fallback instead of a blank screen without WebGL', async ({ page }
   await page.getByRole('button', { name: 'Take command' }).click();
   await expect(page.getByRole('button', { name: 'Settings', exact: true })).toBeVisible();
 });
+
+test('? lists the shortcuts, Escape closes it, and Space pauses', async ({ page }) => {
+  await page.goto('./');
+  await page.getByRole('button', { name: 'Take command' }).click();
+  await page.keyboard.press('?');
+  const dialog = page.getByRole('dialog', { name: 'Keyboard shortcuts' });
+  await expect(dialog).toContainText('Pause or resume');
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await page.keyboard.press('Space');
+  await expect(page.getByTitle('Pause (Space)')).toHaveText('▶');
+});

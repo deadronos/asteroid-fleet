@@ -1,11 +1,12 @@
 import { OrbitControls } from '@react-three/drei';
 import { useFrame, useThree } from '@react-three/fiber';
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 import * as THREE from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { engine } from '../game/engine';
 import { fleetFrame } from './frameState';
 import type { Vec3 } from '../sim/types';
+import { useHotkeys } from '../ui/hotkeys';
 import { easeFactor, focus, resolveFocus, stepTactical } from './focus';
 
 const FOCUS_DISTANCE = 45;
@@ -33,11 +34,15 @@ export function CameraRig({
   const autoOn = useRef(false);
   const wasTactical = useRef(tactical);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && focus.set(null);
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  useHotkeys([
+    {
+      keys: ['Escape'],
+      label: 'Esc',
+      description: 'Close the open dialog, else follow the carrier again',
+      group: 'General',
+      run: () => focus.set(null),
+    },
+  ]);
 
   useFrame((_, dt) => {
     const c = controls.current;

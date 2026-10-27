@@ -127,7 +127,7 @@ export function Hud({
           <button
             className={engine.paused ? 'on' : ''}
             onClick={() => engine.togglePause()}
-            title="Pause"
+            title="Pause (Space)"
           >
             {engine.paused ? '▶' : '❚❚'}
           </button>
@@ -136,6 +136,7 @@ export function Hud({
               key={v}
               className={engine.speed === v && !engine.paused ? 'on' : ''}
               onClick={() => engine.setSpeed(v)}
+              title={`${v}× speed (+ / − to change)`}
             >
               {v}×
             </button>
@@ -146,7 +147,7 @@ export function Hud({
           <button
             className={tactical || autoTactical ? 'on' : ''}
             onClick={onTactical}
-            title="Tactical sensor view (also turns on when you zoom far out). Cyan: scouted rich veins, orange: charted hazards"
+            title="Tactical sensor view (T; also turns on when you zoom far out). Cyan: scouted rich veins, orange: charted hazards"
           >
             Tactical
           </button>
