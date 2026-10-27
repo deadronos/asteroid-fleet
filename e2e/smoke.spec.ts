@@ -5,6 +5,10 @@ test('app loads, renders the canvas, and opens settings without console errors',
 }) => {
   const errors: string[] = [];
   const requested: string[] = [];
+  const failed: string[] = [];
+  page.on('response', (res) => {
+    if (res.status() >= 400) failed.push(`${res.status()} ${res.url()}`);
+  });
   page.on('request', (req) => requested.push(req.url()));
   page.on('console', (msg) => {
     if (msg.type() === 'error') errors.push(msg.text());
@@ -33,6 +37,7 @@ test('app loads, renders the canvas, and opens settings without console errors',
 
   // With a working worker the main-thread fallback sim is never downloaded.
   expect(requested.filter((u) => /localHost-/.test(u))).toEqual([]);
+  expect(failed).toEqual([]);
   expect(errors).toEqual([]);
 });
 

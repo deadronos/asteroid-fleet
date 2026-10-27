@@ -8,14 +8,17 @@ const KB = 1024;
 const BUDGET = {
   // Everything index.html loads before the first frame (entry + modulepreloads + css).
   // The scene (three.js + r3f), research tree and settings menu are lazy chunks that load
-  // right after first paint (#41), so this covers just the HUD shell: ~101 kB + headroom.
+  // right after first paint (#41), so this covers just the HUD shell. Measured 109.6 kB (~6% headroom) with the Doctrine panel
+  // lazy (#134).
   initial: 117 * KB, // was 116; challenge runs panel (#71). Was 115 before the Admiralty panel (#68)
   // Any single JS chunk; three.js is the largest.
   chunk: 200 * KB,
   // Worst-case download: everything except the sim you don't run. The sim ships twice, as the
   // Web Worker bundle and as the lazy main-thread fallback chunk (only fetched when the worker
   // fails); a user gets one of them, so the total counts the larger once, not both.
-  // Measured 425.6 kB at the time of writing, so ~3% headroom (440 kB).
+  // Measured 441.8 kB at the time of writing (#134), so under 1% headroom. Lazy panels move
+  // bytes out of `initial` but not out of the total; reclaiming it needs less shipped code,
+  // e.g. dropping drei's unused DRACO/Meshopt loaders from the r3f chunk.
   total: 445 * KB, // was 440; shared accessible Modal and side-panel tabs (#119)
 };
 
