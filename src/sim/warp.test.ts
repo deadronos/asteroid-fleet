@@ -30,6 +30,12 @@ const inHangar = (s: Sim, id: number) =>
   s.hangars.some((h) => h.items.some((it) => it.shipId === id));
 
 describe('warp jump', () => {
+  it('stores the charge time it started with', () => {
+    const { s } = recallGame();
+    expect(s.warp!.total).toBe(s.warp!.charge);
+    expect(s.warp!.total).toBeGreaterThan(0);
+  });
+
   it('keeps a barge and its bay drones that reach the carrier just before the jump', () => {
     const { s, barge, drone } = recallGame();
     // On top of the carrier visually, but outside the 2-unit docking distance.

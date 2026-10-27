@@ -12,9 +12,10 @@ import {
 } from 'react';
 import * as THREE from 'three';
 import { CameraRig } from './CameraRig';
-import { focus, isDoubleMiss } from './focus';
-import { engine, lerpPos } from '../game/engine';
-import { COVER_RADIUS, H2_STORM_RADIUS, SHIP_STATS } from '../sim/config';
+import { easeFactor, focus, isDoubleMiss, shortestArc } from './focus';
+import { engine, lerpCarrier, lerpPos } from '../game/engine';
+import { OTHER_ROW } from '../game/snapshot';
+import { COVER_RADIUS, H2_STORM_RADIUS, SHIP_STATS, WARP_CHARGE } from '../sim/config';
 import { gasGiantPos } from '../sim/state';
 import { SHIP_CLASSES, type Sim, type Vec3 } from '../sim/types';
 import { AsteroidField } from './AsteroidField';
@@ -48,6 +49,13 @@ const BEAM_COLORS: Record<string, THREE.Color> = {
   pirateLaser: new THREE.Color('#ff3020').multiplyScalar(3),
   repair: new THREE.Color('#5affb4').multiplyScalar(2.5),
 };
+
+const EXPLOSION_COLOR = new THREE.Color('#ffaa55').multiplyScalar(3);
+const BAY_COLOR = new THREE.Color('#ffd27a').multiplyScalar(3);
+const ENGINE_COLOR = new THREE.Color('#58b8ff').multiplyScalar(5);
+const WARP_RING_COLOR = new THREE.Color('#9b7bff').multiplyScalar(4);
+/** How fast the hull turns toward its heading, per second (see `easeFactor`). */
+const TURN_RATE = 0.8;
 
 const rocks = new Map<number, Vec3>();
 const beamFrom: Vec3 = { x: 0, y: 0, z: 0 };
@@ -117,51 +125,17 @@ function Explosions() {
   return (
     <instancedMesh ref={mesh} args={[undefined, undefined, 128]} frustumCulled={false}>
       <icosahedronGeometry args={[1, 1]} />
-      <meshBasicMaterial
-        color={new THREE.Color('#ffaa55').multiplyScalar(3)}
-        toneMapped={false}
-        transparent
-        opacity={0.8}
-      />
+      <meshBasicMaterial color={EXPLOSION_COLOR} toneMapped={false} transparent opacity={0.8} />
     </instancedMesh>
   );
 }
 
-function Carrier() {
-  const group = useRef<THREE.Group>(null);
-  const shield = useRef<THREE.Mesh>(null);
-  const warpRing = useRef<THREE.Mesh>(null);
-  useFrame((st) => {
-    const s = engine.view;
-    const a = engine.alpha();
-    const p = engine.prevCarrier;
-    const c = s.carrier.pos;
-    group.current?.position.set(
-      p.x + (c.x - p.x) * a,
-      p.y + (c.y - p.y) * a,
-      p.z + (c.z - p.z) * a,
-    );
-    if (group.current && s.carrier.target) {
-      const t = s.carrier.target;
-      const ang = Math.atan2(t.x - c.x, t.z - c.z);
-      group.current.rotation.y += (ang - group.current.rotation.y) * 0.01;
-    }
-    if (shield.current) {
-      const mat = shield.current.material as THREE.MeshBasicMaterial;
-      const threatened = s.pirates.length > 0;
-      shield.current.visible = threatened && s.carrier.shield > 0;
-      mat.opacity = s.carrier.shield * 0.07;
-    }
-    if (warpRing.current) {
-      warpRing.current.visible = !!s.warp;
-      warpRing.current.rotation.z = st.clock.elapsedTime * 2;
-      const k = s.warp ? 1 + (1 - s.warp.charge / 15) * 2 : 1;
-      warpRing.current.scale.setScalar(k);
-    }
-  });
-  const hull = '#9aa7b8';
+const HULL_COLOR = '#9aa7b8';
+const OTHER_HULL_COLOR = '#b8a08f';
+
+function CarrierHull({ hull = HULL_COLOR }: { hull?: string }) {
   return (
-    <group ref={group}>
+    <>
       <mesh>
         <boxGeometry args={[5, 2.6, 20]} />
         <meshStandardMaterial color={hull} metalness={0.6} roughness={0.4} flatShading />
@@ -183,21 +157,56 @@ function Carrier() {
       {[-3.4, 3.4].map((x) => (
         <mesh key={'bay' + x} position={[x, -0.4, 7.6]}>
           <boxGeometry args={[1.2, 1.2, 0.2]} />
-          <meshBasicMaterial
-            color={new THREE.Color('#ffd27a').multiplyScalar(3)}
-            toneMapped={false}
-          />
+          <meshBasicMaterial color={BAY_COLOR} toneMapped={false} />
         </mesh>
       ))}
       {[-1.4, 0, 1.4].map((x) => (
         <mesh key={'eng' + x} position={[x, 0, -10.3]}>
           <cylinderGeometry args={[0.6, 0.8, 0.6, 8]} />
-          <meshBasicMaterial
-            color={new THREE.Color('#58b8ff').multiplyScalar(5)}
-            toneMapped={false}
-          />
+          <meshBasicMaterial color={ENGINE_COLOR} toneMapped={false} />
         </mesh>
       ))}
+    </>
+  );
+}
+
+const carrierAt: Vec3 = { x: 0, y: 0, z: 0 };
+
+function Carrier() {
+  const group = useRef<THREE.Group>(null);
+  const shield = useRef<THREE.Mesh>(null);
+  const warpRing = useRef<THREE.Mesh>(null);
+  useFrame((st, dt) => {
+    const s = engine.view;
+    const c = s.carrier.pos;
+    const g = group.current;
+    if (g) {
+      lerpCarrier(engine.alpha(), carrierAt);
+      g.position.set(carrierAt.x, carrierAt.y, carrierAt.z);
+      if (s.carrier.target) {
+        const t = s.carrier.target;
+        const ang = Math.atan2(t.x - c.x, t.z - c.z);
+        g.rotation.y += shortestArc(g.rotation.y, ang) * easeFactor(dt, TURN_RATE);
+        g.rotation.y = shortestArc(0, g.rotation.y);
+      }
+    }
+    if (shield.current) {
+      const mat = shield.current.material as THREE.MeshBasicMaterial;
+      const threatened = s.pirates.length > 0;
+      shield.current.visible = threatened && s.carrier.shield > 0;
+      mat.opacity = s.carrier.shield * 0.07;
+    }
+    if (warpRing.current) {
+      warpRing.current.visible = !!s.warp;
+      warpRing.current.rotation.z = st.clock.elapsedTime * 2;
+      const total = s.warp ? s.warp.total || WARP_CHARGE : 1;
+      const k = s.warp ? 1 + (1 - Math.min(1, s.warp.charge / total)) * 2 : 1;
+      warpRing.current.scale.setScalar(k);
+    }
+  });
+  return (
+    <group ref={group}>
+      <CarrierHull />
       <mesh ref={shield}>
         <sphereGeometry args={[14, 32, 16]} />
         <meshBasicMaterial
@@ -210,12 +219,73 @@ function Carrier() {
       </mesh>
       <mesh ref={warpRing} rotation={[Math.PI / 2, 0, 0]}>
         <torusGeometry args={[12, 0.25, 8, 64]} />
-        <meshBasicMaterial
-          color={new THREE.Color('#9b7bff').multiplyScalar(4)}
-          toneMapped={false}
-        />
+        <meshBasicMaterial color={WARP_RING_COLOR} toneMapped={false} />
       </mesh>
     </group>
+  );
+}
+
+const otherAt: Vec3 = { x: 0, y: 0, z: 0 };
+
+/** Carriers sharing the viewed system: a tinted hull each, and their ships as far-LOD points. */
+function OtherCarriers() {
+  const key = useSyncExternalStore(engine.subscribe, () => engine.others.map((o) => o.id).join());
+  const ids = key ? key.split(',').map(Number) : [];
+  const groups = useRef(new Map<number, THREE.Group>());
+  const geo = useMemo(() => {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(1024 * 3), 3));
+    g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(1024 * 3), 3));
+    return g;
+  }, []);
+  useFrame((_, dt) => {
+    const a = engine.othersAlpha();
+    const pos = geo.getAttribute('position') as THREE.BufferAttribute;
+    const col = geo.getAttribute('color') as THREE.BufferAttribute;
+    let n = 0;
+    for (const o of engine.others) {
+      const p = engine.othersPrev.get(o.id) ?? o.pos;
+      otherAt.x = p.x + (o.pos.x - p.x) * a;
+      otherAt.y = p.y + (o.pos.y - p.y) * a;
+      otherAt.z = p.z + (o.pos.z - p.z) * a;
+      const g = groups.current.get(o.id);
+      if (g) {
+        g.position.set(otherAt.x, otherAt.y, otherAt.z);
+        const dx = o.pos.x - p.x;
+        const dz = o.pos.z - p.z;
+        if (dx * dx + dz * dz > 1e-4) {
+          g.rotation.y += shortestArc(g.rotation.y, Math.atan2(dx, dz)) * easeFactor(dt, TURN_RATE);
+        }
+      }
+      for (let i = 0; i < o.ships.length && n < 1024; i += OTHER_ROW) {
+        const c = ICON_COLORS[SHIP_CLASSES[o.ships[i]]];
+        pos.setXYZ(n, o.ships[i + 1], o.ships[i + 2], o.ships[i + 3]);
+        col.setXYZ(n, c.r, c.g, c.b);
+        n++;
+      }
+    }
+    geo.setDrawRange(0, n);
+    pos.needsUpdate = true;
+    col.needsUpdate = true;
+  });
+  return (
+    <>
+      {ids.map((id) => (
+        <group
+          key={id}
+          name="otherCarrier"
+          ref={(g) => {
+            if (g) groups.current.set(id, g);
+            else groups.current.delete(id);
+          }}
+        >
+          <CarrierHull hull={OTHER_HULL_COLOR} />
+        </group>
+      ))}
+      <points geometry={geo} frustumCulled={false}>
+        <pointsMaterial size={4} sizeAttenuation={false} vertexColors toneMapped={false} />
+      </points>
+    </>
   );
 }
 
@@ -326,6 +396,10 @@ const Sky = memo(function Sky() {
     mat.uniforms.uB.value.set(TIER_SKY[tier][1]);
   }, [tier, mat]);
   const bright = sys.brightness;
+  const sunColor = useMemo(
+    () => new THREE.Color('#fff2c8').multiplyScalar(2 + bright * 2),
+    [bright],
+  );
   return (
     <>
       <mesh material={mat}>
@@ -334,10 +408,7 @@ const Sky = memo(function Sky() {
       <Stars radius={500} depth={200} count={4000} factor={6} fade speed={0.3} />
       <mesh position={[400, 150, -500]}>
         <sphereGeometry args={[18 + bright * 10, 24, 16]} />
-        <meshBasicMaterial
-          color={new THREE.Color('#fff2c8').multiplyScalar(2 + bright * 2)}
-          toneMapped={false}
-        />
+        <meshBasicMaterial color={sunColor} toneMapped={false} />
       </mesh>
       <directionalLight position={[400, 150, -500]} intensity={1.2 + bright} color="#fff1dc" />
       <ambientLight intensity={0.55} color="#8fa8ff" />
@@ -383,7 +454,8 @@ function Tactical({ on }: { on: boolean }) {
       col.setXYZ(n, c.r, c.g, c.b);
       n++;
     };
-    put(s.carrier.pos, ICON_COLORS.carrier);
+    lerpCarrier(a, carrierAt);
+    put(carrierAt, ICON_COLORS.carrier);
     for (const sh of s.ships)
       if (sh.mode !== 'docked' && n < 2048)
         put(lerpPos(sh.id, sh.pos, a, tmp), ICON_COLORS[sh.cls]);
@@ -401,7 +473,7 @@ function Tactical({ on }: { on: boolean }) {
     geo.setDrawRange(0, n);
     pos.needsUpdate = true;
     col.needsUpdate = true;
-    ring.current?.position.set(s.carrier.pos.x, s.carrier.pos.y, s.carrier.pos.z);
+    ring.current?.position.set(carrierAt.x, carrierAt.y, carrierAt.z);
   });
   if (!on) return null;
   return (
@@ -452,6 +524,7 @@ export const Scene = memo(function Scene({
       <Hazards />
       <Containers />
       <Carrier />
+      <OtherCarriers />
       <Fleet lodDistance={quality === 'high' ? 120 : 70} />
       <Beams />
       <Explosions />

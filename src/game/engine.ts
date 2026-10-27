@@ -14,7 +14,7 @@ import type {
 import type { BusEvent } from './events';
 import { createSimHost, type SimHost } from './host';
 import { MODES, PUMP_MS, type Frame, type OutMsg } from './protocol';
-import { applySnapshot, type CarrierBrief } from './snapshot';
+import { applySnapshot, type CarrierBrief, type OtherCarrier } from './snapshot';
 import { allowSaveOverwrite, loadGame, saveGame, saveOverwriteBlocked } from './save';
 import { getActiveSlot, writeSlot } from './slots';
 import { alertActions, offerToasts, ToastQueue } from './toasts';
@@ -56,6 +56,12 @@ class Engine {
   private alertSeen = new Set<number>();
   /** One entry per carrier for the carrier bar, from the latest state message. */
   carriers: CarrierBrief[] = [];
+  /** Other carriers in the viewed system, from the latest state message (#127). */
+  others: OtherCarrier[] = [];
+  /** Where each of `others` was in the state message before, by carrier id. */
+  othersPrev = new Map<number, Vec3>();
+  private othersAt = performance.now();
+  private othersGap = 200;
   /** Warnings and worse that arrived for a carrier since it was last viewed. */
   unseen = new Map<number, { count: number; severity: Severity }>();
   /** Bumped on every switch, so the UI can play the camera cut. */
@@ -139,6 +145,7 @@ class Engine {
       case 'state':
         this.host?.post({ t: 'ack' });
         this.carriers = msg.snap.carriers;
+        this.adoptOthers(msg.snap.others);
         this.adopt(applySnapshot(this.state, msg.snap));
         if (msg.offline) this.offline = msg.offline;
         if (this.ready) {
@@ -175,6 +182,23 @@ class Engine {
         return;
       }
     }
+  }
+
+  private adoptOthers(next: OtherCarrier[]) {
+    const prev = new Map(this.others.map((o) => [o.id, o.pos]));
+    this.othersPrev = new Map(next.map((o) => [o.id, prev.get(o.id) ?? o.pos]));
+    const now = performance.now();
+    const gap = now - this.othersAt;
+    this.othersAt = now;
+    if (gap < 1000) this.othersGap += (gap - this.othersGap) * 0.3;
+    this.others = next;
+  }
+
+  /** 0..1 progress between the previous and current state message, for `others`. */
+  othersAlpha(): number {
+    if (this.paused) return 1;
+    const a = (performance.now() - this.othersAt) / Math.max(1, this.othersGap);
+    return a < 0 ? 0 : a > 1 ? 1 : a;
   }
 
   /** A new state replaces the mirror. Positions keep coming from frames in between. */
@@ -468,5 +492,15 @@ export function lerpPos(id: number, cur: Vec3, a: number, out: Vec3): Vec3 {
   out.x = p.x + (cur.x - p.x) * a;
   out.y = p.y + (cur.y - p.y) * a;
   out.z = p.z + (cur.z - p.z) * a;
+  return out;
+}
+
+/** The focused carrier's position between the last two frames. */
+export function lerpCarrier(a: number, out: Vec3): Vec3 {
+  const p = engine.prevCarrier;
+  const c = engine.view.carrier.pos;
+  out.x = p.x + (c.x - p.x) * a;
+  out.y = p.y + (c.y - p.y) * a;
+  out.z = p.z + (c.z - p.z) * a;
   return out;
 }

@@ -8,6 +8,7 @@ import {
   isDoubleMiss,
   resolveFocus,
   stepTactical,
+  shortestArc,
 } from './focus';
 
 const ships = (...m: [number, string][]) => ({
@@ -80,5 +81,13 @@ describe('stepTactical', () => {
     let auto = false;
     for (const d of [195, 190, 185, 190, 195, 190]) auto = step(false, false, auto, d).auto;
     expect(auto).toBe(false);
+  });
+});
+
+describe('shortestArc', () => {
+  it('takes the short way across ±π', () => {
+    expect(shortestArc(3, -3)).toBeCloseTo(2 * Math.PI - 6);
+    expect(shortestArc(-3, 3)).toBeCloseTo(6 - 2 * Math.PI);
+    expect(shortestArc(0.5, 1)).toBeCloseTo(0.5);
   });
 });

@@ -58,3 +58,9 @@ export function stepTactical(s: {
   const auto = s.auto ? s.dist >= AUTO_TACTICAL_OFF : s.dist > AUTO_TACTICAL_ON;
   return { resetCamera: false, auto };
 }
+
+/** `to - from` wrapped into [-π, π], so a turn takes the short way round. */
+export function shortestArc(from: number, to: number): number {
+  const tau = Math.PI * 2;
+  return ((((to - from) % tau) + tau + Math.PI) % tau) - Math.PI;
+}
