@@ -43,7 +43,7 @@ export const SHIP_STATS: Record<ShipClass, ShipStats> = {
     damage: 0,
     range: 0,
     sensor: 0,
-    color: '#7fd4ff',
+    color: '#56b4e9',
   },
   barge: {
     name: 'Mining barge',
@@ -57,7 +57,7 @@ export const SHIP_STATS: Record<ShipClass, ShipStats> = {
     damage: 0,
     range: 0,
     sensor: 0,
-    color: '#ffc861',
+    color: '#e69f00',
   },
   hauler: {
     name: 'Hauler',
@@ -71,7 +71,7 @@ export const SHIP_STATS: Record<ShipClass, ShipStats> = {
     damage: 0,
     range: 0,
     sensor: 0,
-    color: '#b6f27a',
+    color: '#f0e442',
   },
   fighter: {
     name: 'Fighter',
@@ -85,7 +85,7 @@ export const SHIP_STATS: Record<ShipClass, ShipStats> = {
     damage: 9,
     range: 9,
     sensor: 55,
-    color: '#ff7b8a',
+    color: '#d55e00',
   },
   scout: {
     name: 'Scout',
@@ -99,7 +99,7 @@ export const SHIP_STATS: Record<ShipClass, ShipStats> = {
     damage: 0,
     range: 0,
     sensor: 80,
-    color: '#e4a8ff',
+    color: '#cc79a7',
   },
   repair: {
     name: 'Repair drone',
@@ -113,7 +113,7 @@ export const SHIP_STATS: Record<ShipClass, ShipStats> = {
     damage: 0,
     range: 6,
     sensor: 60,
-    color: '#6effc4',
+    color: '#2fd6a0',
   },
   harvester: {
     name: 'Gas harvester',
@@ -127,7 +127,7 @@ export const SHIP_STATS: Record<ShipClass, ShipStats> = {
     damage: 0,
     range: 0,
     sensor: 0,
-    color: '#ff9f5a',
+    color: '#b8a6ff',
   },
 };
 

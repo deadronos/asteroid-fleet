@@ -7,8 +7,9 @@ import { carrierChoices } from './inbox';
 import { fmt } from './format';
 import { Modal } from './Modal';
 import { MAP_H, MAP_W, layoutSystems } from './mapLayout';
+import { PALETTE } from './palette';
 
-const TIER_COLOR = { 1: '#6fc8ff', 2: '#ffc861', 3: '#ff6b7a' } as const;
+const TIER_COLOR = PALETTE.tier;
 const RESOURCE_LABEL: Record<RouteResource, string> = { ore: 'Ore', h2: 'H2', energy: 'Energy' };
 
 /** Strategic star map (#80): switch carriers, warp the focused one, and run supply routes. */
@@ -82,7 +83,7 @@ export function StarMap({ onClose }: { onClose: () => void }) {
                 cx={p.x}
                 cy={p.y}
                 r={here ? 11 : 8}
-                fill={sys.discovered ? TIER_COLOR[sys.tier] : '#35425a'}
+                fill={sys.discovered ? TIER_COLOR[sys.tier] : PALETTE.undiscovered}
               />
               <text x={p.x} y={p.y + 26} textAnchor="middle">
                 {sys.discovered ? sys.name : '?'}

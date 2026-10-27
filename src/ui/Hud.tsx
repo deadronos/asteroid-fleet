@@ -99,7 +99,7 @@ export function Hud({
         {h.fusion && (
           <div className="chip">
             <span className="k">H2</span>
-            <span className="v" style={{ color: '#ff9f5a' }}>
+            <span className="v" style={{ color: 'var(--tone-orange)' }}>
               {h.h2}
             </span>
           </div>

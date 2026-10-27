@@ -24,6 +24,7 @@ import { Fleet } from './Fleet';
 import { CLASSES, FleetPass, MAX_ENTITIES, asteroidById, fleetFrame } from './frameState';
 import { GAS_FRAG, GAS_VERT, NEBULA_FRAG, NEBULA_VERT } from './geometry';
 import { FrameCap, RenderStats } from './RenderLoop';
+import { ICON_SHAPE, PALETTE, SHAPES } from '../ui/palette';
 
 const Effects = lazy(() => import('./Effects'));
 
@@ -438,34 +439,69 @@ const ICON_COLORS: Record<string, THREE.Color> = {
   ...Object.fromEntries(
     SHIP_CLASSES.map((c) => [c, new THREE.Color(SHIP_STATS[c].color).multiplyScalar(1.6)]),
   ),
-  pirate: new THREE.Color('#ff3030').multiplyScalar(2),
-  carrier: new THREE.Color('#ffffff').multiplyScalar(2),
-  container: new THREE.Color('#f2b632').multiplyScalar(2),
-  hazard: new THREE.Color('#ff5a1f').multiplyScalar(2),
-  vein: new THREE.Color('#5affef').multiplyScalar(2.2),
+  pirate: new THREE.Color(PALETTE.pirate).multiplyScalar(2),
+  carrier: new THREE.Color(PALETTE.carrier).multiplyScalar(2),
+  container: new THREE.Color(PALETTE.container).multiplyScalar(2),
+  hazard: new THREE.Color(PALETTE.hazard).multiplyScalar(2),
+  vein: new THREE.Color(PALETTE.vein).multiplyScalar(2.2),
 };
 
-/** Icon colour per render class index, in `CLASSES` order. */
+/** Icon colour and shape per render class index, in `CLASSES` order. */
 const CLASS_ICON = CLASSES.map((c) => ICON_COLORS[c]);
+const CLASS_SHAPE = CLASSES.map((c) => SHAPES.indexOf(ICON_SHAPE[c]));
+const shapeOf = (k: string) => SHAPES.indexOf(ICON_SHAPE[k]);
 const MAX_ICONS = 2048;
 
 function icon(
   pos: THREE.BufferAttribute,
   col: THREE.BufferAttribute,
+  shp: THREE.BufferAttribute,
   n: number,
   p: Vec3,
-  c: THREE.Color,
+  kind: string,
 ): number {
+  const c = ICON_COLORS[kind];
   pos.setXYZ(n, p.x, p.y, p.z);
   col.setXYZ(n, c.r, c.g, c.b);
+  shp.setX(n, shapeOf(kind));
   return n + 1;
 }
+
+const ICON_VERT = /* glsl */ `
+attribute vec3 color;
+attribute float shape;
+varying vec3 vColor;
+varying float vShape;
+void main() {
+  vColor = color;
+  vShape = shape;
+  gl_PointSize = 11.0;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}`;
+
+// Shapes in SHAPES order: circle, triangle, diamond, cross, square, down-triangle.
+const ICON_FRAG = /* glsl */ `
+varying vec3 vColor;
+varying float vShape;
+void main() {
+  vec2 p = (gl_PointCoord - 0.5) * 2.0;
+  float r = length(p), a = abs(p.x), b = abs(p.y), s = vShape;
+  float t = s > 4.5 ? 0.9 - p.y : p.y + 0.9;
+  bool k = s < 0.5 ? r < 0.9
+    : s < 1.5 || s > 4.5 && s < 5.5 ? a < t * 0.5 && abs(p.y) < 0.9
+    : s < 2.5 ? a + b < 1.0
+    : s < 3.5 ? abs(a - b) < 0.28
+    : a < 0.75 && b < 0.75;
+  if (!k) discard;
+  gl_FragColor = vec4(vColor, 1.0);
+}`;
 
 function Tactical({ on }: { on: boolean }) {
   const geo = useMemo(() => {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(2048 * 3), 3));
     g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(2048 * 3), 3));
+    g.setAttribute('shape', new THREE.BufferAttribute(new Float32Array(2048), 1));
     return g;
   }, []);
   const ring = useRef<THREE.Group>(null);
@@ -475,35 +511,37 @@ function Tactical({ on }: { on: boolean }) {
     const f = fleetFrame;
     const pos = geo.getAttribute('position') as THREE.BufferAttribute;
     const col = geo.getAttribute('color') as THREE.BufferAttribute;
+    const shp = geo.getAttribute('shape') as THREE.BufferAttribute;
     lerpCarrier(engine.alpha(), carrierAt);
-    let n = icon(pos, col, 0, carrierAt, ICON_COLORS.carrier);
+    let n = icon(pos, col, shp, 0, carrierAt, 'carrier');
     for (let i = 0; i < f.count && n < MAX_ICONS; i++) {
       const c = CLASS_ICON[f.cls[i]];
       pos.setXYZ(n, f.pos[i * 3], f.pos[i * 3 + 1], f.pos[i * 3 + 2]);
+      shp.setX(n, CLASS_SHAPE[f.cls[i]]);
       col.setXYZ(n++, c.r, c.g, c.b);
     }
-    for (const c of s.containers)
-      if (n < MAX_ICONS) n = icon(pos, col, n, c.pos, ICON_COLORS.container);
+    for (const c of s.containers) if (n < MAX_ICONS) n = icon(pos, col, shp, n, c.pos, 'container');
     // Scout reconnaissance: charted hazards and rich veins.
     for (const i of s.recon.hazards) {
       const h = s.hazards[i];
-      if (h && n < MAX_ICONS) n = icon(pos, col, n, h.pos, ICON_COLORS.hazard);
+      if (h && n < MAX_ICONS) n = icon(pos, col, shp, n, h.pos, 'hazard');
     }
     const rocks = asteroidById(s.asteroids);
     for (const id of s.recon.veins) {
       const v = rocks.get(id);
-      if (v && v.ore > 0 && n < MAX_ICONS) n = icon(pos, col, n, v.pos, ICON_COLORS.vein);
+      if (v && v.ore > 0 && n < MAX_ICONS) n = icon(pos, col, shp, n, v.pos, 'vein');
     }
     geo.setDrawRange(0, n);
     pos.needsUpdate = true;
     col.needsUpdate = true;
+    shp.needsUpdate = true;
     ring.current?.position.set(carrierAt.x, carrierAt.y, carrierAt.z);
   });
   if (!on) return null;
   return (
     <>
       <points geometry={geo} frustumCulled={false}>
-        <pointsMaterial size={7} sizeAttenuation={false} vertexColors toneMapped={false} />
+        <shaderMaterial vertexShader={ICON_VERT} fragmentShader={ICON_FRAG} />
       </points>
       <group ref={ring}>
         <mesh rotation={[-Math.PI / 2, 0, 0]}>
