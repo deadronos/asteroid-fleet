@@ -39,7 +39,7 @@ test('buying a second carrier from the Research panel', async ({ page }) => {
 
   const bar = page.getByRole('navigation', { name: 'Carriers' });
   await expect(bar).toHaveCount(0);
-  await page.getByRole('button', { name: 'Research', exact: true }).click();
+  await page.getByRole('tab', { name: 'Research', exact: true }).click();
   await page.getByRole('button', { name: /Buy carrier/ }).click();
   await expect(bar.getByRole('button')).toHaveCount(2);
   await expect(page.getByRole('button', { name: /Buy carrier/ })).toBeDisabled();

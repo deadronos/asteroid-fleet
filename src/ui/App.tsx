@@ -25,6 +25,8 @@ import { Hud } from './Hud';
 import { useStackLayout } from './layout';
 import { fmt, formatSimTime } from './format';
 import { GearButton } from './GearButton';
+import { Modal } from './Modal';
+import { Tabs } from './Tabs';
 
 // Not needed for the first frame: the scene (three.js + r3f), the research tree
 // and the settings menu load as separate chunks right after first paint.
@@ -149,39 +151,35 @@ export function LogPanel({
 
 function Help({ onClose }: { onClose: () => void }) {
   return (
-    <div className="modal-bg" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h2>You are the admiral, not the pilot</h2>
-        <p>Your mining carrier's fleet works on its own. You shape how it behaves:</p>
-        <ul>
-          <li>
-            <b>Hangars</b> are the board: buy ships into slots (drone 1, fighter 2, barge 4).
-            Neighbours can trigger synergies, and each hangar has a launch order.
-          </li>
-          <li>
-            <b>Doctrine</b>: stances for the whole fleet, per ship type and per hangar, plus rule
-            cards: when these conditions hold, do that.
-          </li>
-          <li>
-            <b>Logistics</b>: drones mine, barges park at rich clusters as depots, haulers shuttle
-            ore home, the refinery turns ore into credits with energy. The slowest link sets your
-            income.
-          </li>
-          <li>
-            <b>Carrier</b>: warp outward for richer ore and tougher pirates, or back to safety.
-            Ships outside at jump time are lost for good.
-          </li>
-          <li>
-            <b>Research</b>: prestige resets the operation for research points that persist.
-          </li>
-        </ul>
-        <p className="hint">
-          Drag to orbit, scroll to zoom, right-drag to pan. Zoom far out (or press Tactical) for the
-          sensor view. The game saves itself and keeps working at reduced rate while you are away.
-        </p>
-        <button onClick={onClose}>Take command</button>
-      </div>
-    </div>
+    <Modal title="You are the admiral, not the pilot" onClose={onClose}>
+      <p>Your mining carrier's fleet works on its own. You shape how it behaves:</p>
+      <ul>
+        <li>
+          <b>Hangars</b> are the board: buy ships into slots (drone 1, fighter 2, barge 4).
+          Neighbours can trigger synergies, and each hangar has a launch order.
+        </li>
+        <li>
+          <b>Doctrine</b>: stances for the whole fleet, per ship type and per hangar, plus rule
+          cards: when these conditions hold, do that.
+        </li>
+        <li>
+          <b>Logistics</b>: drones mine, barges park at rich clusters as depots, haulers shuttle ore
+          home, the refinery turns ore into credits with energy. The slowest link sets your income.
+        </li>
+        <li>
+          <b>Carrier</b>: warp outward for richer ore and tougher pirates, or back to safety. Ships
+          outside at jump time are lost for good.
+        </li>
+        <li>
+          <b>Research</b>: prestige resets the operation for research points that persist.
+        </li>
+      </ul>
+      <p className="hint">
+        Drag to orbit, scroll to zoom, right-drag to pan. Zoom far out (or press Tactical) for the
+        sensor view. The game saves itself and keeps working at reduced rate while you are away.
+      </p>
+      <button onClick={onClose}>Take command</button>
+    </Modal>
   );
 }
 
@@ -338,7 +336,7 @@ export function App() {
   }, []);
 
   return (
-    <div className="app">
+    <div className="app" id="app-root" tabIndex={-1}>
       <div className="canvas-wrap">
         <SceneBoundary>
           <Suspense fallback={null}>
@@ -364,24 +362,35 @@ export function App() {
       <GearButton onClick={() => setMenu(true)} />
       <div className={`side ${collapsed ? 'collapsed' : ''}`}>
         <div className="tabs">
-          {TABS.map(([id, label]) => (
-            <button
-              key={id}
-              className={tab === id && !collapsed ? 'on' : ''}
-              onClick={() => {
-                if (tab === id) setCollapsed((c) => !c);
-                else {
-                  setTab(id);
-                  setCollapsed(false);
-                }
-              }}
-            >
-              {label}
-            </button>
-          ))}
+          <Tabs
+            tabs={TABS}
+            value={tab}
+            idPrefix="side-tab"
+            label="Panels"
+            controls={collapsed ? undefined : 'side-panel'}
+            highlight={!collapsed}
+            onSelect={(id) => {
+              setTab(id);
+              setCollapsed(false);
+            }}
+          />
+          <button
+            className="collapse-btn"
+            aria-expanded={!collapsed}
+            aria-controls={collapsed ? undefined : 'side-panel'}
+            aria-label={collapsed ? 'Expand panel' : 'Collapse panel'}
+            onClick={() => setCollapsed((c) => !c)}
+          >
+            {collapsed ? '▾' : '▴'}
+          </button>
         </div>
         {!collapsed && (
-          <div className="panel-body">
+          <div
+            className="panel-body"
+            id="side-panel"
+            role="tabpanel"
+            aria-labelledby={`side-tab-${tab}`}
+          >
             {tab === 'fleet' && <FleetPanel />}
             {tab === 'doctrine' && <DoctrinePanel />}
             {tab === 'carrier' && (

@@ -16,7 +16,7 @@ test('rule cards can be added, edited, reordered and deleted', async ({ page }) 
   expect(presets).toBe(Object.keys(PRESETS).length);
   await seedSave(page, s);
   await openApp(page);
-  await page.getByRole('button', { name: 'Doctrine', exact: true }).click();
+  await page.getByRole('tab', { name: 'Doctrine', exact: true }).click();
   await expect(page.getByText(`${presets} / 12`)).toBeVisible();
 
   // Add: drones fall back when their hull is low.

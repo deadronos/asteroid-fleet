@@ -156,7 +156,17 @@ function HangarBoard({
           setOver(i);
         }}
         onDrop={(e) => drop(e, i)}
+        role="button"
+        tabIndex={0}
+        aria-pressed={selShip === id}
         onClick={() => onShip(id)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            e.stopPropagation();
+            onShip(id);
+          }
+        }}
         title={`${st.name}${syn ? ' · ' + syn : ''}${ship.modules.length ? ' · ' + ship.modules.map((m) => MODULES[m].name).join(', ') : ''}`}
       >
         <span className="nm">{st.slots >= 4 ? st.name : st.short}</span>
@@ -214,7 +224,21 @@ function HangarBoard({
           +slot {fmt(HANGAR_SLOT_COST(h.slots))}
         </button>
       </div>
-      <div className="board" style={{ ['--slots' as string]: h.slots }} onClick={onSelect}>
+      <div
+        className="board"
+        style={{ ['--slots' as string]: h.slots }}
+        role="group"
+        tabIndex={0}
+        aria-label={`Hangar ${h.id} board${selected ? ' (selected)' : ''}`}
+        onClick={onSelect}
+        onKeyDown={(e) => {
+          if (e.target !== e.currentTarget) return;
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onSelect();
+          }
+        }}
+      >
         {cells}
       </div>
       {autoBuyUnlocked(s) && (

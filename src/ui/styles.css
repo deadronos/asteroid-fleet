@@ -70,6 +70,7 @@ input[type='range'] {
 .app {
   position: fixed;
   inset: 0;
+  outline: none;
 }
 .canvas-wrap {
   position: absolute;
@@ -192,6 +193,11 @@ input[type='range'] {
   display: flex;
   border-bottom: 1px solid var(--line);
 }
+.tablist {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
 .tabs button {
   flex: 1;
   border: none;
@@ -200,6 +206,9 @@ input[type='range'] {
   padding: 9px 4px;
   color: var(--muted);
   border-bottom: 2px solid transparent;
+}
+.tabs .collapse-btn {
+  flex: 0 0 34px;
 }
 .tabs button.on {
   color: #fff;
@@ -756,6 +765,16 @@ table.doc td:first-child {
 }
 .settings {
   width: min(600px, 100%);
+  /* Fixed size so switching tabs never moves the tab row (#118); only the body scrolls. */
+  height: min(560px, 90vh);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.settings-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 .settings-head {
   display: flex;
@@ -897,6 +916,8 @@ label.button:hover {
 }
 .starmap {
   width: min(820px, 100%);
+  /* Info line and route list vary in height; keep the dialog steady (#118). */
+  height: 90vh;
 }
 .starmap-svg {
   width: 100%;
