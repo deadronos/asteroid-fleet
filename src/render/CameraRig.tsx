@@ -3,7 +3,8 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
-import { engine, lerpPos } from '../game/engine';
+import { engine } from '../game/engine';
+import { fleetFrame } from './frameState';
 import type { Vec3 } from '../sim/types';
 import { easeFactor, focus, resolveFocus, stepTactical } from './focus';
 
@@ -46,9 +47,12 @@ export function CameraRig({
 
     const id = resolveFocus(s, focus.get());
     if (id !== focus.get()) focus.set(id); // docked or destroyed: back to the carrier
-    const ship = id === null ? undefined : s.ships.find((x) => x.id === id);
-    if (ship) lerpPos(ship.id, ship.pos, a, tmp);
-    else carrierPos(a);
+    const ei = id === null ? -1 : fleetFrame.entityOf(id);
+    if (ei >= 0) {
+      tmp.x = fleetFrame.pos[ei * 3];
+      tmp.y = fleetFrame.pos[ei * 3 + 1];
+      tmp.z = fleetFrame.pos[ei * 3 + 2];
+    } else carrierPos(a);
     goal.set(tmp.x, tmp.y, tmp.z);
 
     const jumped = !started.current || system.current !== s.systemId || carrierId.current !== s.id;

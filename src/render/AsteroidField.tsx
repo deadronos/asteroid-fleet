@@ -8,8 +8,8 @@ import { ASTEROID_MODEL, bakeModel, modelUrl } from './models';
 
 const MAX_ASTEROIDS = 1000;
 const dummy = new THREE.Object3D();
+const colorDirty = [false, false];
 const camPos = new THREE.Vector3();
-const c = new THREE.Color();
 
 const ORE_COLORS = [
   new THREE.Color('#8b7d6b'),
@@ -30,15 +30,19 @@ function Field({
   const near = useRef<THREE.InstancedMesh>(null);
   const far = useRef<THREE.InstancedMesh>(null);
   const farGeo = useMemo(() => asteroidGeometry(0), []);
+  // Ore tier last written to each instance slot, so unchanged colours aren't re-uploaded.
+  const nearTier = useMemo(() => new Uint8Array(MAX_ASTEROIDS).fill(255), []);
+  const farTier = useMemo(() => new Uint8Array(MAX_ASTEROIDS).fill(255), []);
   useFrame((st) => {
     const nm = near.current;
     const fm = far.current;
     if (!fm) return;
     const t = st.clock.elapsedTime;
-    const lod2 = model ? lodDistance * lodDistance : -1;
+    const hasNear = nm !== null;
     camPos.copy(st.camera.position);
     let nn = 0;
     let nf = 0;
+    colorDirty[0] = colorDirty[1] = false;
     for (const a of engine.view.asteroids) {
       if (a.ore <= 0) continue;
       if (nn + nf >= MAX_ASTEROIDS) break;
@@ -48,22 +52,26 @@ function Field({
       dummy.scale.setScalar(a.radius * k);
       dummy.updateMatrix();
       const tier = a.value < 2 ? 0 : a.value < 5 ? 1 : a.value < 15 ? 2 : a.value < 40 ? 3 : 4;
-      c.copy(ORE_COLORS[tier]);
       // Allow for the asteroid's size, so big rocks switch later.
-      const d = camPos.distanceTo(dummy.position) - a.radius * 4;
-      const m = nm && d * Math.abs(d) < lod2 ? nm : fm;
-      const i = m === nm ? nn++ : nf++;
+      const reach = lodDistance + a.radius * 4;
+      const isNear = hasNear && camPos.distanceToSquared(dummy.position) < reach * reach;
+      const m = isNear ? nm : fm;
+      const tiers = isNear ? nearTier : farTier;
+      const i = isNear ? nn++ : nf++;
       m.setMatrixAt(i, dummy.matrix);
-      m.setColorAt(i, c);
+      if (tiers[i] !== tier) {
+        tiers[i] = tier;
+        m.setColorAt(i, ORE_COLORS[tier]);
+        colorDirty[isNear ? 1 : 0] = true;
+      }
     }
-    for (const [m, n] of [
-      [fm, nf],
-      [nm, nn],
-    ] as const) {
-      if (!m) continue;
-      m.count = n;
-      m.instanceMatrix.needsUpdate = true;
-      if (m.instanceColor) m.instanceColor.needsUpdate = true;
+    fm.count = nf;
+    fm.instanceMatrix.needsUpdate = true;
+    if (colorDirty[0] && fm.instanceColor) fm.instanceColor.needsUpdate = true;
+    if (nm) {
+      nm.count = nn;
+      nm.instanceMatrix.needsUpdate = true;
+      if (colorDirty[1] && nm.instanceColor) nm.instanceColor.needsUpdate = true;
     }
   });
   return (
