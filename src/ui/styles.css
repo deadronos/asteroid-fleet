@@ -1014,3 +1014,14 @@ label.button:hover {
 .glossary dd {
   margin: 0;
 }
+.hotkeys > div {
+  display: flex;
+  gap: 12px;
+  margin: 4px 0;
+}
+.hotkeys dt {
+  min-width: 70px;
+}
+.hotkeys dd {
+  margin: 0;
+}

@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react';
+import { MODAL_PRIORITY, useHotkeys } from './hotkeys';
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -26,18 +27,26 @@ export function Modal({
     onCloseRef.current = onClose;
   });
 
+  // Escape goes through the registry so the topmost modal closes first and nothing below sees it.
+  useHotkeys([
+    {
+      keys: ['Escape'],
+      priority: MODAL_PRIORITY,
+      allowInInput: true,
+      run: (e) => {
+        // Escape belongs to an open <select>; swallow it so it doesn't fall through to the camera.
+        if ((e.target as Element | null)?.closest?.('select')) return;
+        onCloseRef.current();
+      },
+    },
+  ]);
+
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null;
     const node = ref.current;
     const items = () => Array.from(node?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? []);
     (items()[0] ?? node)?.focus();
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        if (e.defaultPrevented || (e.target as Element).closest?.('select')) return;
-        e.stopPropagation();
-        onCloseRef.current();
-        return;
-      }
       if (e.key !== 'Tab' || !node) return;
       const list = items();
       if (list.length === 0) {

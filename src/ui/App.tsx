@@ -19,7 +19,8 @@ import {
 import { SceneBoundary } from './ErrorBoundary';
 import { FleetPanel } from './FleetPanel';
 import { CarrierBar } from './CarrierBar';
-import { ignoresHotkey } from './carriers';
+import { useHotkeys } from './hotkeys';
+import { HotkeyHelp } from './HotkeyHelp';
 import { Hud } from './Hud';
 import { useStackLayout } from './layout';
 import { fmt, formatSimTime } from './format';
@@ -150,6 +151,14 @@ export function LogPanel({
       </div>
     </>
   );
+}
+
+/** Next preset speed up or down from `v`, clamped to 1×–4×. */
+export function stepSpeed(v: number, dir: 1 | -1): number {
+  const steps = [1, 2, 4];
+  const i = steps.findIndex((s) => s >= v);
+  const at = i < 0 ? steps.length - 1 : i;
+  return steps[Math.max(0, Math.min(steps.length - 1, at + dir))];
 }
 
 function Help({ onClose }: { onClose: () => void }) {
@@ -333,18 +342,59 @@ export function App() {
   const [menu, setMenu] = useState(false);
   const [map, setMap] = useState(false);
   const [help, setHelp] = useState(() => read<string>('af-seen-help', '') !== '1');
+  const [keysHelp, setKeysHelp] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
 
   useStackLayout();
   useEffect(() => write('af-tab', tab), [tab]);
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (ignoresHotkey(e) || e.key.toLowerCase() !== 'm') return;
-      setMap((v) => !v);
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  useHotkeys([
+    {
+      keys: [' '],
+      label: 'Space',
+      description: 'Pause or resume',
+      group: 'Time',
+      // A focused button already uses Space to activate itself.
+      run: (e) => {
+        if ((e.target as Element | null)?.closest?.('button, a, summary')) return false;
+        engine.togglePause();
+      },
+    },
+    {
+      keys: ['+', '=', ']'],
+      label: '+ / ]',
+      description: 'Faster (1× → 2× → 4×)',
+      group: 'Time',
+      run: () => engine.setSpeed(stepSpeed(engine.speed, 1)),
+    },
+    {
+      keys: ['-', '_', '['],
+      label: '− / [',
+      description: 'Slower',
+      group: 'Time',
+      run: () => engine.setSpeed(stepSpeed(engine.speed, -1)),
+    },
+    {
+      keys: ['t'],
+      label: 'T',
+      description: 'Toggle tactical view',
+      group: 'View',
+      run: () => setTactical((v) => !v),
+    },
+    {
+      keys: ['m'],
+      label: 'M',
+      description: 'Open or close the star map',
+      group: 'View',
+      run: () => setMap((v) => !v),
+    },
+    {
+      keys: ['?'],
+      label: '?',
+      description: 'Show this list',
+      group: 'General',
+      run: () => setKeysHelp((v) => !v),
+    },
+  ]);
   useEffect(() => {
     document.documentElement.style.setProperty('--ui-scale', String(settings.uiScale));
   }, [settings.uiScale]);
@@ -480,6 +530,7 @@ export function App() {
           <StarMap onClose={() => setMap(false)} />
         </Suspense>
       )}
+      {keysHelp && <HotkeyHelp onClose={() => setKeysHelp(false)} />}
       {help && (
         <Help
           onClose={() => {

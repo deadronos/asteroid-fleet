@@ -1,7 +1,7 @@
-import { useEffect } from 'react';
 import { engine, useGame } from '../game/engine';
 import { carrierChoices } from './inbox';
-import { carrierForKey, ignoresHotkey } from './carriers';
+import { carrierForKey } from './carriers';
+import { useHotkeys } from './hotkeys';
 import { fmt } from './format';
 import { deepEqual } from './equal';
 
@@ -29,15 +29,19 @@ export function CarrierBar() {
     };
   }, deepEqual);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (ignoresHotkey(e)) return;
-      const id = carrierForKey(e.key, engine.carriers);
-      if (id !== null) engine.focusCarrier(id);
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  useHotkeys([
+    {
+      keys: ['1', '2', '3', '4', '5', '6', '7', '8', '9'],
+      label: '1–9',
+      description: 'Select carrier',
+      group: 'Fleet',
+      run: (e) => {
+        const id = carrierForKey(e.key, engine.carriers);
+        if (id === null) return false;
+        engine.focusCarrier(id);
+      },
+    },
+  ]);
 
   if (bar.rows.length < 2) return null;
   return (
