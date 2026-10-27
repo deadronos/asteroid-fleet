@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { describe, expect, it } from 'vitest';
 import { engine, useGame } from '../game/engine';
 import { newGame } from '../sim/state';
+import { countByClass } from './FleetPanel';
 import { deepEqual, shallowEqual } from './equal';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -65,6 +66,15 @@ describe('useGame selector', () => {
       el.remove();
       engine.state = previous;
     }
+  });
+});
+
+describe('countByClass', () => {
+  it('counts every class in one pass, zero included', () => {
+    const c = countByClass([{ cls: 'drone' }, { cls: 'drone' }, { cls: 'barge' }]);
+    expect(c.drone).toBe(2);
+    expect(c.barge).toBe(1);
+    expect(c.hauler).toBe(0);
   });
 });
 

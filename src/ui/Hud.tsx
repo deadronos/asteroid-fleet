@@ -36,6 +36,7 @@ export function Hud({
     const c = s.carrier;
     const sys = s.systems[s.systemId];
     const emax = maxEnergy(s);
+    const heat = heatFactor(s);
     return {
       credits: fmt(s.credits),
       income: `${s.incomeAvg >= 0 ? '+' : ''}${s.incomeAvg.toFixed(1)}`,
@@ -49,8 +50,8 @@ export function Hud({
       refine: refineThroughput(s).toFixed(0),
       fusion: lvl(s, 'fusion') > 0,
       h2: c.h2.toFixed(0),
-      heat: heatFactor(s).toFixed(2),
-      heatNum: Math.round(heatFactor(s) * 100) / 100,
+      heat: heat.toFixed(2),
+      heatNum: Math.round(heat * 100) / 100,
       outside: s.ships.filter((x) => x.mode !== 'docked').length,
       sysName: sys.name,
       sysTier: sys.tier,
