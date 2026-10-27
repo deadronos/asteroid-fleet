@@ -48,7 +48,10 @@ export function power(s: Sim, dt: number, ctx: Ctx) {
   // Shield regen costs energy; when the pool is empty the shields stay down.
   if (c.shield < 1 && c.energy > 0) {
     const mult = s.powerMode === 'defense' ? 2 : s.powerMode === 'income' ? 0.5 : 1;
-    const regen = Math.min(1 - c.shield, 0.03 * HULLS[c.hullClass].shield * mult * dt);
+    const regen = Math.min(
+      1 - c.shield,
+      0.03 * HULLS[c.hullClass].shield * (1 + 0.1 * lvl(s, 'reactor')) * mult * dt,
+    );
     const cost = regen * SHIELD_HP * 0.4;
     if (c.energy >= cost) {
       c.energy -= cost;
