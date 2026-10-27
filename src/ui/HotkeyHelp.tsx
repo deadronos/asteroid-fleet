@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import { Modal } from './Modal';
-import { listHotkeys, subscribeHotkeys } from './hotkeys';
+import { MODAL_PRIORITY, listHotkeys, subscribeHotkeys, useHotkeys } from './hotkeys';
 
 let cache: ReturnType<typeof listHotkeys> = [];
 const snapshot = () => {
@@ -11,6 +11,8 @@ const snapshot = () => {
 
 /** Shortcut list generated from whatever is registered right now. */
 export function HotkeyHelp({ onClose }: { onClose: () => void }) {
+  // `?` toggles this overlay; every other background key is blocked while it is open.
+  useHotkeys([{ keys: ['?'], priority: MODAL_PRIORITY, run: () => onClose() }]);
   const list = useSyncExternalStore(subscribeHotkeys, snapshot);
   const groups = [...new Set(list.map((h) => h.group))];
   return (

@@ -1,5 +1,5 @@
-import { useEffect, useId, useRef, type ReactNode } from 'react';
-import { MODAL_PRIORITY, useHotkeys } from './hotkeys';
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { MODAL_PRIORITY, isTopModal, pushModal, useHotkeys } from './hotkeys';
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -22,6 +22,7 @@ export function Modal({
 }) {
   const titleId = useId();
   const ref = useRef<HTMLDivElement>(null);
+  const press = useRef({ down: false, up: false });
   const onCloseRef = useRef(onClose);
   useEffect(() => {
     onCloseRef.current = onClose;
@@ -41,13 +42,18 @@ export function Modal({
     },
   ]);
 
+  // Join and leave the modal stack in the same commit that adds and removes the dialog, so a key
+  // pressed right after it closes isn't still blocked by a passive effect that hasn't run yet.
+  const [id] = useState(() => Symbol('modal'));
+  useLayoutEffect(() => pushModal(id), [id]);
+
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null;
     const node = ref.current;
     const items = () => Array.from(node?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? []);
     (items()[0] ?? node)?.focus();
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Tab' || !node) return;
+      if (e.key !== 'Tab' || !node || !isTopModal(id)) return;
       const list = items();
       if (list.length === 0) {
         e.preventDefault();
@@ -71,10 +77,19 @@ export function Modal({
       // The opener may have unmounted (Settings -> Help); fall back to the app root.
       (opener?.isConnected ? opener : document.getElementById('app-root'))?.focus();
     };
-  }, []);
+  }, [id]);
 
   return (
-    <div className="modal-bg" onClick={onClose}>
+    <div
+      className="modal-bg"
+      onMouseDown={(e) => (press.current = { down: e.target === e.currentTarget, up: false })}
+      onMouseUp={(e) => (press.current.up = e.target === e.currentTarget)}
+      onClick={(e) => {
+        // A drag between dialog and backdrop (either way) is not a backdrop click.
+        if (e.target === e.currentTarget && press.current.down && press.current.up) onClose();
+        press.current = { down: false, up: false };
+      }}
+    >
       <div
         ref={ref}
         className={`modal ${className}`.trim()}
@@ -82,7 +97,6 @@ export function Modal({
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        onClick={(e) => e.stopPropagation()}
       >
         <div className="settings-head">
           <h2 id={titleId}>{title}</h2>

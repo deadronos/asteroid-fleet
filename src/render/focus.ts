@@ -39,6 +39,18 @@ export function easeFactor(dt: number, rate: number): number {
   return 1 - Math.exp(-Math.max(0, dt) * rate);
 }
 
+let exitRequested = false;
+/** Ask the camera rig to leave tactical view (manual and auto) on its next frame. */
+export function leaveTactical(): void {
+  exitRequested = true;
+}
+/** True once per {@link leaveTactical} call. */
+export function takeTacticalExit(): boolean {
+  const r = exitRequested;
+  exitRequested = false;
+  return r;
+}
+
 /** Camera distance above which tactical turns on by itself. */
 export const AUTO_TACTICAL_ON = 200;
 /** Camera distance below which auto-tactical turns back off; lower than ON so it does not flicker. */

@@ -18,6 +18,20 @@ export interface Hotkey {
 
 export const MODAL_PRIORITY = 100;
 
+/** Open modals, bottom to top. Only the top one traps Tab, and while any is open background keys are ignored. */
+const modalStack: symbol[] = [];
+
+/** Registers an open modal; returns its remover. */
+export function pushModal(id: symbol): () => void {
+  modalStack.push(id);
+  return () => {
+    const i = modalStack.lastIndexOf(id);
+    if (i >= 0) modalStack.splice(i, 1);
+  };
+}
+
+export const isTopModal = (id: symbol) => modalStack[modalStack.length - 1] === id;
+
 interface Entry {
   hotkey: Hotkey;
   seq: number;
@@ -37,6 +51,7 @@ export function dispatchHotkey(e: KeyboardEvent): void {
   const blocked = ignoresHotkey(e);
   const hits = [...entries]
     .filter(({ hotkey }) => hotkey.keys.some((k) => norm(k) === key))
+    .filter(({ hotkey }) => !modalStack.length || (hotkey.priority ?? 0) >= MODAL_PRIORITY)
     .filter(
       ({ hotkey }) => !blocked || (hotkey.allowInInput && !e.ctrlKey && !e.metaKey && !e.altKey),
     )

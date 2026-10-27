@@ -23,7 +23,7 @@ export * from './economy';
 export { SEVERITY, emit } from './events';
 
 /** Bump together with a `migrations[n]` step and a fixture. See README "Save migrations". */
-export const SAVE_VERSION = 16;
+export const SAVE_VERSION = 17;
 
 interface Carry {
   research: number;

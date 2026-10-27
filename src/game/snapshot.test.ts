@@ -4,7 +4,7 @@ import { stressGame } from '../sim/stress';
 import { stateOf } from '../sim/state';
 import { stepSim } from '../sim/tick';
 import type { GameState, Sim } from '../sim/types';
-import { applySnapshot, encodeSnapshot } from './snapshot';
+import { OTHER_ROW, applySnapshot, encodeSnapshot } from './snapshot';
 
 function busyGame(): Sim {
   const s = stressGame(1000, 600, 40);
@@ -54,8 +54,13 @@ describe('UI snapshot', () => {
     const { snap } = encodeSnapshot(g, false);
     expect(snap.others.map((o) => o.id)).toEqual([91]);
     expect(snap.others[0].pos).toEqual(near.carrier.pos);
-    const live = near.ships.filter((x) => x.mode !== 'docked').length;
-    expect(snap.others[0].ships.length).toBe(live * 4);
+    const live = near.ships.filter((x) => x.mode !== 'docked');
+    const rows = snap.others[0].ships;
+    expect(rows.length).toBe(live.length * OTHER_ROW);
+    // Rows carry the ship id, so interpolation can pair each ship with itself.
+    expect(Array.from({ length: live.length }, (_, i) => rows[i * OTHER_ROW])).toEqual(
+      live.map((x) => x.id),
+    );
   });
 
   it('rebuilds the exact sim state', () => {

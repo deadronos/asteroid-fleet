@@ -57,6 +57,9 @@ export function Hud({
       sysName: sys.name,
       sysTier: sys.tier,
       brightness: sys.brightness.toFixed(2),
+      // Engine-side, not sim state: a paused sim sends nothing new, so they must be selected too.
+      paused: engine.paused,
+      speed: engine.speed,
     };
   }, shallowEqual);
   return (
@@ -138,16 +141,16 @@ export function Hud({
         <div className="spacer" />
         <div className="controls">
           <button
-            className={engine.paused ? 'on' : ''}
+            className={h.paused ? 'on' : ''}
             onClick={() => engine.togglePause()}
             title="Pause (Space)"
           >
-            {engine.paused ? '▶' : '❚❚'}
+            {h.paused ? '▶' : '❚❚'}
           </button>
           {[1, 2, 4].map((v) => (
             <button
               key={v}
-              className={engine.speed === v && !engine.paused ? 'on' : ''}
+              className={h.speed === v && !h.paused ? 'on' : ''}
               onClick={() => engine.setSpeed(v)}
               title={`${v}× speed (+ / − to change)`}
             >

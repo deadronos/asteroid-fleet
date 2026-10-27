@@ -9,7 +9,7 @@ import { game } from './testing';
 const FIELDS_BUDGET_BYTES = 16 * 1024;
 
 const warp = (s: Sim, to: number) => {
-  s.warp = { targetSystem: to, charge: 0 };
+  s.warp = { targetSystem: to, charge: 0, total: 1 };
   executeJump(s);
 };
 

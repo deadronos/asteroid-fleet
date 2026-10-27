@@ -8,7 +8,7 @@ import { CAMERA_OFFSET } from './constants';
 import { fleetFrame } from './frameState';
 import type { Vec3 } from '../sim/types';
 import { useHotkeys } from '../ui/hotkeys';
-import { easeFactor, focus, resolveFocus, stepTactical } from './focus';
+import { easeFactor, focus, resolveFocus, stepTactical, takeTacticalExit } from './focus';
 
 const FOCUS_DISTANCE = 45;
 const FOLLOW_RATE = 7;
@@ -91,8 +91,10 @@ export function CameraRig({
     if (tactical && !wasTactical.current) {
       camera.position.set(c.target.x, c.target.y + 230, c.target.z + 1);
     }
+    // Leaving from auto-tactical: pretend manual tactical was on and is now off.
+    const exit = takeTacticalExit();
     const step = stepTactical({
-      wasTactical: wasTactical.current,
+      wasTactical: wasTactical.current || exit,
       tactical,
       auto: autoOn.current,
       dist: camera.position.distanceTo(c.target),

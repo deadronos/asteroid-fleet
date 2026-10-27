@@ -15,7 +15,7 @@ import { CameraRig } from './CameraRig';
 import { easeFactor, focus, isDoubleMiss, shortestArc } from './focus';
 import { engine, lerpCarrier } from '../game/engine';
 import { OTHER_ROW } from '../game/snapshot';
-import { COVER_RADIUS, H2_STORM_RADIUS, SHIP_STATS, WARP_CHARGE } from '../sim/config';
+import { COVER_RADIUS, H2_STORM_RADIUS, SHIP_STATS } from '../sim/config';
 import { gasGiantPos } from '../sim/state';
 import { SHIP_CLASSES, type Vec3 } from '../sim/types';
 import { AsteroidField } from './AsteroidField';
@@ -217,7 +217,7 @@ function Carrier() {
     if (warpRing.current) {
       warpRing.current.visible = !!s.warp;
       warpRing.current.rotation.z = st.clock.elapsedTime * 2;
-      const total = s.warp ? s.warp.total || WARP_CHARGE : 1;
+      const total = s.warp ? s.warp.total : 1;
       const k = s.warp ? 1 + (1 - Math.min(1, s.warp.charge / total)) * 2 : 1;
       warpRing.current.scale.setScalar(k);
     }
@@ -276,8 +276,14 @@ function OtherCarriers() {
         }
       }
       for (let i = 0; i < o.ships.length && n < 1024; i += OTHER_ROW) {
-        const c = ICON_COLORS[SHIP_CLASSES[o.ships[i]]];
-        pos.setXYZ(n, o.ships[i + 1], o.ships[i + 2], o.ships[i + 3]);
+        const c = ICON_COLORS[SHIP_CLASSES[o.ships[i + 1]]];
+        const x = o.ships[i + 2];
+        const y = o.ships[i + 3];
+        const z = o.ships[i + 4];
+        // New ships have no previous position and appear where they are.
+        const q = engine.othersPrevShips.get(o.ships[i]);
+        if (q) pos.setXYZ(n, q[0] + (x - q[0]) * a, q[1] + (y - q[1]) * a, q[2] + (z - q[2]) * a);
+        else pos.setXYZ(n, x, y, z);
         col.setXYZ(n, c.r, c.g, c.b);
         n++;
       }
