@@ -4,6 +4,8 @@ const port = 4173;
 
 export default defineConfig({
   testDir: 'e2e',
+  // Software GL makes whole flows slow on CI runners; waits are signal-based, this is only the ceiling.
+  timeout: 60_000,
   retries: process.env.CI ? 1 : 0,
   use: {
     baseURL: `http://localhost:${port}/asteroid-fleet/`,

@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 import { order, type Order } from '../src/sim/actions';
 import { SAVE_KEY } from '../src/game/save';
 import { focused, newGame, stateOf } from '../src/sim/state';
@@ -43,12 +43,46 @@ export async function seedSave(page: Page, state: Sim): Promise<void> {
 export async function openApp(page: Page): Promise<void> {
   await page.goto('./');
   await page.getByRole('button', { name: 'Take command' }).click();
+  // Slow starts otherwise eat the default 5 s of the first assertion after this.
+  await engineReady(page);
+}
+
+type Fleet = { loaded: boolean; fullState(): Promise<GameState> };
+
+/**
+ * Wait until the engine has loaded the save and the sim worker has answered. `fullState()` itself
+ * waits on the same startup, so calling it earlier blocks `page.evaluate` for as long as a slow
+ * machine takes to boot, then times out the whole test. This polls a cheap synchronous flag
+ * instead, and it survives the page navigating underneath it (a reload, for one).
+ */
+export async function engineReady(page: Page, timeout = 60_000): Promise<void> {
+  await expect
+    .poll(
+      () =>
+        page
+          .evaluate(() => (globalThis as unknown as { __fleet?: Fleet }).__fleet?.loaded === true)
+          .catch(() => false),
+      { timeout, message: 'engine did not finish loading' },
+    )
+    .toBe(true);
+}
+
+/**
+ * Leave the app and come back to the same URL, which is what a reload is for the save. A plain
+ * `page.reload()` on a busy page (software GL, sim worker, pending save) intermittently fails
+ * with net::ERR_ABORTED on CI; going through about:blank lets the heavy renderer unload first.
+ */
+export async function reopenApp(page: Page): Promise<void> {
+  const url = page.url();
+  await page.goto('about:blank');
+  await page.goto(url);
 }
 
 /** The worker's exact state, through the engine's debug handle, flattened to its one operation. */
 export async function simState(page: Page): Promise<Sim> {
+  await engineReady(page);
   const g = await page.evaluate(() =>
-    (globalThis as unknown as { __fleet: { fullState(): Promise<GameState> } }).__fleet.fullState(),
+    (globalThis as unknown as { __fleet: Fleet }).__fleet.fullState(),
   );
   return { ...g, ...g.ops[0] };
 }
