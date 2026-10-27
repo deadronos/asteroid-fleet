@@ -122,6 +122,11 @@ export const migrations: Record<number, Migration> = {
     save.marks = 0;
     return save;
   },
+  // v14: Admiralty upgrade shop (#69).
+  13: (save) => {
+    save.admiralty = {};
+    return save;
+  },
 };
 
 const LEGACY_TONE: Record<string, Severity> = {

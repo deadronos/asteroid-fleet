@@ -418,6 +418,8 @@ export interface GameState {
   };
   /** Unspent Admiralty Marks (#68). Survive both prestige layers. */
   marks: number;
+  /** Admiralty shop levels by upgrade id (#69). Survive both prestige layers. */
+  admiralty: Record<string, number>;
   powerMode: 'balanced' | 'income' | 'defense';
   /** The last few events, newest first, for the Log tab. Saved. */
   log: SimEvent[];

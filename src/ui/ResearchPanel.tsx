@@ -11,6 +11,13 @@ import {
   type Branch,
 } from '../sim/research';
 import { SHIP_CLASSES, type HullId, type ShipClass } from '../sim/types';
+import {
+  ADMIRALTY_UPGRADES,
+  admiraltyCost,
+  admiraltyEffect,
+  admiraltyLevel,
+  canBuyAdmiralty,
+} from '../sim/admiralty';
 import { fmt } from './format';
 
 const GLOBAL: Branch[] = ['Logistics', 'Mining', 'Combat', 'Carrier', 'Reserves', 'Automation'];
@@ -167,6 +174,27 @@ export function ResearchPanel() {
             <button onClick={() => setConfirmAdm(false)}>Cancel</button>
           </div>
         )}
+      </div>
+      <div className="branch">
+        <h3>
+          Admiralty shop <span className="hint">{fmt(s.marks)} Marks</span>
+        </h3>
+        {ADMIRALTY_UPGRADES.map((u) => (
+          <div className="row" key={u.id}>
+            <div className="grow">
+              <b>{u.name}</b>
+              <div className="hint" style={{ margin: 0 }}>
+                {u.desc} · level {fmt(admiraltyLevel(s, u.id))}: {u.label(admiraltyEffect(s, u.id))}
+              </div>
+            </div>
+            <button
+              disabled={!canBuyAdmiralty(s, u.id)}
+              onClick={() => engine.dispatch({ type: 'buyAdmiralty', id: u.id })}
+            >
+              {fmt(admiraltyCost(s, u.id))} Marks
+            </button>
+          </div>
+        ))}
       </div>
       {GLOBAL.map(branch)}
       {SHIP_CLASSES.map((c) => branch(c))}
