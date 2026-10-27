@@ -64,9 +64,7 @@ export function Hud({
         <div className="chip">
           <span className="k">Credits</span>
           <span className="v">{h.credits}</span>
-          <span className="sub">
-            {h.income}/s
-          </span>
+          <span className="sub">{h.income}/s</span>
         </div>
         <div
           className="chip"
@@ -109,7 +107,9 @@ export function Hud({
           <span className="k">Cargo heat</span>
           <span
             className="v"
-            style={{ color: h.heatNum > 2 ? 'var(--bad)' : h.heatNum > 1.4 ? 'var(--warn)' : 'var(--text)' }}
+            style={{
+              color: h.heatNum > 2 ? 'var(--bad)' : h.heatNum > 1.4 ? 'var(--warn)' : 'var(--text)',
+            }}
           >
             ×{h.heat}
           </span>
@@ -180,7 +180,8 @@ function Alerts() {
         outside: leftBehind(s).length,
       };
     if (s.wave.active) return { kind: 'attack', raiders: s.pirates.length };
-    if (s.wave.warning) return { kind: 'wave', seconds: Math.ceil(s.wave.timer), size: s.wave.size };
+    if (s.wave.warning)
+      return { kind: 'wave', seconds: Math.ceil(s.wave.timer), size: s.wave.size };
     if (s.storm.active > 0) return { kind: 'storm', gas: s.systems[s.systemId].gasGiant };
     return null;
   }, shallowEqual);
@@ -205,6 +206,7 @@ function Alerts() {
         Pirate wave inbound in {a.seconds} s · {a.size} raiders
       </div>
     );
-  if (a.gas) return <div className="alert warn">H2 storm · ships near the gas giant take damage</div>;
+  if (a.gas)
+    return <div className="alert warn">H2 storm · ships near the gas giant take damage</div>;
   return <div className="alert warn">Solar storm · ships outside cover take damage</div>;
 }

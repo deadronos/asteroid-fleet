@@ -8,29 +8,26 @@ import { deepEqual } from './equal';
 /** Carrier tabs, hotkeys 1–9 and the cut that hides a swap. Hidden with a single carrier. */
 export function CarrierBar() {
   // Rows hold only what is drawn, so an idle tick that changes nothing visible skips the render.
-  const bar = useGame(
-    (s) => {
-      const carriers = engine.carriers;
-      const labels = carrierChoices(carriers, s.systems);
-      return {
-        cuts: engine.cuts,
-        rows: carriers.map((c, i) => {
-          const badge = engine.unseen.get(c.id);
-          return {
-            id: c.id,
-            label: labels[i].label,
-            on: c.id === engine.focusedCarrierId,
-            hull: Math.round(c.hull * 100),
-            energy: Math.floor(c.energy),
-            income: fmt(c.income),
-            positive: c.income >= 0,
-            badge: badge ? { severity: badge.severity, count: badge.count } : null,
-          };
-        }),
-      };
-    },
-    deepEqual,
-  );
+  const bar = useGame((s) => {
+    const carriers = engine.carriers;
+    const labels = carrierChoices(carriers, s.systems);
+    return {
+      cuts: engine.cuts,
+      rows: carriers.map((c, i) => {
+        const badge = engine.unseen.get(c.id);
+        return {
+          id: c.id,
+          label: labels[i].label,
+          on: c.id === engine.focusedCarrierId,
+          hull: Math.round(c.hull * 100),
+          energy: Math.floor(c.energy),
+          income: fmt(c.income),
+          positive: c.income >= 0,
+          badge: badge ? { severity: badge.severity, count: badge.count } : null,
+        };
+      }),
+    };
+  }, deepEqual);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

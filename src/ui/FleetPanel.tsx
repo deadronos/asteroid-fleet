@@ -490,9 +490,7 @@ export function FleetPanel() {
               focus.set(id === selShip ? null : id);
             }}
           />
-          {selShip >= 0 && f.hasSel[i] && (
-            <ShipDetail id={selShip} />
-          )}
+          {selShip >= 0 && f.hasSel[i] && <ShipDetail id={selShip} />}
         </div>
       ))}
       {
@@ -505,9 +503,7 @@ export function FleetPanel() {
             {(Object.keys(HANGAR_TYPES) as HangarType[]).map((t) => (
               <button
                 key={t}
-                disabled={
-                  !f.canAfford || !!hangarLocked(t, f.furthestTier)
-                }
+                disabled={!f.canAfford || !!hangarLocked(t, f.furthestTier)}
                 onClick={() => engine.dispatch({ type: 'buyHangar', hangarType: t })}
                 title={hangarLocked(t, f.furthestTier) ?? HANGAR_TYPES[t].blurb}
               >
