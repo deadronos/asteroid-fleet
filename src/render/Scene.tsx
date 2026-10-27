@@ -1,5 +1,5 @@
 import { Stars } from '@react-three/drei';
-import { Canvas, useFrame } from '@react-three/fiber';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import {
   Suspense,
   lazy,
@@ -468,6 +468,7 @@ function icon(
 }
 
 const ICON_VERT = /* glsl */ `
+uniform float uPx;
 attribute vec3 color;
 attribute float shape;
 varying vec3 vColor;
@@ -475,7 +476,7 @@ varying float vShape;
 void main() {
   vColor = color;
   vShape = shape;
-  gl_PointSize = 11.0;
+  gl_PointSize = 11.0 * uPx;
   gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
 }`;
 
@@ -494,9 +495,11 @@ void main() {
     : a < 0.75 && b < 0.75;
   if (!k) discard;
   gl_FragColor = vec4(vColor, 1.0);
+  #include <colorspace_fragment>
 }`;
 
 function Tactical({ on }: { on: boolean }) {
+  const dpr = useThree((st) => st.viewport.dpr);
   const geo = useMemo(() => {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(2048 * 3), 3));
@@ -541,7 +544,11 @@ function Tactical({ on }: { on: boolean }) {
   return (
     <>
       <points geometry={geo} frustumCulled={false}>
-        <shaderMaterial vertexShader={ICON_VERT} fragmentShader={ICON_FRAG} />
+        <shaderMaterial
+          vertexShader={ICON_VERT}
+          fragmentShader={ICON_FRAG}
+          uniforms={{ uPx: { value: dpr } }}
+        />
       </points>
       <group ref={ring}>
         <mesh rotation={[-Math.PI / 2, 0, 0]}>
