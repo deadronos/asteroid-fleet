@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { engine } from '../game/engine';
 import {
   SAVE_BACKUP_FAILED_NOTICE,
@@ -20,6 +20,7 @@ import {
 } from '../game/slots';
 import type { GameState } from '../sim/types';
 import { downloadFile } from './download';
+import { Modal } from './Modal';
 
 type Tab = 'ui' | 'visuals' | 'audio' | 'saves';
 const TABS: [Tab, string][] = [
@@ -363,47 +364,27 @@ function SavesTab() {
 
 export function SettingsMenu({ onClose, onHelp }: { onClose: () => void; onHelp: () => void }) {
   const [tab, setTab] = useState<Tab>('ui');
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
   return (
-    <div className="modal-bg" onClick={onClose}>
-      <div
-        className="modal settings"
-        role="dialog"
-        aria-label="Settings"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="settings-head">
-          <h2>Settings</h2>
-          <button onClick={onClose} aria-label="Close">
-            ✕
+    <Modal title="Settings" className="settings" onClose={onClose}>
+      <div className="tabs" role="tablist">
+        {TABS.map(([id, label]) => (
+          <button
+            key={id}
+            role="tab"
+            aria-selected={tab === id}
+            className={tab === id ? 'on' : ''}
+            onClick={() => setTab(id)}
+          >
+            {label}
           </button>
-        </div>
-        <div className="tabs" role="tablist">
-          {TABS.map(([id, label]) => (
-            <button
-              key={id}
-              role="tab"
-              aria-selected={tab === id}
-              className={tab === id ? 'on' : ''}
-              onClick={() => setTab(id)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        <div className="settings-body">
-          {tab === 'ui' && <UiTab onHelp={onHelp} />}
-          {tab === 'visuals' && <VisualsTab />}
-          {tab === 'audio' && <AudioTab />}
-          {tab === 'saves' && <SavesTab />}
-        </div>
+        ))}
       </div>
-    </div>
+      <div className="settings-body">
+        {tab === 'ui' && <UiTab onHelp={onHelp} />}
+        {tab === 'visuals' && <VisualsTab />}
+        {tab === 'audio' && <AudioTab />}
+        {tab === 'saves' && <SavesTab />}
+      </div>
+    </Modal>
   );
 }

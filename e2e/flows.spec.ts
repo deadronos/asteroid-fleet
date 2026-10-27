@@ -31,7 +31,7 @@ test.describe('prestige and research', () => {
     await seedSave(page, s);
     await openApp(page);
 
-    await page.getByRole('button', { name: 'Research', exact: true }).click();
+    await page.getByRole('tab', { name: 'Research', exact: true }).click();
     await expect(page.getByText('Research points available')).toBeVisible();
     await page.getByRole('button', { name: 'Prestige…' }).click();
     await page.getByRole('button', { name: 'Yes, reset' }).click();
