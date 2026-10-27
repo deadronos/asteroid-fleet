@@ -18,6 +18,7 @@ import { jumpCost, refineThroughput, solarRate, upkeep } from '../sim/state';
 import { cargoCap } from '../sim/ctx';
 import { SHIP_CLASSES, type Sim } from '../sim/types';
 import { fmt } from './format';
+import { deepEqual } from './equal';
 import { Shipyard } from './Shipyard';
 
 /** Rough per-link rates for the throughput = min(...) readout. Ore units per second. */
@@ -51,14 +52,13 @@ function throughput(s: Sim) {
   return { links, min };
 }
 
-export function CarrierPanel() {
-  const s = useGame();
-  const sys = s.systems[s.systemId];
-  const t = throughput(s);
-  const refCost = REFINERY_COST(s.carrier.refinery);
-  const solar = solarRate(s);
-  const up = upkeep(s);
-  const net = solar - up.total;
+/** Throughput and power tables: derived numbers only, so most ticks leave it untouched. */
+function PowerReadout() {
+  const { t, solar, up, net, fusion } = useGame((s) => {
+    const up = upkeep(s);
+    const solar = solarRate(s);
+    return { t: throughput(s), solar, up, net: solar - up.total, fusion: lvl(s, 'fusion') > 0 };
+  }, deepEqual);
   return (
     <>
       <h3>Throughput</h3>
@@ -88,7 +88,7 @@ export function CarrierPanel() {
             <td>Solar</td>
             <td style={{ textAlign: 'right' }}>+{solar.toFixed(2)}/s</td>
           </tr>
-          {lvl(s, 'fusion') > 0 && (
+          {fusion && (
             <tr>
               <td>Fusion (while H2 lasts)</td>
               <td style={{ textAlign: 'right' }}>up to +{FUSION_RATE}/s</td>
@@ -117,6 +117,17 @@ export function CarrierPanel() {
           </tr>
         </tbody>
       </table>
+    </>
+  );
+}
+
+export function CarrierPanel() {
+  const s = useGame();
+  const sys = s.systems[s.systemId];
+  const refCost = REFINERY_COST(s.carrier.refinery);
+  return (
+    <>
+      <PowerReadout />
       <div className="row">
         {(
           [

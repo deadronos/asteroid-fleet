@@ -28,6 +28,7 @@ import {
   type ShipClass,
 } from '../sim/types';
 import { fmt } from './format';
+import { deepEqual } from './equal';
 
 const MODE_LABEL: Record<string, string> = {
   docked: 'docked',
@@ -399,45 +400,77 @@ function AutomationBar() {
   );
 }
 
+/** Per-class owned counts in one pass over the fleet. */
+export function countByClass(ships: readonly { cls: ShipClass }[]): Record<ShipClass, number> {
+  const counts = Object.fromEntries(SHIP_CLASSES.map((c) => [c, 0])) as Record<ShipClass, number>;
+  for (const x of ships) counts[x.cls]++;
+  return counts;
+}
+
+function ShipShop({ hangarId }: { hangarId: number }) {
+  const shop = useGame((s) => {
+    const counts = countByClass(s.ships);
+    return SHIP_CLASSES.map((c) => {
+      const cost = shipCost(s, c);
+      return {
+        cls: c,
+        unlocked: s.unlocked.includes(c),
+        cost,
+        affordable: s.credits >= cost,
+        count: counts[c],
+      };
+    });
+  }, deepEqual);
+  return (
+    <div className="shop">
+      {shop.map(({ cls: c, unlocked, cost, affordable, count }) => {
+        const st = SHIP_STATS[c];
+        return (
+          <button
+            key={c}
+            disabled={!unlocked || !affordable}
+            onClick={() => engine.dispatch({ type: 'buyShip', cls: c, hangarId })}
+            title={st.role}
+          >
+            <span>
+              <i className="swatch" style={{ background: st.color }} />
+              {st.name}
+            </span>
+            <span className="meta">
+              {unlocked ? (
+                <>
+                  <span className="cost">{fmt(cost)} cr</span> · {st.slots} slot
+                  {st.slots > 1 ? 's' : ''} · ×{count}
+                </>
+              ) : (
+                (UNLOCK_HINT[c] ?? 'Locked')
+              )}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export function FleetPanel() {
-  const s = useGame();
-  const [sel, setSel] = useState(s.hangars[0]?.id ?? 1);
+  const [sel, setSel] = useState(() => engine.view.hangars[0]?.id ?? 1);
   const [selShip, setSelShip] = useState(-1);
-  const hangarCount = s.hangars.length;
+  // Hangar boards and the shop subscribe themselves; this only needs the list shape.
+  const f = useGame(
+    (s) => ({
+      ids: s.hangars.map((h) => h.id),
+      hasSel: s.hangars.map((h) => h.items.some((it) => it.shipId === selShip)),
+      canAfford: s.credits >= NEW_HANGAR_COST(s.hangars.length),
+      furthestTier: s.stats.furthestTier,
+    }),
+    deepEqual,
+  );
+  const hangarCount = f.ids.length;
   return (
     <>
       <h3>Shipyard · builds into Hangar {sel}</h3>
-      <div className="shop">
-        {SHIP_CLASSES.map((c) => {
-          const st = SHIP_STATS[c];
-          const unlocked = s.unlocked.includes(c);
-          const cost = shipCost(s, c);
-          const count = s.ships.filter((x) => x.cls === c).length;
-          return (
-            <button
-              key={c}
-              disabled={!unlocked || s.credits < cost}
-              onClick={() => engine.dispatch({ type: 'buyShip', cls: c, hangarId: sel })}
-              title={st.role}
-            >
-              <span>
-                <i className="swatch" style={{ background: st.color }} />
-                {st.name}
-              </span>
-              <span className="meta">
-                {unlocked ? (
-                  <>
-                    <span className="cost">{fmt(cost)} cr</span> · {st.slots} slot
-                    {st.slots > 1 ? 's' : ''} · ×{count}
-                  </>
-                ) : (
-                  (UNLOCK_HINT[c] ?? 'Locked')
-                )}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+      <ShipShop hangarId={sel} />
       <h3>Hangars</h3>
       <AutomationBar />
       <p className="hint">
@@ -445,7 +478,7 @@ export function FleetPanel() {
         barges and they repair 3× faster when docked. Click a hangar to build into it, click a
         docked ship to fit modules.
       </p>
-      {s.hangars.map((h) => (
+      {engine.view.hangars.map((h, i) => (
         <div key={h.id}>
           <HangarBoard
             h={h}
@@ -457,9 +490,7 @@ export function FleetPanel() {
               focus.set(id === selShip ? null : id);
             }}
           />
-          {selShip >= 0 && h.items.some((it) => it.shipId === selShip) && (
-            <ShipDetail id={selShip} />
-          )}
+          {selShip >= 0 && f.hasSel[i] && <ShipDetail id={selShip} />}
         </div>
       ))}
       {
@@ -472,12 +503,9 @@ export function FleetPanel() {
             {(Object.keys(HANGAR_TYPES) as HangarType[]).map((t) => (
               <button
                 key={t}
-                disabled={
-                  s.credits < NEW_HANGAR_COST(hangarCount) ||
-                  !!hangarLocked(t, s.stats.furthestTier)
-                }
+                disabled={!f.canAfford || !!hangarLocked(t, f.furthestTier)}
                 onClick={() => engine.dispatch({ type: 'buyHangar', hangarType: t })}
-                title={hangarLocked(t, s.stats.furthestTier) ?? HANGAR_TYPES[t].blurb}
+                title={hangarLocked(t, f.furthestTier) ?? HANGAR_TYPES[t].blurb}
               >
                 {HANGAR_TYPES[t].name}
               </button>
