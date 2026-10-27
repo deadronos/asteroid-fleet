@@ -206,6 +206,9 @@ export const NEW_HANGAR_COST = (count: number) => {
   return Math.round(base * Math.pow(2, over));
 };
 
+/** Credits for the next carrier when `owned` are already running (#78): 20k, 120k, 720k... */
+export const CARRIER_COST = (owned: number) => 20000 * 6 ** (owned - 1);
+
 export const DEFAULT_STANCE: Stance = {
   engagement: 'defensive',
   underFire: 'retreatHull',

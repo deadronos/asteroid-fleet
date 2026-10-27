@@ -7,6 +7,7 @@ import {
   moduleLocked,
   REFINERY_COST,
   NEW_HANGAR_COST,
+  CARRIER_COST,
   OFFLINE_CAP_S,
   OFFLINE_EFFICIENCY,
   MARKS_DIVISOR,
@@ -19,9 +20,20 @@ import {
 import { cardSlots, checkCard, nextCardId } from './cards';
 import { autoBuyUnlocked, autoRebuildUnlocked, engagementUnlocked } from './automation';
 import { moveShip as moveOnBoard } from './hangar';
+import { carrierSlots } from './milestones';
 import { buyAdmiralty } from './admiralty';
 import { buyResearch as buyNode, lvl, RESEARCH_BY_ID } from './research';
-import { bind, createShip, emit, focused, jumpCost, maxEnergy, newGame } from './state';
+import {
+  addCarrier,
+  bind,
+  createShip,
+  emit,
+  focused,
+  jumpCost,
+  maxEnergy,
+  newGame,
+  stateOf,
+} from './state';
 import { executeJump } from './tick';
 import { RETURN_GRACE_S, dematerialise, materialise, runBackground } from './background';
 import type {
@@ -45,6 +57,8 @@ export type Order =
   | { type: 'moveShip'; shipId: number; hangarId: number; start: number }
   | { type: 'buySlot'; hangarId: number }
   | { type: 'buyHangar'; hangarType: HangarType }
+  /** Buy another carrier (#78); credits are shared, so any carrier can place it. */
+  | { type: 'buyCarrier' }
   | { type: 'retrofitHangar'; hangarId: number; hangarType: HangarType }
   | { type: 'setLaunchOrder'; hangarId: number; order: ShipClass[] }
   | {
@@ -139,6 +153,15 @@ export function order(s: Sim, c: Order): string | null {
       if (s.credits < cost) return 'Not enough credits';
       s.credits -= cost;
       h.slots++;
+      return null;
+    }
+    case 'buyCarrier': {
+      const g = stateOf(s);
+      if (g.ops.length >= carrierSlots(g)) return 'No free slot';
+      const cost = CARRIER_COST(g.ops.length);
+      if (g.credits < cost) return 'Not enough credits';
+      g.credits -= cost;
+      addCarrier(g);
       return null;
     }
     case 'buyHangar': {

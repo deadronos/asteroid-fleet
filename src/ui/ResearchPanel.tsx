@@ -1,7 +1,14 @@
 import { useState } from 'react';
 import { engine, useGame } from '../game/engine';
 import { marksPayout, researchPayout } from '../sim/actions';
-import { HULLS, MARKS_DIVISOR, RP_DIVISOR, SHIP_STATS, TIER_NAMES } from '../sim/config';
+import {
+  CARRIER_COST,
+  HULLS,
+  MARKS_DIVISOR,
+  RP_DIVISOR,
+  SHIP_STATS,
+  TIER_NAMES,
+} from '../sim/config';
 import {
   RESEARCH,
   canBuyResearch,
@@ -22,6 +29,28 @@ import {
 import { fmt } from './format';
 
 const GLOBAL: Branch[] = ['Logistics', 'Mining', 'Combat', 'Carrier', 'Reserves', 'Automation'];
+
+function BuyCarrier(p: { credits: number; slots: number }) {
+  const owned = engine.carriers.length;
+  const cost = CARRIER_COST(owned);
+  const free = owned < p.slots;
+  return (
+    <div className="row">
+      <button
+        disabled={!free || p.credits < cost}
+        onClick={() => engine.dispatch({ type: 'buyCarrier' })}
+        title={
+          free ? 'A new carrier starts in the home system' : 'Reach the next Admiralty milestone'
+        }
+      >
+        Buy carrier · {fmt(cost)} cr
+      </button>
+      <span className="hint">
+        {owned} of {p.slots} carrier slots in use
+      </span>
+    </div>
+  );
+}
 
 function Pair(p: { a: string; av: string; b: string; bv: string }) {
   return (
@@ -209,6 +238,7 @@ export function ResearchPanel() {
             {s.lifetime.admiralties >= m.at ? '✓' : '○'} {m.at}: {m.label}
           </div>
         ))}
+        <BuyCarrier credits={s.credits} slots={carrierSlots(s)} />
       </div>
       {GLOBAL.map(branch)}
       {SHIP_CLASSES.map((c) => branch(c))}

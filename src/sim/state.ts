@@ -743,20 +743,23 @@ interface Carry {
   automation?: GameState['automation'];
 }
 
-export function newGame(seed = 1337, carry?: Carry): GameState {
-  const slotsBonus = carry?.researchLevels.slots ?? 0;
-  const hulls = carry?.hulls ?? ['standard'];
-  const hullClass =
-    carry?.hullClass && hulls.includes(carry.hullClass) ? carry.hullClass : 'standard';
+/** A fresh operation: carrier, hangars and empty fields, not yet in any system. */
+function buildOp(
+  id: number,
+  seed: number,
+  hullClass: HullId,
+  levels: Record<string, number>,
+): Operation {
+  const slotsBonus = levels.slots ?? 0;
   const hd = HULLS[hullClass];
-  const op: Operation = {
-    id: 0,
+  return {
+    id,
     rng: seed,
     carrier: {
       pos: v3(),
       target: null,
-      hull: hd.hull * (1 + 0.12 * (carry?.researchLevels.frame ?? 0)),
-      maxHull: hd.hull * (1 + 0.12 * (carry?.researchLevels.frame ?? 0)),
+      hull: hd.hull * (1 + 0.12 * (levels.frame ?? 0)),
+      maxHull: hd.hull * (1 + 0.12 * (levels.frame ?? 0)),
       energy: ENERGY_MAX * 0.6,
       shield: 1,
       ore: 0,
@@ -802,6 +805,32 @@ export function newGame(seed = 1337, carry?: Carry): GameState {
     miningIncomeAvg: 0,
     fx: [],
   };
+}
+
+/**
+ * Add a second (or later) carrier to the run (#78). It gets an id no ship or other
+ * carrier uses, hangar ids no other carrier's hangars use (rules and stances name
+ * hangars globally), its own rng seed, and starts in the home system.
+ */
+export function addCarrier(g: GameState): Operation {
+  const id = g.nextId++;
+  const op = buildOp(id, g.seed + id * 7919, 'standard', g.researchLevels);
+  const top = Math.max(...g.ops.flatMap((o) => o.hangars.map((h) => h.id)));
+  for (const h of op.hangars) h.id += top;
+  g.ops.push(op);
+  const s = bind(g, op);
+  s.carrier.energy = maxEnergy(s) * 0.6;
+  enterSystem(s, 0);
+  for (let i = 0; i < 4; i++) createShip(s, 'drone', op.hangars[0].id);
+  emit(s, 'CarrierOnline', { system: s.systems[0].name });
+  return op;
+}
+
+export function newGame(seed = 1337, carry?: Carry): GameState {
+  const hulls = carry?.hulls ?? ['standard'];
+  const hullClass =
+    carry?.hullClass && hulls.includes(carry.hullClass) ? carry.hullClass : 'standard';
+  const op = buildOp(0, seed, hullClass, carry?.researchLevels ?? {});
   const g: GameState = {
     version: SAVE_VERSION,
     seed,

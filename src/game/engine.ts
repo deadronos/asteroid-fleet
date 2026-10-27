@@ -367,6 +367,8 @@ class Engine {
   }
 
   private saveMirror() {
+    // The mirror holds only the focused carrier; with several it would drop the others.
+    if (this.carriers.length > 1) return;
     if (!saveOverwriteBlocked()) void this.write(this.state);
   }
 
