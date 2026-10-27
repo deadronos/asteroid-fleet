@@ -28,6 +28,7 @@ import { GearButton } from './GearButton';
 import { tierHint } from '../sim/config';
 import { Modal } from './Modal';
 import { Tabs } from './Tabs';
+import { ICON_SHAPE, PALETTE } from './palette';
 
 // Not needed for the first frame: the scene (three.js + r3f), the research tree
 // and the settings menu load as separate chunks right after first paint.
@@ -496,14 +497,26 @@ export function App() {
       <div className="legend">
         {SHIP_CLASSES.map((c) => (
           <span key={c}>
-            <i className="swatch" style={{ background: SHIP_STATS[c].color }} />
+            <i
+              className={`swatch shape-${ICON_SHAPE[c]}`}
+              style={{ background: SHIP_STATS[c].color }}
+            />
             {SHIP_STATS[c].name}
           </span>
         ))}
-        <span>
-          <i className="swatch" style={{ background: '#ff3b3b' }} />
-          Pirate
-        </span>
+        {(
+          [
+            ['Pirate', 'pirate'],
+            ['Carrier', 'carrier'],
+            ['Container', 'container'],
+            ['Hazard', 'hazard'],
+          ] as const
+        ).map(([name, k]) => (
+          <span key={k}>
+            <i className={`swatch shape-${ICON_SHAPE[k]}`} style={{ background: PALETTE[k] }} />
+            {name}
+          </span>
+        ))}
       </div>
       <SaveNotice />
       <Toasts onOpenInbox={openCriticalInbox} />

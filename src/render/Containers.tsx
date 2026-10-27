@@ -3,6 +3,7 @@ import { useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { engine } from '../game/engine';
 import { CONTAINER_TTL } from '../sim/mining';
+import { PALETTE } from '../ui/palette';
 
 const MAX_CONTAINERS = 64;
 const dummy = new THREE.Object3D();
@@ -32,8 +33,8 @@ export function Containers() {
   return (
     <instancedMesh ref={mesh} args={[geo, undefined, MAX_CONTAINERS]} frustumCulled={false}>
       <meshStandardMaterial
-        color="#f2b632"
-        emissive="#f2b632"
+        color={PALETTE.container}
+        emissive={PALETTE.container}
         emissiveIntensity={0.4}
         roughness={0.6}
         metalness={0.4}

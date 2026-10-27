@@ -66,7 +66,7 @@ function Pair(p: { a: string; av: string; b: string; bv: string }) {
         <div className="hint" style={{ margin: 0 }}>
           {p.b}
         </div>
-        <div className="big" style={{ color: '#c9b6ff' }}>
+        <div className="big" style={{ color: 'var(--accent-research)' }}>
           {p.bv}
         </div>
       </div>

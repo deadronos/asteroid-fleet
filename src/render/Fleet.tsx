@@ -7,6 +7,7 @@ import { shipGeometry } from './geometry';
 import { focus } from './focus';
 import { CLASSES, fleetFrame } from './frameState';
 import { SHIP_LENGTH, SHIP_MODEL, bakeModel, modelUrl, type ModelClass } from './models';
+import { PALETTE } from '../ui/palette';
 
 // Sized for the 1000-ship sim cap; the buffers are allocated once per layer.
 const MAX_PER_CLASS = 1000;
@@ -16,7 +17,7 @@ const URLS = CLASSES.map((c) => modelUrl(SHIP_MODEL[c]));
 const dummy = new THREE.Object3D();
 const camPos = new THREE.Vector3();
 
-const classColor = (cls: ModelClass) => (cls === 'pirate' ? '#ff3b3b' : SHIP_STATS[cls].color);
+const classColor = (cls: ModelClass) => (cls === 'pirate' ? PALETTE.pirate : SHIP_STATS[cls].color);
 
 /**
  * Ships beyond `lodDistance` from the camera draw as the cheap placeholder
