@@ -29,6 +29,8 @@ const MODE_INDEX = new Map(MODES.map((m, i) => [m, i]));
 export type InMsg =
   | { t: 'init'; state: GameState; now: number; settle: boolean; epoch?: number }
   | { t: 'cmd'; cmd: Command }
+  /** Look at another carrier; unknown ids are ignored. */
+  | { t: 'focus'; carrierId: number }
   | { t: 'speed'; v: number }
   | { t: 'pause'; v: boolean }
   | { t: 'prestige' }
@@ -41,6 +43,8 @@ export type InMsg =
  */
 export interface Frame {
   t: 'frame';
+  /** The carrier these entities belong to; a frame for a carrier no longer focused is dropped. */
+  carrierId: number;
   nShips: number;
   ids: Int32Array;
   pos: Float64Array;
@@ -93,6 +97,7 @@ export function encodeFrame(s: Operation): { frame: Frame; transfer: ArrayBuffer
   return {
     frame: {
       t: 'frame',
+      carrierId: s.id,
       nShips: s.ships.length,
       ids,
       pos,

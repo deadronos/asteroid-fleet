@@ -829,3 +829,63 @@ label.button:hover {
   color: #cfe3ff;
   background: #020308;
 }
+
+.carrier-bar {
+  position: absolute;
+  top: 74px;
+  left: 10px;
+  z-index: 4;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  max-width: calc(100% - 20px);
+  zoom: var(--ui-scale, 1);
+}
+.carrier-bar button {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 4px 10px;
+  text-align: left;
+}
+.carrier-bar button.on {
+  border-color: var(--shield);
+}
+.carrier-bar .k {
+  opacity: 0.6;
+}
+.carrier-bar .badge {
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 8px;
+  background: #d9a441;
+  color: #000;
+}
+.carrier-bar .badge.sev-critical {
+  background: #ff3b3b;
+}
+.warp-cut {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  background: radial-gradient(circle, #fff 0%, #9cf 40%, transparent 80%);
+  opacity: 0;
+  animation: warp-cut 350ms ease-out;
+}
+@keyframes warp-cut {
+  0% {
+    opacity: 0;
+  }
+  25% {
+    opacity: 0.85;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .warp-cut {
+    animation: none;
+  }
+}

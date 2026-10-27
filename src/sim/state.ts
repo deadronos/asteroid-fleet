@@ -318,8 +318,9 @@ export function stateOf(s: Sim): GameState {
   return (s as unknown as SimView).g;
 }
 
-/** The operation the player is looking at. Always the first until carrier switching (#77). */
+/** The operation the player is looking at: `focusId`, or the first one. */
 export function focusOp(g: GameState): Operation {
+  if (g.focusId !== undefined) for (const op of g.ops) if (op.id === g.focusId) return op;
   return g.ops[0];
 }
 

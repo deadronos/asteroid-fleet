@@ -398,6 +398,8 @@ export interface GameState {
   savedAt: number; // wall-clock ms
   /** Actively played carriers. Always exactly one until #78. */
   ops: Operation[];
+  /** Id of the carrier the player is looking at; the first one when absent or unknown. */
+  focusId?: number;
 }
 
 /**
