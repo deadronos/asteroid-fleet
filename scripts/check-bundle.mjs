@@ -16,7 +16,7 @@ const BUDGET = {
   // Web Worker bundle and as the lazy main-thread fallback chunk (only fetched when the worker
   // fails); a user gets one of them, so the total counts the larger once, not both.
   // Measured 425.6 kB at the time of writing, so ~3% headroom (440 kB).
-  total: 440 * KB,
+  total: 445 * KB, // was 440; shared accessible Modal and side-panel tabs (#119)
 };
 
 const dist = 'dist';
