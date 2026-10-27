@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { DOUBLE_CLICK_MS, easeFactor, focus, isDoubleMiss, resolveFocus } from './focus';
+import {
+  AUTO_TACTICAL_OFF,
+  AUTO_TACTICAL_ON,
+  DOUBLE_CLICK_MS,
+  easeFactor,
+  focus,
+  isDoubleMiss,
+  resolveFocus,
+  stepTactical,
+} from './focus';
 
 const ships = (...m: [number, string][]) => ({
   ships: m.map(([id, mode]) => ({ id, mode })) as never,
@@ -41,5 +50,35 @@ describe('focus store', () => {
     focus.set(null);
     off();
     expect(n).toBe(2);
+  });
+});
+
+const step = (wasTactical: boolean, tactical: boolean, auto: boolean, dist: number) =>
+  stepTactical({ wasTactical, tactical, auto, dist });
+
+describe('stepTactical', () => {
+  it('manual off resets the camera and clears auto even when far away', () => {
+    expect(step(true, false, true, 230)).toEqual({ resetCamera: true, auto: false });
+  });
+  it('manual on does not reset the camera', () => {
+    expect(step(false, true, false, 74).resetCamera).toBe(false);
+  });
+  it('turns auto on above the on threshold', () => {
+    expect(step(false, false, false, AUTO_TACTICAL_ON + 1).auto).toBe(true);
+  });
+  it('stays off at the on threshold', () => {
+    expect(step(false, false, false, AUTO_TACTICAL_ON).auto).toBe(false);
+  });
+  it('holds auto inside the hysteresis band', () => {
+    expect(step(false, false, true, 180).auto).toBe(true);
+    expect(step(false, false, false, 180).auto).toBe(false);
+  });
+  it('turns auto off below the off threshold', () => {
+    expect(step(false, false, true, AUTO_TACTICAL_OFF - 1).auto).toBe(false);
+  });
+  it('does not flip every frame around 190', () => {
+    let auto = false;
+    for (const d of [195, 190, 185, 190, 195, 190]) auto = step(false, false, auto, d).auto;
+    expect(auto).toBe(false);
   });
 });
