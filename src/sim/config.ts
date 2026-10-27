@@ -518,6 +518,9 @@ export const HULLS: Record<HullId, HullDef> = {
 
 export const HULL_IDS = Object.keys(HULLS) as HullId[];
 
+/** Credits to swap hull class at a starter-system shipyard (#66). */
+export const REFIT_COST = 5000;
+
 // ---------- Pirates ----------
 
 export const WAVE_INTERVAL = (tier: number) => (tier >= 3 ? 70 : 110);

@@ -22,6 +22,7 @@ import { moveShip as moveOnBoard } from './hangar';
 import { buyResearch as buyNode, lvl, RESEARCH_BY_ID } from './research';
 import { bind, createShip, emit, focused, jumpCost, maxEnergy, newGame } from './state';
 import { executeJump } from './tick';
+import { refit } from './shipyard';
 import { RETURN_GRACE_S, dematerialise, materialise, runBackground } from './background';
 import type {
   AlertMode,
@@ -69,6 +70,7 @@ export type Order =
     }
   | { type: 'setHangarTarget'; hangarId: number; cls: ShipClass; count: number }
   | { type: 'upgradeRefinery' }
+  | { type: 'refit'; hull: HullId }
   | { type: 'fitModule'; shipId: number; slot: number; module: ModuleId | null };
 
 /** Every command names the carrier (operation) it is for. */
@@ -279,6 +281,8 @@ export function order(s: Sim, c: Order): string | null {
     case 'setCarrierStance':
       s.carrier.stance = c.stance;
       return null;
+    case 'refit':
+      return refit(s, c.hull);
     case 'upgradeRefinery': {
       if (s.carrier.refinery >= MAX_REFINERY) return 'Refinery fully upgraded';
       const cost = REFINERY_COST(s.carrier.refinery);
