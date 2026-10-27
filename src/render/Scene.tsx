@@ -238,7 +238,7 @@ function OtherCarriers() {
     g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(1024 * 3), 3));
     return g;
   }, []);
-  useFrame(() => {
+  useFrame((_, dt) => {
     const a = engine.othersAlpha();
     const pos = geo.getAttribute('position') as THREE.BufferAttribute;
     const col = geo.getAttribute('color') as THREE.BufferAttribute;
@@ -254,7 +254,7 @@ function OtherCarriers() {
         const dx = o.pos.x - p.x;
         const dz = o.pos.z - p.z;
         if (dx * dx + dz * dz > 1e-4) {
-          g.rotation.y += shortestArc(g.rotation.y, Math.atan2(dx, dz)) * 0.1;
+          g.rotation.y += shortestArc(g.rotation.y, Math.atan2(dx, dz)) * easeFactor(dt, TURN_RATE);
         }
       }
       for (let i = 0; i < o.ships.length && n < 1024; i += OTHER_ROW) {
