@@ -5,7 +5,7 @@ The #169 review was split into #170–#190. This is the remaining work, in sugge
 ## Done
 
 - #170, #171, #172: save integrity (#191)
-- #190: save fixtures for v11, v12, v16 (#194). Still open on GitHub, because #194 did not link it. Close it.
+- #190: save fixtures for v11, v12, v16 (#194)
 
 ## 1. Quick fixes
 
@@ -40,10 +40,3 @@ Each is a small change with one test.
 
 - [ ] #176 should carriers in one system share a live field? Today each carrier mines its own copy, and the depletion record is consumed by whichever carrier enters next.
 - [ ] #179 offline: safe (as the README says) or risky (as #103 built)? Either way, `rollWave` must stop destroying docked ships.
-
-## Docs to align
-
-These docs were written before #191 merged:
-
-- `docs/agents/save-and-migrations.md`: a failed IndexedDB write now deletes the stale IndexedDB copy once localStorage holds the save (#171)
-- `docs/agents/architecture/host-and-protocol.md` (`epoch`): `save()` also drops a snapshot requested before a `replace` (#170)

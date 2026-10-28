@@ -26,7 +26,7 @@ Source of truth: `host.ts`, `localHost.ts`, `sim.worker.ts`, `runner.ts`, `proto
   - `events`: drained sim events, merged and ranked.
   - `error`: a refused command's message.
   - `snapshot`: the full `GameState`, used by the save path.
-- `epoch`: a `replace` bumps the run generation. Event batches carry it, and the engine drops stale ones so an in-flight message cannot toast the previous run.
+- `epoch`: a `replace` bumps the run generation. Event batches carry it, and the engine drops stale ones so an in-flight message cannot toast the previous run. `save()` checks it too: a `snapshot` requested before the `replace` holds the old run and is not written (#170).
 - Adding a ship mode means appending to `MODES`. Adding snapshot data means extending `encodeSnapshot` and `applySnapshot` together; `snapshot.test.ts` round-trips them.
 
 ## Events and toasts
