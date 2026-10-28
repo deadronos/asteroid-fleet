@@ -491,7 +491,7 @@ export function settleOffline(
       hidden,
     });
   // Routes keep running over the time away (whole seconds; the remainder is dropped).
-  for (let i = 0; i < t && g.routes.length; i++) routeTick(g, 1);
+  for (let i = 0; i < Math.floor(t) && g.routes.length; i++) routeTick(g, 1);
   return report;
 }
 

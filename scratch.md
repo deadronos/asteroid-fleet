@@ -8,15 +8,10 @@ The #169 review was split into #170–#190. This is the remaining work, in sugge
 - #190: save fixtures for v11, v12, v16 (#194)
 - #173: `buyHangar` takes the next hangar id across every carrier (#196)
 - #175: `dispatch` stamps `focusedCarrierId` after a switch (#197)
-
-## 1. Quick fixes
-
-Each is a small change with one test.
-
-- [ ] #181 `'carried'` missing from frame codec `MODES` (`src/game/protocol.ts:19`), plus a test that every `ShipMode` round-trips
-- [ ] #185 offline route loop runs `ceil(t)` seconds: use `Math.floor(t)` (`src/sim/actions.ts:493`)
-- [ ] #188 held toggle hotkeys repeat: ignore `e.repeat` (`src/ui/hotkeys.ts:48`)
-- [ ] #189 runner `replace` keeps `lastPump`: call `resetClock()` (`src/game/runner.ts:113`)
+- #181: `'carried'` round-trips in the frame codec, and carried drones stay hidden (#198)
+- #185: offline routes run `floor(t)` seconds (#198)
+- #188: held toggle hotkeys do not repeat (#198)
+- #189: a new run restarts the runner clock (#198)
 
 ## 2. Multi-carrier correctness
 

@@ -10,7 +10,7 @@ Source of truth: `Scene.tsx`, `frameState.ts`, `Fleet.tsx`, `AsteroidField.tsx`,
 
 ## Per-frame data
 
-- `fleetFrame` (`frameState.ts`) is one shared, preallocated set of typed arrays (`MAX_ENTITIES = 2048`) holding every live ship and pirate, interpolated **once per frame** by `FleetPass`. Ship layers, trails and beams all read from it. Entities are bucketed by render class (`CLASSES`: ship classes, then pirate).
+- `fleetFrame` (`frameState.ts`) is one shared, preallocated set of typed arrays (`MAX_ENTITIES = 2048`) holding every live ship and pirate, interpolated **once per frame** by `FleetPass`. Docked ships and drones riding in a barge are omitted (#181). Ship layers, trails and beams all read from it. Entities are bucketed by render class (`CLASSES`: ship classes, then pirate).
 - Don't allocate in `useFrame`. Reuse module-level scratch vectors, colors and buffers, as the existing components do (`BEAM_COLORS`, `MAX_SEG` line buffers).
 - Read the engine directly in `useFrame` (`engine.view`, `lerpPos`, `lerpCarrier`). Don't route positions through React state.
 - R3F mutates three.js objects inside `useFrame` by design, which is why the `react/immutability` lint rule is off.

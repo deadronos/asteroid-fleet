@@ -87,6 +87,15 @@ describe('hotkey registry', () => {
     expect(low).toHaveBeenCalledTimes(1);
   });
 
+  it('does not repeat a held key (#188)', () => {
+    const run = vi.fn<() => void>();
+    offs.push(registerHotkeys([{ keys: [' '], run }]));
+    press(' ', { repeat: true });
+    expect(run).not.toHaveBeenCalled();
+    press(' ');
+    expect(run).toHaveBeenCalledTimes(1);
+  });
+
   it('lists labelled bindings once', () => {
     offs.push(
       registerHotkeys([

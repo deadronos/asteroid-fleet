@@ -46,7 +46,8 @@ const norm = (key: string) => (key.length === 1 ? key.toLowerCase() : key);
 
 /** The single keydown handler: matching bindings run in priority order until one accepts the key. */
 export function dispatchHotkey(e: KeyboardEvent): void {
-  if (e.defaultPrevented) return;
+  // A held key repeats. Toggles (pause, tactical, map, help) must not flip on each repeat (#188).
+  if (e.defaultPrevented || e.repeat) return;
   const key = norm(e.key);
   const blocked = ignoresHotkey(e);
   const hits = [...entries]
