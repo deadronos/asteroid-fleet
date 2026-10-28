@@ -246,7 +246,14 @@ export function drone(s: Sim, ship: Ship, dt: number, ctx: Ctx, mining: 'greedy'
     // Cover only matters while pirates are about; otherwise an empty cover would idle the fleet (#156).
     if (!a && mining === 'safe' && s.pirates.length === 0)
       a = pickAsteroid(s, ship, ctx, 'greedy') ?? undefined;
-    if (!a && mining === 'safe' && ship.cargo === 0 && ship.cls === 'drone') {
+    // Back off only when ore exists but none of it is covered; an empty field is not a cover problem.
+    if (
+      !a &&
+      mining === 'safe' &&
+      ship.cargo === 0 &&
+      ship.cls === 'drone' &&
+      pickAsteroid(s, ship, ctx, 'greedy')
+    ) {
       s.noCoverAt = s.time;
       ship.idleUntil = s.time + COVER_BACKOFF;
     }

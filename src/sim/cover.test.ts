@@ -2,6 +2,7 @@ import { expect, it } from 'vitest';
 import { stepSim } from './tick';
 import { COVER_BACKOFF, TICK_HZ } from './config';
 import { game } from './testing';
+import { enterSystem } from './state';
 
 // #156: a held carrier parked away from all ore must not leave safe drones docked forever.
 it('safe drones still mine when no ore is inside cover and no pirates are around', () => {
@@ -63,4 +64,22 @@ it('flags "no ore in cover" while pirates keep safe drones docked, and clears it
   s.carrier.pos = { ...a.pos };
   for (let i = 0; i < 1000; i++) stepSim(s);
   expect(s.time - s.noCoverAt!).toBeGreaterThan(5);
+});
+
+it('does not flag "no ore in cover" or back drones off when the field has no ore at all', () => {
+  const s = raidedAwayFromOre();
+  s.asteroids = [];
+  for (let i = 0; i < 400; i++) stepSim(s);
+  expect(s.noCoverAt).toBeUndefined();
+  expect(s.ships.every((x) => x.idleUntil === undefined)).toBe(true);
+});
+
+it('entering a new system clears the back-off and the hint', () => {
+  const s = raidedAwayFromOre();
+  for (let i = 0; i < 400; i++) stepSim(s);
+  expect(s.noCoverAt).toBeDefined();
+  expect(s.ships.some((x) => x.idleUntil !== undefined)).toBe(true);
+  enterSystem(s, s.systemId);
+  expect(s.noCoverAt).toBeUndefined();
+  expect(s.ships.every((x) => x.idleUntil === undefined)).toBe(true);
 });

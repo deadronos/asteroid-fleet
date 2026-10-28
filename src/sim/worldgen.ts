@@ -156,6 +156,8 @@ export function enterSystem(s: Sim, id: number) {
   s.pirates = [];
   s.containers = [];
   s.fx = [];
+  s.noCoverAt = undefined;
+  for (const sh of s.ships) delete sh.idleUntil;
   s.carrier.pos = v3();
   s.carrier.target = null;
   s.asteroids = [];
