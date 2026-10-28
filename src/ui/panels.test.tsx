@@ -86,6 +86,33 @@ describe('FleetPanel', () => {
       hangarId: focused(rich).hangars[0].id,
     });
   });
+
+  // #152: a worker snapshot rebuilds `hangars` as fresh objects. Buying a slot or a ship leaves
+  // FleetPanel's own selection unchanged, so the boards must not hold on to the old objects.
+  it('redraws a hangar board when a snapshot brings new hangar objects', async () => {
+    const s = game();
+    const op = focused(s);
+    const h0 = op.hangars[0];
+    const m = await mount(<FleetPanel />, s);
+    cleanup = m.cleanup;
+    const board = () => m.el.querySelector(`[aria-label^="Hangar ${h0.id} board"]`)!;
+    const usedBefore = board().querySelectorAll('.ship-tile').length;
+    const slotsBefore = h0.slots;
+    expect(m.el.textContent).toContain(`${usedBefore}/${slotsBefore}`);
+
+    // Mirror a snapshot after a buySlot + buyShip(drone): new hangar objects, same ids.
+    const drone = op.ships.find((x) => x.cls === 'drone')!;
+    const extra = { ...drone, id: 9999 };
+    const free = slotsBefore; // the bought slot
+    const hangars = structuredClone(s.ops[0].hangars);
+    hangars[0].slots++;
+    hangars[0].items.push({ shipId: extra.id, start: free });
+    s.ops[0] = { ...s.ops[0], ships: [...s.ops[0].ships, extra], hangars };
+    await act(async () => engine.emit());
+
+    expect(m.el.textContent).toContain(`${usedBefore + 1}/${slotsBefore + 1}`);
+    expect(board().querySelectorAll('.ship-tile').length).toBe(usedBefore + 1);
+  });
 });
 
 describe('CarrierPanel', () => {
