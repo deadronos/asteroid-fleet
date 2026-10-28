@@ -8,6 +8,7 @@ import { focus } from './focus';
 import { CLASSES, fleetFrame } from './frameState';
 import { SHIP_LENGTH, SHIP_MODEL, bakeModel, modelUrl, type ModelClass } from './models';
 import { PALETTE } from '../ui/palette';
+import { FAR_SHIP_MIN_PX } from './constants';
 
 // Sized for the 1000-ship sim cap; the buffers are allocated once per layer.
 const MAX_PER_CLASS = 1000;
@@ -38,16 +39,26 @@ function ShipLayer({
   const nearIds = useMemo(() => new Int32Array(MAX_PER_CLASS), []);
   const farIds = useMemo(() => new Int32Array(MAX_PER_CLASS), []);
   const farGeo = useMemo(() => shipGeometry(cls), [cls]);
+  // Longest extent of the far shape, in world units.
+  const farSize = useMemo(() => {
+    farGeo.computeBoundingBox();
+    const s = farGeo.boundingBox!.getSize(new THREE.Vector3());
+    return Math.max(s.x, s.y, s.z);
+  }, [farGeo]);
   const color = classColor(cls);
 
   const ci = CLASSES.indexOf(cls);
-  useFrame(({ camera }) => {
+  useFrame(({ camera, size }) => {
     const nm = near.current;
     const fm = far.current;
     if (!fm) return;
     const f = fleetFrame;
     const lod2 = model ? lodDistance * lodDistance : -1;
     camPos.copy(camera.position);
+    // Far shapes grow with distance so they never shrink below FAR_SHIP_MIN_PX on screen.
+    const fov = (camera as THREE.PerspectiveCamera).fov ?? 55;
+    const minScalePerDist =
+      (FAR_SHIP_MIN_PX * 2 * Math.tan(THREE.MathUtils.degToRad(fov) / 2)) / size.height / farSize;
     const list = f.bucket[ci];
     const total = Math.min(f.bucketLen[ci], MAX_PER_CLASS);
     let nn = 0;
@@ -60,16 +71,20 @@ function ShipLayer({
       const z = f.pos[o + 2];
       dummy.position.set(x, y, z);
       dummy.lookAt(x + f.hdg[o], y + f.hdg[o + 1], z + f.hdg[o + 2]);
-      dummy.updateMatrix();
       const d2 = camPos.distanceToSquared(dummy.position);
       if (nm && d2 < lod2) {
+        dummy.scale.setScalar(1);
+        dummy.updateMatrix();
         nearIds[nn] = f.ids[i];
         nm.setMatrixAt(nn++, dummy.matrix);
       } else {
+        dummy.scale.setScalar(Math.max(1, Math.sqrt(d2) * minScalePerDist));
+        dummy.updateMatrix();
         farIds[nf] = f.ids[i];
         fm.setMatrixAt(nf++, dummy.matrix);
       }
     }
+    dummy.scale.setScalar(1);
     fm.count = nf;
     fm.instanceMatrix.needsUpdate = true;
     if (nm) {

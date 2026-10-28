@@ -87,7 +87,8 @@ test('400 ships stay within the draw-call budget; low quality caps the frame rat
   await page.goto('./');
   await page.getByRole('button', { name: 'Take command' }).click();
   await engineReady(page);
-  await expect.poll(() => models.length, { timeout: 20_000 }).toBe(9);
+  // Eight ship classes, the carrier and the asteroid.
+  await expect.poll(() => models.length, { timeout: 20_000 }).toBe(10);
   expect(models.every((s) => s === 200)).toBe(true);
 
   await spawnFleet(page, 400);
