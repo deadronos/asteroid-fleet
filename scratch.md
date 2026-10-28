@@ -7,7 +7,7 @@ The #169 review was split into #170–#190. This is the remaining work, in sugge
 - #170, #171, #172: save integrity (#191)
 - #190: save fixtures for v11, v12, v16 (#194)
 - #173: `buyHangar` takes the next hangar id across every carrier (#196)
-- #175: `dispatch` stamps `focusedCarrierId` after a switch
+- #175: `dispatch` stamps `focusedCarrierId` after a switch (#197)
 
 ## 1. Quick fixes
 
