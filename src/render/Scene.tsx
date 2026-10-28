@@ -51,6 +51,7 @@ const BEAM_COLORS: Record<string, THREE.Color> = {
   mine: new THREE.Color('#7fe7ff').multiplyScalar(2.2),
   laser: new THREE.Color('#ff8fa0').multiplyScalar(3),
   pirateLaser: new THREE.Color('#ff3020').multiplyScalar(3),
+  turretLaser: new THREE.Color('#ffd27a').multiplyScalar(3),
   repair: new THREE.Color('#5affb4').multiplyScalar(2.5),
 };
 

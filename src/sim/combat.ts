@@ -4,6 +4,7 @@ import {
   AGGRESSIVE_CARRIER_SENSOR_MULT,
   AGGRESSIVE_ORBIT_RADIUS,
   CARRIER_SENSOR,
+  HULLS,
   DEFENSIVE_VICTIM_RANGE,
   ESCORT_ATTACKER_RANGE,
   ESCORT_NEAR,
@@ -20,6 +21,9 @@ import {
   SCOUT_ORBIT_RADIUS,
   STORM_DURATION,
   STORM_GAP,
+  TURRET_DAMAGE_PER_LEVEL,
+  TURRET_RANGE_PER_LEVEL,
+  TURRETS,
   WAVE_INTERVAL_JITTER,
   WAVE_SIZE_BASE,
   WAVE_SIZE_PER_DISTANCE,
@@ -30,7 +34,7 @@ import {
   VEIN_VALUE_SHARE,
   WAVE_INTERVAL,
   WAVE_WARNING,
-} from './config';
+} from "./config";
 import {
   CARRIER,
   cargoCap,
@@ -41,15 +45,15 @@ import {
   nearestPirate,
   speed,
   type Ctx,
-} from './ctx';
-import { copy, dist, dist2, moveToward, rand, randRange, seeded } from './math';
-import { lvl } from './research';
-import { clusterCenters, emit, maxHull } from './state';
-import type { Sim, Pirate, Ship, Vec3 } from './types';
+} from "./ctx";
+import { copy, dist, dist2, moveToward, rand, randRange, seeded } from "./math";
+import { lvl } from "./research";
+import { clusterCenters, emit, maxHull } from "./state";
+import type { Sim, Pirate, Ship, Vec3 } from "./types";
 
 export function cargoHeat(s: Sim): number {
   let v = s.carrier.oreValue;
-  for (const sh of s.ships) if (sh.mode !== 'docked') v += sh.cargoValue;
+  for (const sh of s.ships) if (sh.mode !== "docked") v += sh.cargoValue;
   return v;
 }
 
@@ -62,32 +66,47 @@ export function heatFactor(s: Sim): number {
 export function waveSize(s: Sim): number {
   const sys = s.systems[s.systemId];
   const base =
-    WAVE_SIZE_BASE + sys.distance * WAVE_SIZE_PER_DISTANCE + (sys.tier - 2) * WAVE_SIZE_PER_TIER;
+    WAVE_SIZE_BASE +
+    sys.distance * WAVE_SIZE_PER_DISTANCE +
+    (sys.tier - 2) * WAVE_SIZE_PER_TIER;
   return Math.max(1, Math.round(base * heatFactor(s)));
 }
 
 export function waveWarning(s: Sim): number {
   let scouts = 0;
-  for (const x of s.ships) if (x.cls === 'scout' && x.mode !== 'docked') scouts++;
-  return WAVE_WARNING + 5 * lvl(s, 'sensors') + (lvl(s, 'scoutRelay') > 0 ? 10 * scouts : 0);
+  for (const x of s.ships)
+    if (x.cls === "scout" && x.mode !== "docked") scouts++;
+  return (
+    WAVE_WARNING +
+    5 * lvl(s, "sensors") +
+    (lvl(s, "scoutRelay") > 0 ? 10 * scouts : 0)
+  );
 }
 
-function fighterTarget(s: Sim, ship: Ship, ctx: Ctx, engagement: string): Pirate | null {
+function fighterTarget(
+  s: Sim,
+  ship: Ship,
+  ctx: Ctx,
+  engagement: string,
+): Pirate | null {
   const sensor = SHIP_STATS.fighter.sensor;
-  if (engagement === 'passive') return null;
-  if (engagement === 'aggressive')
+  if (engagement === "passive") return null;
+  if (engagement === "aggressive")
     return (
       nearestPirate(s, ship.pos, sensor) ??
       nearestPirate(s, s.carrier.pos, sensor * AGGRESSIVE_CARRIER_SENSOR_MULT)
     );
-  if (engagement === 'escort') {
+  if (engagement === "escort") {
     const ward = ctx.ships.get(ship.escortId);
     const anchor = ward ? ward.pos : s.carrier.pos;
     let best: Pirate | null = null;
     let bd = Infinity;
     for (const p of s.pirates) {
       const d = dist(p.pos, anchor);
-      if ((p.targetId === ship.escortId && d < ESCORT_ATTACKER_RANGE) || d < ESCORT_NEAR) {
+      if (
+        (p.targetId === ship.escortId && d < ESCORT_ATTACKER_RANGE) ||
+        d < ESCORT_NEAR
+      ) {
         if (d < bd) {
           bd = d;
           best = p;
@@ -100,7 +119,8 @@ function fighterTarget(s: Sim, ship: Ship, ctx: Ctx, engagement: string): Pirate
   let best: Pirate | null = null;
   let bd = Infinity;
   for (const p of s.pirates) {
-    const victim = p.targetId === CARRIER ? s.carrier.pos : ctx.ships.get(p.targetId)?.pos;
+    const victim =
+      p.targetId === CARRIER ? s.carrier.pos : ctx.ships.get(p.targetId)?.pos;
     const engaged = victim && dist(p.pos, victim) < DEFENSIVE_VICTIM_RANGE;
     const nearCarrier = dist(p.pos, s.carrier.pos) < CARRIER_SENSOR;
     if (!engaged && !nearCarrier) continue;
@@ -117,9 +137,9 @@ function pickWard(ctx: Ctx): number {
   let best = -1;
   let bs = -Infinity;
   for (const w of ctx.wards) {
-    if (w.mode === 'docked') continue;
+    if (w.mode === "docked") continue;
     const n = ctx.escorts.get(w.id) ?? 0;
-    const score = (w.cls === 'barge' ? 3 : 1) + w.cargo / 200 - n * 2.5;
+    const score = (w.cls === "barge" ? 3 : 1) + w.cargo / 200 - n * 2.5;
     if (score > bs) {
       bs = score;
       best = w.id;
@@ -128,39 +148,65 @@ function pickWard(ctx: Ctx): number {
   return best;
 }
 
-function orbit(p: Vec3, c: Vec3, r: number, t: number, phase: number, step: number) {
+function orbit(
+  p: Vec3,
+  c: Vec3,
+  r: number,
+  t: number,
+  phase: number,
+  step: number,
+) {
   const a = t * 0.35 + phase;
   moveToward(
     p,
-    { x: c.x + Math.cos(a) * r, y: c.y + Math.sin(a * 0.7) * 2, z: c.z + Math.sin(a) * r },
+    {
+      x: c.x + Math.cos(a) * r,
+      y: c.y + Math.sin(a * 0.7) * 2,
+      z: c.z + Math.sin(a) * r,
+    },
     step,
   );
 }
 
-export function fighter(s: Sim, ship: Ship, dt: number, ctx: Ctx, engagement: string) {
+export function fighter(
+  s: Sim,
+  ship: Ship,
+  dt: number,
+  ctx: Ctx,
+  engagement: string,
+) {
   const v = speed(s, ship) * dt;
-  if (engagement === 'escort') {
+  if (engagement === "escort") {
     const ward = ctx.ships.get(ship.escortId);
-    if (!ward || ward.mode === 'docked') {
+    if (!ward || ward.mode === "docked") {
       const prev = ship.escortId;
-      if (prev >= 0) ctx.escorts.set(prev, Math.max(0, (ctx.escorts.get(prev) ?? 1) - 1));
+      if (prev >= 0)
+        ctx.escorts.set(prev, Math.max(0, (ctx.escorts.get(prev) ?? 1) - 1));
       ship.escortId = pickWard(ctx);
       if (ship.escortId >= 0)
-        ctx.escorts.set(ship.escortId, (ctx.escorts.get(ship.escortId) ?? 0) + 1);
+        ctx.escorts.set(
+          ship.escortId,
+          (ctx.escorts.get(ship.escortId) ?? 0) + 1,
+        );
     }
   } else ship.escortId = -1;
 
   const target = fighterTarget(s, ship, ctx, engagement);
   ship.fireCooldown -= dt;
   if (target) {
-    ship.mode = 'attack';
+    ship.mode = "attack";
     ship.targetId = target.id;
-    const range = SHIP_STATS.fighter.range * (1 + 0.2 * lvl(s, 'fighterRange'));
+    const range = SHIP_STATS.fighter.range * (1 + 0.2 * lvl(s, "fighterRange"));
     moveToward(ship.pos, target.pos, v, range * 0.7);
     if (dist(ship.pos, target.pos) <= range) {
       target.hull -= fighterDamage(s, ctx, ship) * dt;
       if (ship.fireCooldown <= 0) {
-        s.fx.push({ kind: 'laser', a: copy(ship.pos), b: copy(target.pos), ttl: 0.15 });
+        s.fx.push({
+          kind: "laser",
+          a: copy(ship.pos),
+          b: copy(target.pos),
+          ttl: 0.15,
+        });
         ship.fireCooldown = 0.35;
       }
     }
@@ -168,14 +214,21 @@ export function fighter(s: Sim, ship: Ship, dt: number, ctx: Ctx, engagement: st
   }
   ship.targetId = -1;
   const ward = ctx.ships.get(ship.escortId);
-  if (engagement === 'escort' && ward) {
-    ship.mode = 'escort';
+  if (engagement === "escort" && ward) {
+    ship.mode = "escort";
     orbit(ship.pos, ward.pos, ESCORT_ORBIT_RADIUS, s.time, ship.id, v);
-  } else if (engagement === 'aggressive') {
-    ship.mode = 'patrol';
-    orbit(ship.pos, s.carrier.pos, AGGRESSIVE_ORBIT_RADIUS, s.time * 0.5, ship.id, v);
+  } else if (engagement === "aggressive") {
+    ship.mode = "patrol";
+    orbit(
+      ship.pos,
+      s.carrier.pos,
+      AGGRESSIVE_ORBIT_RADIUS,
+      s.time * 0.5,
+      ship.id,
+      v,
+    );
   } else {
-    ship.mode = 'patrol';
+    ship.mode = "patrol";
     orbit(ship.pos, s.carrier.pos, PATROL_ORBIT_RADIUS, s.time, ship.id, v);
   }
 }
@@ -194,7 +247,7 @@ export function scout(s: Sim, ship: Ship, dt: number, ctx: Ctx) {
     const h = s.hazards[i];
     if (dist2(h.pos, ship.pos) < sensor2) {
       r.hazards.push(i);
-      emit(s, 'HazardCharted', { hazard: h.kind });
+      emit(s, "HazardCharted", { hazard: h.kind });
     }
   }
   const centers = clusterCenters(s.systems[s.systemId]);
@@ -203,7 +256,11 @@ export function scout(s: Sim, ship: Ship, dt: number, ctx: Ctx) {
   for (let i = 0; i < centers.length; i++) {
     if (r.clusters.includes(i)) continue;
     // Other scouts' targets are left to them.
-    if (ctx.byClass.scout.some((o) => o !== ship && o.targetId === i && o.mode === 'toAsteroid'))
+    if (
+      ctx.byClass.scout.some(
+        (o) => o !== ship && o.targetId === i && o.mode === "toAsteroid",
+      )
+    )
       continue;
     const d = dist2(ship.pos, centers[i]);
     if (d < bd) {
@@ -213,17 +270,28 @@ export function scout(s: Sim, ship: Ship, dt: number, ctx: Ctx) {
   }
   const v = speed(s, ship) * dt;
   if (target < 0) {
-    ship.mode = 'patrol';
+    ship.mode = "patrol";
     ship.targetId = -1;
-    orbit(ship.pos, s.carrier.pos, SCOUT_ORBIT_RADIUS, s.time * 0.15, ship.id * 1.7, v);
+    orbit(
+      ship.pos,
+      s.carrier.pos,
+      SCOUT_ORBIT_RADIUS,
+      s.time * 0.15,
+      ship.id * 1.7,
+      v,
+    );
     // A full lap later, sweep again.
-    if (r.clusters.length >= centers.length && Math.floor(s.time * 10) % 600 === ship.id % 600)
+    if (
+      r.clusters.length >= centers.length &&
+      Math.floor(s.time * 10) % 600 === ship.id % 600
+    )
       r.clusters.length = 0;
     return;
   }
-  ship.mode = 'toAsteroid';
+  ship.mode = "toAsteroid";
   ship.targetId = target;
-  if (moveToward(ship.pos, centers[target], v, SURVEY_RADIUS)) surveyCluster(s, target, ctx);
+  if (moveToward(ship.pos, centers[target], v, SURVEY_RADIUS))
+    surveyCluster(s, target, ctx);
 }
 
 /** Mark cluster `i` surveyed and its rich rocks as veins. */
@@ -237,24 +305,34 @@ export function surveyCluster(s: Sim, i: number, ctx: Ctx) {
   const r2 = VEIN_SCAN_RADIUS * VEIN_SCAN_RADIUS;
   let found = 0;
   for (const a of s.asteroids) {
-    if (a.ore <= 0 || a.value < rich || dist2(a.pos, c) > r2 || r.veins.includes(a.id)) continue;
+    if (
+      a.ore <= 0 ||
+      a.value < rich ||
+      dist2(a.pos, c) > r2 ||
+      r.veins.includes(a.id)
+    )
+      continue;
     r.veins.push(a.id);
     ctx.veins.add(a.id);
     found++;
   }
-  if (found > 0) emit(s, 'VeinFound', { veins: found });
+  if (found > 0) emit(s, "VeinFound", { veins: found });
 }
 
 export function repairDrone(s: Sim, ship: Ship, dt: number, ctx: Ctx) {
   const v = speed(s, ship) * dt;
   let patient = ctx.ships.get(ship.targetId);
-  if (!patient || patient.mode === 'docked' || patient.hull >= maxHull(s, patient.cls) * 0.98) {
+  if (
+    !patient ||
+    patient.mode === "docked" ||
+    patient.hull >= maxHull(s, patient.cls) * 0.98
+  ) {
     patient = undefined;
     let worst = 0.85;
     for (const o of ctx.ships.values()) {
-      if (o.id === ship.id || o.mode === 'docked') continue;
+      if (o.id === ship.id || o.mode === "docked") continue;
       let frac = o.hull / maxHull(s, o.cls);
-      if (o.cls === 'barge' || o.cls === 'fighter') frac -= 0.1;
+      if (o.cls === "barge" || o.cls === "fighter") frac -= 0.1;
       if (frac < worst) {
         worst = frac;
         patient = o;
@@ -266,14 +344,15 @@ export function repairDrone(s: Sim, ship: Ship, dt: number, ctx: Ctx) {
     goHome(s, ship, dt);
     return;
   }
-  ship.mode = 'repairing';
+  ship.mode = "repairing";
   const range = SHIP_STATS.repair.range;
   moveToward(ship.pos, patient.pos, v, range * 0.6);
-  const heal = 7 * (1 + 0.3 * lvl(s, 'repair')) * (1 + 0.25 * lvl(s, 'repairBeam')) * dt;
-  const nano = lvl(s, 'repairNano') > 0;
+  const heal =
+    7 * (1 + 0.3 * lvl(s, "repair")) * (1 + 0.25 * lvl(s, "repairBeam")) * dt;
+  const nano = lvl(s, "repairNano") > 0;
   if (nano) {
     for (const o of ctx.ships.values()) {
-      if (o.mode === 'docked' || dist(o.pos, ship.pos) > range) continue;
+      if (o.mode === "docked" || dist(o.pos, ship.pos) > range) continue;
       o.hull = Math.min(maxHull(s, o.cls), o.hull + heal);
     }
   } else if (dist(patient.pos, ship.pos) <= range) {
@@ -281,7 +360,12 @@ export function repairDrone(s: Sim, ship: Ship, dt: number, ctx: Ctx) {
   }
   ship.fireCooldown -= dt;
   if (ship.fireCooldown <= 0 && dist(patient.pos, ship.pos) <= range) {
-    s.fx.push({ kind: 'repair', a: copy(ship.pos), b: copy(patient.pos), ttl: 0.3 });
+    s.fx.push({
+      kind: "repair",
+      a: copy(ship.pos),
+      b: copy(patient.pos),
+      ttl: 0.3,
+    });
     ship.fireCooldown = 0.5;
   }
 }
@@ -295,7 +379,7 @@ export function threats(s: Sim, dt: number) {
   if (!w.warning && w.timer <= warn) {
     w.warning = true;
     w.size = waveSize(s);
-    emit(s, 'PirateWaveIncoming', { size: w.size, eta: Math.ceil(w.timer) });
+    emit(s, "PirateWaveIncoming", { size: w.size, eta: Math.ceil(w.timer) });
   }
   if (w.timer <= 0) {
     w.warning = false;
@@ -320,54 +404,58 @@ export function threats(s: Sim, dt: number) {
         pos,
         hull: PIRATE_BASE.hull * scale,
         maxHull: PIRATE_BASE.hull * scale,
-        damage: PIRATE_BASE.damage * (1 + sys.distance * PIRATE_DAMAGE_PER_DISTANCE),
+        damage:
+          PIRATE_BASE.damage * (1 + sys.distance * PIRATE_DAMAGE_PER_DISTANCE),
         speed: PIRATE_BASE.speed,
         targetId: -1,
         fireCooldown: 0,
       });
     }
-    emit(s, 'PiratesArrived', { size: w.size });
+    emit(s, "PiratesArrived", { size: w.size });
     w.timer = WAVE_INTERVAL(sys.tier) * randRange(s, ...WAVE_INTERVAL_JITTER);
   }
   // Solar storms in the frontier and beyond; H2 storms at gas giants.
   const st = s.storm;
   if (st.active > 0) {
     st.active -= dt;
-    if (st.active <= 0) emit(s, 'StormPassed', { h2: s.systems[s.systemId].gasGiant });
+    if (st.active <= 0)
+      emit(s, "StormPassed", { h2: s.systems[s.systemId].gasGiant });
   } else {
     st.timer -= dt;
     if (st.timer <= 0) {
       st.active = STORM_DURATION;
       st.timer = randRange(s, ...STORM_GAP);
-      emit(s, 'StormStarted', { h2: s.systems[s.systemId].gasGiant });
+      emit(s, "StormStarted", { h2: s.systems[s.systemId].gasGiant });
     }
   }
 }
 
 /** Gas giant pirates hunt harvesters: H2 is easy to fence. */
 function gasGiantTargetBias(s: Sim, sh: Ship): number {
-  if (sh.cls !== 'harvester' || !s.systems[s.systemId].gasGiant) return 1;
+  if (sh.cls !== "harvester" || !s.systems[s.systemId].gasGiant) return 1;
   return GAS_PIRATE_HARVESTER_BIAS;
 }
 
 export function pirateTargetScore(s: Sim, sh: Ship): number {
-  if (sh.mode === 'docked') return 0;
+  if (sh.mode === "docked") return 0;
   return baseTargetScore(s, sh) * gasGiantTargetBias(s, sh);
 }
 
 function baseTargetScore(s: Sim, sh: Ship): number {
-  if (sh.cls === 'barge') return 4 + (sh.cargo / cargoCap(s, 'barge', sh)) * 6; // full barges first
-  if (sh.cls === 'hauler' || sh.cls === 'harvester') return 2 + sh.cargo / 60;
-  if (sh.cls === 'fighter') return 1.5;
+  if (sh.cls === "barge") return 4 + (sh.cargo / cargoCap(s, "barge", sh)) * 6; // full barges first
+  if (sh.cls === "hauler" || sh.cls === "harvester") return 2 + sh.cargo / 60;
+  if (sh.cls === "fighter") return 1.5;
   return 1;
 }
 
 export function pirateStep(s: Sim, dt: number, ctx: Ctx) {
   for (const p of s.pirates) {
     let tgtPos: Vec3 | null =
-      p.targetId === CARRIER ? s.carrier.pos : (ctx.ships.get(p.targetId)?.pos ?? null);
+      p.targetId === CARRIER
+        ? s.carrier.pos
+        : (ctx.ships.get(p.targetId)?.pos ?? null);
     const t = ctx.ships.get(p.targetId);
-    if (!tgtPos || (t && t.mode === 'docked') || rand(s) < dt / 3) {
+    if (!tgtPos || (t && t.mode === "docked") || rand(s) < dt / 3) {
       let best = CARRIER;
       let bs = 0.6 / (dist(p.pos, s.carrier.pos) + 30);
       for (const sh of ctx.ships.values()) {
@@ -393,9 +481,51 @@ export function pirateStep(s: Sim, dt: number, ctx: Ctx) {
         if (victim) damageShip(s, victim, dmg);
       }
       if (p.fireCooldown <= 0) {
-        s.fx.push({ kind: 'pirateLaser', a: copy(p.pos), b: copy(tgtPos), ttl: 0.15 });
+        s.fx.push({
+          kind: "pirateLaser",
+          a: copy(p.pos),
+          b: copy(tgtPos),
+          ttl: 0.15,
+        });
         p.fireCooldown = 0.5;
       }
     }
+  }
+}
+
+/**
+ * Carrier turrets (#160): every hull fires on pirates in range, so a run without fighters
+ * can still clear a wave. Point-defense takes the nearest pirate, heavy batteries the toughest.
+ */
+export function carrierTurrets(s: Sim, dt: number) {
+  if (s.pirates.length === 0) return;
+  const c = s.carrier.pos;
+  const dmgMul = 1 + TURRET_DAMAGE_PER_LEVEL * lvl(s, "turretDamage");
+  const rangeMul = 1 + TURRET_RANGE_PER_LEVEL * lvl(s, "turretRange");
+  for (const kind of HULLS[s.carrier.hullClass].turrets) {
+    const t = TURRETS[kind];
+    const r2 = (t.range * rangeMul) ** 2;
+    let target: Pirate | null = null;
+    let best = Infinity;
+    for (const p of s.pirates) {
+      if (p.hull <= 0) continue;
+      const d2 = dist2(p.pos, c);
+      if (d2 > r2) continue;
+      const score = kind === "pd" ? d2 : -p.hull;
+      if (score < best) {
+        best = score;
+        target = p;
+      }
+    }
+    if (!target) continue;
+    target.hull -= t.damage * dmgMul * dt;
+    // Beams on a fixed beat from sim time, so firing draws no randomness.
+    if (Math.floor(s.time / t.period) !== Math.floor((s.time - dt) / t.period))
+      s.fx.push({
+        kind: "turretLaser",
+        a: copy(c),
+        b: copy(target.pos),
+        ttl: 0.15,
+      });
   }
 }
