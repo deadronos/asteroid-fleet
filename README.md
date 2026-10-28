@@ -47,7 +47,7 @@ CI runs on every pull request and on pushes to `main`, on Node 22 with pnpm 12. 
 1. **Energy at zero**: shields stop regenerating and refining stops, but the carrier is never stranded because solar keeps trickling in.
 2. **H2**: fusion fuel only, not direct warp fuel.
 3. **Reserves offline**: reserve ships keep rebuilding on their cooldown while you are away.
-4. **Rule depth**: fixed rule cards with one parameter each, as a first step before building blocks.
+4. **Rule depth**: condition/action cards (a scope, 1–3 AND-ed conditions, one action, up to 12 cards), with the old fixed rules kept as preset cards (#82).
 
 ## Save migrations
 
