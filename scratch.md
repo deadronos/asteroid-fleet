@@ -7,12 +7,12 @@ The #169 review was split into #170–#190. This is the remaining work, in sugge
 - #170, #171, #172: save integrity (#191)
 - #190: save fixtures for v11, v12, v16 (#194)
 - #173: `buyHangar` takes the next hangar id across every carrier (#196)
+- #175: `dispatch` stamps `focusedCarrierId` after a switch (#197)
 
 ## 1. Quick fixes
 
 Each is a small change with one test.
 
-- [ ] #175 `dispatch` stamps the old carrier after a switch: use `focusedCarrierId` (`src/game/engine.ts:341`)
 - [ ] #181 `'carried'` missing from frame codec `MODES` (`src/game/protocol.ts:19`), plus a test that every `ShipMode` round-trips
 - [ ] #185 offline route loop runs `ceil(t)` seconds: use `Math.floor(t)` (`src/sim/actions.ts:493`)
 - [ ] #188 held toggle hotkeys repeat: ignore `e.repeat` (`src/ui/hotkeys.ts:48`)

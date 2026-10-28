@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { newGame } from '../sim/state';
+import { focusOp, newGame } from '../sim/state';
 import type { SimEvent } from '../sim/types';
 import { engine } from './engine';
 import { ACTIVE_SLOT_KEY } from './slots';
@@ -147,6 +147,50 @@ describe('toast Go to', () => {
     engine.goToToast(key);
     expect(engine.focusedCarrierId).toBe(id);
     expect(engine.toasts.shown()).toEqual([]);
+  });
+});
+
+describe('dispatch after a carrier switch (#175)', () => {
+  it('stamps the carrier just focused, not the one still on the mirror', () => {
+    const e = engine as unknown as {
+      host: { kind: string; post: (m: { t: string }) => void } | null;
+      pendingFocus: number | null;
+    };
+    const state = engine.state;
+    const host = e.host;
+    const focusedId = engine.focusedCarrierId;
+    const pending = e.pendingFocus;
+    const carriers = engine.carriers;
+    const g = newGame(4);
+    const other = structuredClone(g.ops[0]);
+    other.id = 6;
+    g.ops.push(other);
+    g.focusId = g.ops[0].id;
+    engine.state = g;
+    engine.carriers = [];
+    engine.focusedCarrierId = g.ops[0].id;
+    e.pendingFocus = null;
+    const posted: { t: string; cmd?: { type: string; carrierId: number } }[] = [];
+    e.host = {
+      kind: 'local',
+      post: (m) => posted.push(m),
+    };
+    try {
+      engine.focusCarrier(6);
+      expect(engine.focusedCarrierId).toBe(6);
+      expect(focusOp(engine.state).id).toBe(g.ops[0].id);
+      engine.dispatch({ type: 'buyCarrier' });
+      expect(posted.find((m) => m.t === 'cmd')?.cmd).toMatchObject({
+        type: 'buyCarrier',
+        carrierId: 6,
+      });
+    } finally {
+      engine.state = state;
+      e.host = host;
+      engine.focusedCarrierId = focusedId;
+      e.pendingFocus = pending;
+      engine.carriers = carriers;
+    }
   });
 });
 

@@ -337,9 +337,12 @@ class Engine {
     this.emit();
   }
 
-  /** An order for the focused carrier. Errors come back from the sim as a toast. */
+  /**
+   * An order for the focused carrier. Errors come back from the sim as a toast.
+   * Stamps `focusedCarrierId`, which updates on a switch before the mirror does (#175).
+   */
   dispatch(order: Order) {
-    this.host?.post({ t: 'cmd', cmd: { ...order, carrierId: focusOp(this.state).id } });
+    this.host?.post({ t: 'cmd', cmd: { ...order, carrierId: this.focusedCarrierId } });
   }
 
   /** An order for a named carrier, e.g. a supply route that starts at another one. */
