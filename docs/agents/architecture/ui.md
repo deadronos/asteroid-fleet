@@ -6,7 +6,7 @@ Source of truth: `App.tsx`, `../game/engine.ts` (`useGame`), `hotkeys.ts`, `Moda
 
 - `useGame(selector, equals?)` (`game/engine.ts`) is how components subscribe. The mirror is **mutated in place**, so a selector must return primitives or freshly derived data, compared with a structural `equals` (`shallowEqual` / `deepEqual` in `equal.ts`). Returning a live sub-object with the default `Object.is` will never re-render.
 - `useGame()` with no selector re-renders on every UI tick and returns `engine.view`. Use it only for components that genuinely change every tick.
-- Write only through `engine.dispatch(order)` / `engine.dispatchFor(carrierId, order)`. A refused order comes back as an `error` message and a toast.
+- Write only through `engine.dispatch(order)` / `engine.dispatchFor(carrierId, order)`. `dispatch` names `focusedCarrierId`, which changes as soon as the player switches; the mirror's `focusId` waits for the next state message (#175). A refused order comes back as an `error` message and a toast.
 
 ## Structure
 

@@ -36,7 +36,7 @@ Source of truth: `host.ts`, `localHost.ts`, `sim.worker.ts`, `runner.ts`, `proto
 
 ## Engine (`engine.ts`)
 
-- `engine` is a singleton: the main-thread mirror, the toast queue, focus and carrier-bar data, autosave every 15 s, and the `dispatch` / `doPrestige` / `replace` / `reset` entry points.
+- `engine` is a singleton: the main-thread mirror, the toast queue, focus and carrier-bar data, autosave every 15 s, and the `dispatch` / `doPrestige` / `replace` / `reset` entry points. `dispatch` stamps `focusedCarrierId`. That field updates in `focusCarrier` immediately; the mirror's `focusId` updates only when the next state arrives (#175).
 - Interpolation: `engine.prev` holds last-frame positions, `alpha()` gives the blend factor, and `lerpPos` / `lerpCarrier` give interpolated positions.
 - React reads it via `useGame` (see [ui.md](ui.md)). The renderer reads `engine.view` directly inside `useFrame`.
 - Settings (`settings.ts`) are stored apart from saves under their own key, so reset and import never touch them.
