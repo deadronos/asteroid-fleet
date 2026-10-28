@@ -23,6 +23,7 @@ export function Hud({
   onTactical,
   onQuality,
   onMap,
+  onMapIntent,
 }: {
   tactical: boolean;
   autoTactical: boolean;
@@ -30,6 +31,8 @@ export function Hud({
   onTactical: () => void;
   onQuality: () => void;
   onMap: () => void;
+  /** Hover/focus on the Map button: lets the app fetch the map chunk before the click. */
+  onMapIntent?: () => void;
 }) {
   // Everything drawn, rounded as it is displayed, so a tick that changes nothing visible skips the render.
   const h = useGame((s) => {
@@ -157,7 +160,12 @@ export function Hud({
               {v}×
             </button>
           ))}
-          <button onClick={onMap} title="Star map and supply routes (M)">
+          <button
+            onClick={onMap}
+            onPointerEnter={onMapIntent}
+            onFocus={onMapIntent}
+            title="Star map and supply routes (M)"
+          >
             Map
           </button>
           <button

@@ -49,7 +49,9 @@ const StarMap = lazy(loadStarMap);
 
 // Warm the secondary chunks once the browser is idle so opening them doesn't pop in.
 const whenIdle = (fn: () => void) =>
-  typeof requestIdleCallback === 'function' ? requestIdleCallback(fn) : setTimeout(fn, 2000);
+  typeof requestIdleCallback === 'function'
+    ? requestIdleCallback(fn, { timeout: 2000 })
+    : setTimeout(fn, 2000);
 whenIdle(() => {
   void loadResearch();
   void loadSettings();
@@ -442,6 +444,7 @@ export function App() {
           engine.notify(`Quality: ${quality === 'high' ? 'High' : 'Low'}`);
         }}
         onMap={() => setMap(true)}
+        onMapIntent={() => void loadStarMap()}
       />
       <CarrierBar />
       <GearButton onClick={() => setMenu(true)} />

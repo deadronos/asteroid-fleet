@@ -27,8 +27,15 @@ describe('Hud', () => {
     const onTactical = vi.fn<() => void>();
     const onQuality = vi.fn<() => void>();
     const onMap = vi.fn<() => void>();
+    const onMapIntent = vi.fn<() => void>();
     const m = await mount(
-      <Hud {...props} onTactical={onTactical} onQuality={onQuality} onMap={onMap} />,
+      <Hud
+        {...props}
+        onTactical={onTactical}
+        onQuality={onQuality}
+        onMap={onMap}
+        onMapIntent={onMapIntent}
+      />,
       game(),
     );
     cleanup = m.cleanup;
@@ -39,6 +46,12 @@ describe('Hud', () => {
     expect(speed.mock.calls).toEqual([[4]]);
     await click(m.el.querySelector<HTMLElement>('[title^="Star map"]')!);
     expect(onMap).toHaveBeenCalledOnce();
+    const mapBtn = m.el.querySelector<HTMLElement>('[title^="Star map"]')!;
+    await act(async () => {
+      mapBtn.dispatchEvent(new PointerEvent('pointerover', { bubbles: true }));
+      mapBtn.focus();
+    });
+    expect(onMapIntent).toHaveBeenCalled();
     await click(m.el.querySelector<HTMLElement>('[title^="Tactical sensor"]')!);
     expect(onTactical).toHaveBeenCalledOnce();
     await click(m.el.querySelector<HTMLElement>('[title^="Low quality"]')!);
