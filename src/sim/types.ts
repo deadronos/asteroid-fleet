@@ -72,9 +72,6 @@ export interface Automation {
   autoRebuild: boolean;
   /** Automation never spends credits below this. */
   creditFloor: number;
-  /** Lost ships waiting for a paid rebuild, oldest first. */
-  rebuildQueue: { cls: ShipClass; hangarId: number }[];
-  timer: number;
 }
 
 export type ShipMode =
@@ -398,6 +395,10 @@ export interface Operation {
   fx: Fx[];
   /** Sim time a safe drone last found no ore in cover while pirates were about; drives the hangar hint (#156). */
   noCoverAt?: number;
+  /** Lost ships waiting for a paid rebuild on this carrier, oldest first (#174). */
+  rebuildQueue: { cls: ShipClass; hangarId: number }[];
+  /** Seconds until this carrier's next automation pass (#174). */
+  automationTimer: number;
 }
 
 /** What a supply route carries. Credits and RP are shared, so only per-carrier pools move (Q10, #49). */

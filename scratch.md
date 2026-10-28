@@ -12,10 +12,10 @@ The #169 review was split into #170–#190. This is the remaining work, in sugge
 - #185: offline routes run `floor(t)` seconds (#198)
 - #188: held toggle hotkeys do not repeat (#198)
 - #189: a new run restarts the runner clock (#198)
+- #174: each carrier keeps its own rebuild queue and automation timer
 
 ## 2. Multi-carrier correctness
 
-- [ ] #174 one auto-rebuild queue for all carriers: add the carrier id to entries, or move the queue onto `Operation` (needs a save migration)
 - [ ] #177 switching focus deletes an active wave: resolve it before `dematerialise`
 - [ ] #183 shop keeps a stale hangar after a carrier switch: key `FleetPanel` by carrier
 - [ ] #178 UI lists read `engine.state.ops` (focused only): use `engine.carriers`

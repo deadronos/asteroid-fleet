@@ -62,10 +62,10 @@ describe('run modifiers (#71)', () => {
     s.researchLevels.autoRebuild = 1;
     order(s, { type: 'setAutomation', patch: { autoBuy: true, autoRebuild: true } });
     order(s, { type: 'setHangarTarget', hangarId: 1, cls: 'fighter', count: 4 });
-    s.automation.rebuildQueue.push({ cls: 'fighter', hangarId: 1 });
+    s.rebuildQueue.push({ cls: 'fighter', hangarId: 1 });
     for (let i = 0; i < 20_000; i++) stepSim(s);
     expect(s.ships.some((x) => x.cls === 'fighter')).toBe(false);
-    expect(s.automation.rebuildQueue).toEqual([]);
+    expect(s.rebuildQueue).toEqual([]);
     // The same setup without the modifier does build them.
     const plain = focused(newGame(5));
     plain.unlocked.push('fighter');

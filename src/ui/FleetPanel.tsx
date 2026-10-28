@@ -413,7 +413,7 @@ function AutomationBar() {
             checked={a.autoRebuild}
             onChange={(e) => setAutomation({ autoRebuild: e.target.checked })}
           />
-          Auto-rebuild{a.rebuildQueue.length > 0 ? ` (${a.rebuildQueue.length} queued)` : ''}
+          Auto-rebuild{s.rebuildQueue.length > 0 ? ` (${s.rebuildQueue.length} queued)` : ''}
         </label>
       )}
       {buy && (

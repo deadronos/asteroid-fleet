@@ -155,6 +155,43 @@ export const migrations: Record<number, Migration> = {
       }
     return save;
   },
+  // v18: each carrier keeps its own rebuild queue and automation timer (#174).
+  17: (save) => {
+    const automation = isRecord(save.automation) ? save.automation : null;
+    const timer =
+      automation && typeof automation.timer === 'number' && Number.isFinite(automation.timer)
+        ? automation.timer
+        : 0;
+    const rawQueue =
+      automation && Array.isArray(automation.rebuildQueue) ? automation.rebuildQueue : [];
+    const ops = Array.isArray(save.ops) ? save.ops.filter(isRecord) : [];
+    const focused = ops.find((op) => op.id === save.focusId) ?? ops[0];
+    const owners = new Map<number, SaveBlob[]>();
+    for (const op of ops) {
+      op.rebuildQueue = [];
+      op.automationTimer = timer;
+      if (!Array.isArray(op.hangars)) continue;
+      for (const hangar of op.hangars) {
+        if (!isRecord(hangar) || typeof hangar.id !== 'number') continue;
+        const list = owners.get(hangar.id);
+        if (list) list.push(op);
+        else owners.set(hangar.id, [op]);
+      }
+    }
+    for (const entry of rawQueue) {
+      if (!isRecord(entry) || typeof entry.cls !== 'string' || typeof entry.hangarId !== 'number')
+        continue;
+      const matches = owners.get(entry.hangarId);
+      const dest = matches?.length === 1 ? matches[0] : focused;
+      if (!dest || !Array.isArray(dest.rebuildQueue)) continue;
+      dest.rebuildQueue.push({ cls: entry.cls, hangarId: entry.hangarId });
+    }
+    if (automation) {
+      delete automation.rebuildQueue;
+      delete automation.timer;
+    }
+    return save;
+  },
 };
 
 const LEGACY_TONE: Record<string, Severity> = {
@@ -293,6 +330,9 @@ function validOp(op: SaveBlob): boolean {
   // NaN is stored as null; a non-finite income would poison the rolling average.
   if (typeof op.miningIncomeAvg !== 'number' || !Number.isFinite(op.miningIncomeAvg))
     op.miningIncomeAvg = 0;
+  if (!Array.isArray(op.rebuildQueue)) op.rebuildQueue = [];
+  if (typeof op.automationTimer !== 'number' || !Number.isFinite(op.automationTimer))
+    op.automationTimer = 0;
   if (typeof op.systemId !== 'number' || !Number.isInteger(op.systemId) || op.systemId < 0)
     return false;
   return true;
