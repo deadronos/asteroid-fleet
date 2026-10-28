@@ -428,12 +428,18 @@ class Engine {
     // The mirror holds only the focused carrier, so writing it would drop the others from the
     // save. Trade-off: closing the tab with several carriers loses up to one autosave interval.
     if (this.carriers.length > 1) return;
+    // The mirror lags the worker by up to one UI tick, so it must not replace a newer write.
+    if (this.state.time < this.lastWrittenTime) return;
     if (!saveOverwriteBlocked()) void this.write(this.state);
   }
+
+  /** Sim time of the newest state handed to `write`; -1 before the first write. */
+  private lastWrittenTime = -1;
 
   private async write(state: GameState): Promise<boolean> {
     if (saveOverwriteBlocked()) return false;
     state.savedAt = Date.now();
+    this.lastWrittenTime = state.time;
     const slot = getActiveSlot();
     if (slot !== null)
       this.reportWrite(

@@ -149,3 +149,27 @@ describe('toast Go to', () => {
     expect(engine.toasts.shown()).toEqual([]);
   });
 });
+
+describe('unload mirror save (#157)', () => {
+  it('does not overwrite a newer worker save with the lagging mirror', () => {
+    const e = engine as unknown as {
+      state: { time: number };
+      write: (s: unknown) => Promise<boolean>;
+      saveMirror: () => void;
+      lastWrittenTime: number;
+      carriers: unknown[];
+    };
+    const write = vi.spyOn(e, 'write').mockResolvedValue(true);
+    const carriers = e.carriers;
+    e.carriers = [];
+    const time = e.state.time;
+    e.lastWrittenTime = time + 0.2;
+    e.saveMirror();
+    expect(write).not.toHaveBeenCalled();
+    e.lastWrittenTime = time;
+    e.saveMirror();
+    expect(write).toHaveBeenCalledTimes(1);
+    e.carriers = carriers;
+    write.mockRestore();
+  });
+});
