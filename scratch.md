@@ -8,10 +8,10 @@ The #169 review was split into #170–#190. This is the remaining work, in sugge
 - #190: save fixtures for v11, v12, v16 (#194)
 - #173: `buyHangar` takes the next hangar id across every carrier (#196)
 - #175: `dispatch` stamps `focusedCarrierId` after a switch (#197)
-- #181: `'carried'` round-trips in the frame codec, and carried drones stay hidden
-- #185: offline routes run `floor(t)` seconds
-- #188: held toggle hotkeys do not repeat
-- #189: a new run restarts the runner clock
+- #181: `'carried'` round-trips in the frame codec, and carried drones stay hidden (#198)
+- #185: offline routes run `floor(t)` seconds (#198)
+- #188: held toggle hotkeys do not repeat (#198)
+- #189: a new run restarts the runner clock (#198)
 
 ## 2. Multi-carrier correctness
 
