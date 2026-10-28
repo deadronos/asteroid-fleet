@@ -24,6 +24,7 @@ export const OP_KEYS = [
   'incomeAvg',
   'miningIncomeAvg',
   'fx',
+  'noCoverAt',
 ] as const satisfies readonly (keyof Operation)[];
 
 /** Every run-wide `GameState` field a `Sim` exposes (all but `ops` and `focusId`). */

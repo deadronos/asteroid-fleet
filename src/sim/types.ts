@@ -122,6 +122,8 @@ export interface Ship {
   modules: ModuleId[];
   /** A timed stance card still in force after its conditions stopped holding. */
   hold?: { card: number; until: number };
+  /** Sim time before which a drone that found no ore in cover is not launched again (#156). */
+  idleUntil?: number;
 }
 
 export interface Pirate {
@@ -394,6 +396,8 @@ export interface Operation {
   incomeAvg: number; // rolling credits/s, all sources (salvage included)
   miningIncomeAvg: number; // rolling credits/s from refined ore only, used for offline settlement
   fx: Fx[];
+  /** Sim time a safe drone last found no ore in cover while pirates were about; drives the hangar hint (#156). */
+  noCoverAt?: number;
 }
 
 /** What a supply route carries. Credits and RP are shared, so only per-carrier pools move (Q10, #49). */

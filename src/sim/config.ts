@@ -15,6 +15,9 @@ import {
 export const TICK_HZ = 10;
 export const DT = 1 / TICK_HZ;
 
+/** Seconds a safe drone that found no ore in cover stays docked before launching again (#156). */
+export const COVER_BACKOFF = 30;
+
 export interface ShipStats {
   name: string;
   short: string;

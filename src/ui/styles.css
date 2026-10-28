@@ -321,6 +321,9 @@ input[type='range'] {
   color: var(--muted);
   font-size: 11px;
 }
+.hangar-head .blurb.warn {
+  color: var(--warn);
+}
 .board {
   display: grid;
   grid-template-columns: repeat(var(--slots), minmax(0, 1fr));

@@ -10,6 +10,7 @@ import {
   hangarLocked,
   tierHint,
   HANGAR_UPKEEP,
+  COVER_BACKOFF,
   MODULE_IDS,
   MODULE_SLOTS,
   MODULES,
@@ -220,6 +221,14 @@ function HangarBoard({
           ))}
         </select>
         <span className="blurb grow">{def.blurb}</span>
+        {s.noCoverAt !== undefined && s.time - s.noCoverAt < COVER_BACKOFF + 5 && (
+          <span
+            className="blurb warn"
+            title="Safe-stance drones only mine ore near the carrier, a stationed barge or a fighter while pirates are about"
+          >
+            No ore in cover
+          </span>
+        )}
         <span className="blurb">
           {used}/{h.slots}
         </span>
