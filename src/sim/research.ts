@@ -99,6 +99,23 @@ export const RESEARCH: ResearchNode[] = [
     cost: lin(1, 1),
   },
   {
+    id: 'turretDamage',
+    branch: 'Combat',
+    name: 'Turret capacitors',
+    desc: '+15 % carrier turret damage',
+    maxLevel: 5,
+    cost: lin(1, 1),
+  },
+  {
+    id: 'turretRange',
+    branch: 'Combat',
+    name: 'Fire control',
+    desc: '+20 % carrier turret range',
+    maxLevel: 3,
+    cost: lin(1, 1),
+    requires: 'turretDamage',
+  },
+  {
     id: 'armor',
     branch: 'Combat',
     name: 'Composite armor',
@@ -489,7 +506,11 @@ export const RESEARCH: ResearchNode[] = [
     desc: 'Repeatable; mining yield, diminishing toward +100 %',
     maxLevel: Infinity,
     cost: geo(10, 1.25),
-    repeat: { base: 'yield', cap: 1, label: (e) => `+${pct(e)} % mining yield` },
+    repeat: {
+      base: 'yield',
+      cap: 1,
+      label: (e) => `+${pct(e)} % mining yield`,
+    },
   },
   {
     id: 'deepEnergy',
@@ -498,7 +519,11 @@ export const RESEARCH: ResearchNode[] = [
     desc: 'Repeatable; energy capacity, diminishing toward +100 %',
     maxLevel: Infinity,
     cost: geo(10, 1.25),
-    repeat: { base: 'energyCap', cap: 1, label: (e) => `+${pct(e)} % energy capacity` },
+    repeat: {
+      base: 'energyCap',
+      cap: 1,
+      label: (e) => `+${pct(e)} % energy capacity`,
+    },
   },
   {
     id: 'deepLaunch',
@@ -508,7 +533,11 @@ export const RESEARCH: ResearchNode[] = [
     maxLevel: Infinity,
     cost: geo(10, 1.25),
     // No finite node touches launch speed; Hangar frames is the closest hangar node.
-    repeat: { base: 'slots', cap: 0.5, label: (e) => `−${pct(e)} % launch interval` },
+    repeat: {
+      base: 'slots',
+      cap: 0.5,
+      label: (e) => `−${pct(e)} % launch interval`,
+    },
   },
 ];
 

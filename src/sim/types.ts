@@ -297,7 +297,14 @@ export interface Warp {
   total: number;
 }
 
-export type FxKind = 'laser' | 'mine' | 'explosion' | 'repair' | 'pirateLaser' | 'warp';
+export type FxKind =
+  | 'laser'
+  | 'mine'
+  | 'explosion'
+  | 'repair'
+  | 'pirateLaser'
+  | 'turretLaser'
+  | 'warp';
 export interface Fx {
   kind: FxKind;
   a: Vec3;

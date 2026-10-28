@@ -4,6 +4,7 @@ import {
   AGGRESSIVE_CARRIER_SENSOR_MULT,
   AGGRESSIVE_ORBIT_RADIUS,
   CARRIER_SENSOR,
+  HULLS,
   DEFENSIVE_VICTIM_RANGE,
   ESCORT_ATTACKER_RANGE,
   ESCORT_NEAR,
@@ -20,6 +21,9 @@ import {
   SCOUT_ORBIT_RADIUS,
   STORM_DURATION,
   STORM_GAP,
+  TURRET_DAMAGE_PER_LEVEL,
+  TURRET_RANGE_PER_LEVEL,
+  TURRETS,
   WAVE_INTERVAL_JITTER,
   WAVE_SIZE_BASE,
   WAVE_SIZE_PER_DISTANCE,
@@ -132,7 +136,11 @@ function orbit(p: Vec3, c: Vec3, r: number, t: number, phase: number, step: numb
   const a = t * 0.35 + phase;
   moveToward(
     p,
-    { x: c.x + Math.cos(a) * r, y: c.y + Math.sin(a * 0.7) * 2, z: c.z + Math.sin(a) * r },
+    {
+      x: c.x + Math.cos(a) * r,
+      y: c.y + Math.sin(a * 0.7) * 2,
+      z: c.z + Math.sin(a) * r,
+    },
     step,
   );
 }
@@ -160,7 +168,12 @@ export function fighter(s: Sim, ship: Ship, dt: number, ctx: Ctx, engagement: st
     if (dist(ship.pos, target.pos) <= range) {
       target.hull -= fighterDamage(s, ctx, ship) * dt;
       if (ship.fireCooldown <= 0) {
-        s.fx.push({ kind: 'laser', a: copy(ship.pos), b: copy(target.pos), ttl: 0.15 });
+        s.fx.push({
+          kind: 'laser',
+          a: copy(ship.pos),
+          b: copy(target.pos),
+          ttl: 0.15,
+        });
         ship.fireCooldown = 0.35;
       }
     }
@@ -281,7 +294,12 @@ export function repairDrone(s: Sim, ship: Ship, dt: number, ctx: Ctx) {
   }
   ship.fireCooldown -= dt;
   if (ship.fireCooldown <= 0 && dist(patient.pos, ship.pos) <= range) {
-    s.fx.push({ kind: 'repair', a: copy(ship.pos), b: copy(patient.pos), ttl: 0.3 });
+    s.fx.push({
+      kind: 'repair',
+      a: copy(ship.pos),
+      b: copy(patient.pos),
+      ttl: 0.3,
+    });
     ship.fireCooldown = 0.5;
   }
 }
@@ -393,9 +411,51 @@ export function pirateStep(s: Sim, dt: number, ctx: Ctx) {
         if (victim) damageShip(s, victim, dmg);
       }
       if (p.fireCooldown <= 0) {
-        s.fx.push({ kind: 'pirateLaser', a: copy(p.pos), b: copy(tgtPos), ttl: 0.15 });
+        s.fx.push({
+          kind: 'pirateLaser',
+          a: copy(p.pos),
+          b: copy(tgtPos),
+          ttl: 0.15,
+        });
         p.fireCooldown = 0.5;
       }
     }
+  }
+}
+
+/**
+ * Carrier turrets (#160): every hull fires on pirates in range, so a run without fighters
+ * can still clear a wave. Point-defense takes the nearest pirate, heavy batteries the toughest.
+ */
+export function carrierTurrets(s: Sim, dt: number) {
+  if (s.pirates.length === 0) return;
+  const c = s.carrier.pos;
+  const dmgMul = 1 + TURRET_DAMAGE_PER_LEVEL * lvl(s, 'turretDamage');
+  const rangeMul = 1 + TURRET_RANGE_PER_LEVEL * lvl(s, 'turretRange');
+  for (const kind of HULLS[s.carrier.hullClass].turrets) {
+    const t = TURRETS[kind];
+    const r2 = (t.range * rangeMul) ** 2;
+    let target: Pirate | null = null;
+    let best = Infinity;
+    for (const p of s.pirates) {
+      if (p.hull <= 0) continue;
+      const d2 = dist2(p.pos, c);
+      if (d2 > r2) continue;
+      const score = kind === 'pd' ? d2 : -p.hull;
+      if (score < best) {
+        best = score;
+        target = p;
+      }
+    }
+    if (!target) continue;
+    target.hull -= t.damage * dmgMul * dt;
+    // Beams on a fixed beat from sim time, so firing draws no randomness.
+    if (Math.floor(s.time / t.period) !== Math.floor((s.time - dt) / t.period))
+      s.fx.push({
+        kind: 'turretLaser',
+        a: copy(c),
+        b: copy(target.pos),
+        ttl: 0.15,
+      });
   }
 }

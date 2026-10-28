@@ -332,7 +332,9 @@ export const PRESETS: Record<RuleId, PresetDef> = {
     { kind: 'callHauler' },
     0,
   ),
-  bargeFallBack: preset(cls('barge'), [{ kind: 'pirateWithin', value: 28 }], { kind: 'fallBack' }),
+  bargeFallBack: preset(cls('barge'), [{ kind: 'pirateWithin', value: 28 }], {
+    kind: 'fallBack',
+  }),
   droneUnloadAtBarge: preset(
     cls('drone'),
     [{ kind: 'carrierFarther', value: 15 }],
@@ -347,14 +349,20 @@ export const PRESETS: Record<RuleId, PresetDef> = {
     0,
   ),
   reserveWarpEnergy: preset(FLEET, ALWAYS, { kind: 'reserveWarp' }),
-  harvesterStormShelter: preset(cls('harvester'), [{ kind: 'storm' }], { kind: 'shelter' }),
+  harvesterStormShelter: preset(cls('harvester'), [{ kind: 'storm' }], {
+    kind: 'shelter',
+  }),
 };
 
 export const STARTER_RULES: RuleId[] = ['droneUnloadAtBarge', 'bargeCallHauler', 'haulerPark'];
 
 // ---------- Zones ----------
 
-export const TIER_NAMES = { 1: 'Starter', 2: 'Frontier', 3: 'Deep space' } as const;
+export const TIER_NAMES = {
+  1: 'Starter',
+  2: 'Frontier',
+  3: 'Deep space',
+} as const;
 
 export const ORE_BY_TIER: Record<number, { name: string; value: number; weight: number }[]> = {
   1: [
@@ -433,6 +441,18 @@ export const warpPayment = (cost: number, energy: number, h2: number) => {
   return h2 + 1e-9 < need ? null : { energy: e, h2: need };
 };
 
+// ---------- Carrier turrets (#160) ----------
+
+export type TurretKind = 'pd' | 'heavy';
+/** Point-defense: short, quick, nearest pirate. Heavy battery: long, hard-hitting, toughest pirate. */
+export const TURRETS: Record<TurretKind, { range: number; damage: number; period: number }> = {
+  pd: { range: 26, damage: 6, period: 0.25 },
+  heavy: { range: 55, damage: 16, period: 0.9 },
+};
+/** Per research level: turretDamage and turretRange, matching the fighter nodes. */
+export const TURRET_DAMAGE_PER_LEVEL = 0.15;
+export const TURRET_RANGE_PER_LEVEL = 0.2;
+
 // ---------- Hull classes (#65) ----------
 
 export interface HullDef {
@@ -449,6 +469,8 @@ export interface HullDef {
   warpCharge: number; // multiplier on charge time
   warpCost: number; // multiplier on jump energy
   shield: number; // multiplier on shield regeneration
+  /** Weapon mounts; every hull has at least one. */
+  turrets: TurretKind[];
   /** Unlocks once this zone tier has been reached on a run after the first prestige. */
   tier: 1 | 2 | 3;
 }
@@ -466,6 +488,7 @@ export const HULLS: Record<HullId, HullDef> = {
     warpCharge: 1,
     warpCost: 1,
     shield: 1,
+    turrets: ['pd'],
     tier: 1,
   },
   light: {
@@ -480,6 +503,7 @@ export const HULLS: Record<HullId, HullDef> = {
     warpCharge: 0.5,
     warpCost: 0.6,
     shield: 1,
+    turrets: ['pd'],
     tier: 2,
   },
   fleet: {
@@ -494,6 +518,7 @@ export const HULLS: Record<HullId, HullDef> = {
     warpCharge: 1.3,
     warpCost: 1.3,
     shield: 1,
+    turrets: ['pd', 'pd'],
     tier: 2,
   },
   mining: {
@@ -508,6 +533,7 @@ export const HULLS: Record<HullId, HullDef> = {
     warpCharge: 1.2,
     warpCost: 1.2,
     shield: 1,
+    turrets: ['pd'],
     tier: 3,
   },
   bastion: {
@@ -522,6 +548,7 @@ export const HULLS: Record<HullId, HullDef> = {
     warpCharge: 1.5,
     warpCost: 1.4,
     shield: 2,
+    turrets: ['pd', 'pd', 'heavy'],
     tier: 3,
   },
 };

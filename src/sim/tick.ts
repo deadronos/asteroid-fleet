@@ -3,7 +3,7 @@ import { automation } from './automation';
 // and warp.ts; ctx.ts holds the per-tick lookups they share.
 
 import { DT, HANGAR_TYPES, PIRATE_BASE } from './config';
-import { fighter, pirateStep, repairDrone, scout, threats } from './combat';
+import { carrierTurrets, fighter, pirateStep, repairDrone, scout, threats } from './combat';
 import {
   buildCtx,
   destroyShip,
@@ -89,6 +89,7 @@ export function stepOp(s: Sim, dt = DT) {
     }
     behave(s, ship, dt, ctx);
   }
+  carrierTurrets(s, dt);
   pirateStep(s, dt, ctx);
   hazards(s, dt);
   refine(s, dt, ctx);
