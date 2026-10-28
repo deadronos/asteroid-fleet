@@ -2,6 +2,9 @@
 
 A browser idle game with an autobattler setup, in full 3D. You are the admiral, not the pilot: outfit a mining carrier's hangars, set stances and rules, and warp outward into richer, more dangerous systems while the fleet works on its own. See [asteroid-fleet-game-concept.md](asteroid-fleet-game-concept.md) for the design.
 
+## Screenshot
+![Screenshot of Asteroid Fleet](image.png)
+
 ## Run it
 
 ```sh
