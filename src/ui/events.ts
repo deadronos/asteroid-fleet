@@ -76,8 +76,12 @@ export function formatEvent(ev: SimEvent): string {
       return `Challenge begun: ${CHALLENGES[ev.data.challenge].name}.`;
     case 'ChallengeComplete':
       return `Challenge complete: ${CHALLENGES[ev.data.challenge].name}. +${ev.data.marks} Admiralty Marks and a permanent bonus.`;
-    case 'WelcomeBack':
-      return `Welcome back. The fleet earned ${ev.data.credits} credits while you were away.`;
+    case 'WelcomeBack': {
+      const away = ev.data.hidden ? 'while the tab was hidden' : 'while you were away';
+      return ev.data.credits > 0
+        ? `Welcome back. The fleet earned ${ev.data.credits} credits ${away}.`
+        : `Welcome back. The fleet earned 0 credits ${away}: it was idle, with no recent mining income.`;
+    }
     case 'Legacy':
       return ev.data.text;
   }

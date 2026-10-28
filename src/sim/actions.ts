@@ -468,7 +468,11 @@ export interface OfflineReport {
  * prestige research. Energy recharges from solar minus fleet upkeep over the elapsed time (never
  * below zero; mining income is already net of upkeep). Reserves keep rebuilding.
  */
-export function settleOffline(g: GameState, elapsedS: number): OfflineReport | null {
+export function settleOffline(
+  g: GameState,
+  elapsedS: number,
+  hidden = false,
+): OfflineReport | null {
   const t = Math.min(OFFLINE_CAP_S, Math.max(0, elapsedS));
   if (t < 30) return null;
   const report: OfflineReport = { seconds: t, credits: 0, rebuilt: 0 };
@@ -477,6 +481,14 @@ export function settleOffline(g: GameState, elapsedS: number): OfflineReport | n
     report.credits += r.credits;
     report.rebuilt += r.rebuilt;
   }
+  // One summary for the whole settlement, on the focused carrier's log.
+  const first = g.ops[0];
+  if (first)
+    emit(bind(g, first), 'WelcomeBack', {
+      credits: Math.round(report.credits),
+      seconds: t,
+      hidden,
+    });
   // Routes keep running over the time away (whole seconds; the remainder is dropped).
   for (let i = 0; i < t && g.routes.length; i++) routeTick(g, 1);
   return report;
@@ -493,6 +505,5 @@ function settleOp(s: Sim, t: number): { credits: number; rebuilt: number } {
     s.wave.warning = false;
   }
   materialise(s);
-  emit(s, 'WelcomeBack', { credits: Math.round(r.credits) });
   return { credits: r.credits, rebuilt: r.rebuilt };
 }

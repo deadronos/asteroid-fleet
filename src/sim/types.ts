@@ -342,7 +342,7 @@ export interface EventData {
   Admiralty: { marks: number };
   ChallengeStarted: { challenge: ChallengeId };
   ChallengeComplete: { challenge: ChallengeId; marks: number };
-  WelcomeBack: { credits: number };
+  WelcomeBack: { credits: number; seconds: number; hidden: boolean };
   /** A plain-text line from a save written before typed events (v7 and older). */
   Legacy: { text: string };
 }

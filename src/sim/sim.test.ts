@@ -7,6 +7,8 @@ import { maxEnergy, upkeepRate, stateOf } from './state';
 import { stepSim } from './tick';
 import type { Sim } from './types';
 import { game } from './testing';
+import { formatEvent } from '../ui/events';
+import { bind } from './view';
 
 const run = (s: Sim, seconds: number) => {
   for (let i = 0; i < seconds * 10; i++) stepSim(s);
@@ -108,6 +110,26 @@ describe('simulation', () => {
     expect(rep.credits).toBeCloseTo(18000);
     expect(s.credits - before).toBeCloseTo(18000);
     expect(s.pirates.length).toBe(0);
+  });
+
+  it('emits one WelcomeBack per settlement, however many carriers', () => {
+    const s = game(9);
+    s.miningIncomeAvg = 10;
+    const g = stateOf(s);
+    settleOffline(g, 3600, true);
+    const evs = g.ops.flatMap((o) => bind(g, o).events).filter((e) => e.kind === 'WelcomeBack');
+    expect(evs.length).toBe(1);
+    expect(evs[0].data).toMatchObject({ seconds: 3600, hidden: true });
+  });
+
+  it('reports an idle fleet when nothing was earned', () => {
+    const s = game(9);
+    s.miningIncomeAvg = 0;
+    const g = stateOf(s);
+    settleOffline(g, 3600);
+    const ev = g.ops.flatMap((o) => bind(g, o).events).find((e) => e.kind === 'WelcomeBack')!;
+    expect(ev.data).toMatchObject({ credits: 0 });
+    expect(formatEvent(ev)).toMatch(/idle/);
   });
 
   it('pays offline only from mining income, not salvage', () => {

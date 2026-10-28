@@ -404,7 +404,7 @@ describe('toast queue', () => {
       q,
       [
         bus(ev('VeinFound', { veins: 1 }), 1),
-        bus(ev('WelcomeBack', { credits: 4 }, { t: 5 }), 3),
+        bus(ev('WelcomeBack', { credits: 4, seconds: 60, hidden: false }, { t: 5 }), 3),
         bus(ev('PiratesArrived', { size: 2 }, { t: 5 }), 2),
       ],
       0,
@@ -474,7 +474,7 @@ function sampleOf(kind: SimEventKind): SimEvent {
     case 'ChallengeComplete':
       return ev(kind, { challenge: 'pacifist', marks: 1 });
     case 'WelcomeBack':
-      return ev(kind, { credits: 20 });
+      return ev(kind, { credits: 20, seconds: 60, hidden: false });
     case 'Legacy':
       return ev(kind, { text: 'Docked.' });
     default: {

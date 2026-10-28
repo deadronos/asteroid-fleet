@@ -153,7 +153,7 @@ export class SimRunner {
     if (!this.paused && elapsed > MAX_CATCHUP_TICKS * TICK_MS) {
       // Long background-tab gap: settle the real wall-clock time like offline
       // time; game speed applies to live ticks only.
-      const report = settleOffline(s, elapsed / 1000);
+      const report = settleOffline(s, elapsed / 1000, true);
       if (report) this.offline = report;
       this.resync();
       this.acc = 0;
