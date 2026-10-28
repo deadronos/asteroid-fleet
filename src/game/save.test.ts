@@ -15,6 +15,7 @@ import saveV10 from './fixtures/save-v10.json';
 import saveV13 from './fixtures/save-v13.json';
 import saveV14 from './fixtures/save-v14.json';
 import saveV15 from './fixtures/save-v15.json';
+import { set } from 'idb-keyval';
 import { applyMigrationSteps, migrate, type SaveBlob } from './migrate';
 import {
   SAVE_BACKUP_FAILED_NOTICE,
@@ -629,6 +630,24 @@ describe('storage weight (#40)', () => {
     expect(await saveGame(newGame(7))).toBe(true);
     expect(typeof mem.idb.get(SAVE_KEY)).toBe('string');
     expect(local.has(SAVE_KEY)).toBe(false);
+  });
+
+  it('loads the localStorage fallback, not an older IndexedDB save, after an IndexedDB write fails (#171)', async () => {
+    const older = newGame(7);
+    expect(await saveGame(older)).toBe(true);
+    const newer = newGame(8);
+    vi.mocked(set).mockRejectedValueOnce(new Error('quota'));
+    expect(await saveGame(newer)).toBe(true);
+    expect(await readPrimaryText()).toBe(JSON.stringify(newer));
+  });
+
+  it('keeps the older IndexedDB save when neither store takes the new one (#171)', async () => {
+    const older = newGame(7);
+    expect(await saveGame(older)).toBe(true);
+    installLocalStorage({ rejectWrites: true });
+    vi.mocked(set).mockRejectedValueOnce(new Error('quota'));
+    expect(await saveGame(newGame(8))).toBe(false);
+    expect(await readPrimaryText()).toBe(JSON.stringify(older));
   });
 
   it('falls back to localStorage without IndexedDB, and reports a save nothing kept', async () => {

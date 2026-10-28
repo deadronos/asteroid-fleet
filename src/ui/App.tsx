@@ -2,6 +2,7 @@ import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
 import { engine, useGame } from '../game/engine';
 import { readBackups, readPrimaryText } from '../game/save';
 import { updateSettings, useSettings } from '../game/settings';
+import { setActiveSlot } from '../game/slots';
 import { SHIP_STATS } from '../sim/config';
 import { SHIP_CLASSES } from '../sim/types';
 import { downloadFile } from './download';
@@ -262,7 +263,7 @@ async function downloadUnreadable() {
   downloadText('asteroid-fleet-unreadable-save.txt', text);
 }
 
-function SaveNotice() {
+export function SaveNotice() {
   useGame();
   if (!engine.saveNotice) return null;
   return (
@@ -273,7 +274,15 @@ function SaveNotice() {
           <button onClick={() => void downloadUnreadable()}>Download unreadable save</button>
         ) : (
           <>
-            <button onClick={() => engine.reset()}>Start new game (keeps backup)</button>
+            <button
+              onClick={() => {
+                // Like the Settings reset: the new game must not be copied into a slot (#172).
+                setActiveSlot(null);
+                engine.reset();
+              }}
+            >
+              Start new game (keeps backup)
+            </button>
             <button onClick={() => void downloadBackups()}>Download backup</button>
           </>
         )}

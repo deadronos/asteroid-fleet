@@ -56,6 +56,9 @@ async function writeStore(key: string, json: string, mirror = true): Promise<boo
   } catch {
     localOk = false;
   }
+  // Reads try IndexedDB first, so an older copy left there would shadow the fallback (#171).
+  // Only once the fallback holds the bytes: with both stores failing, the old copy is all there is.
+  if (!idbOk && localOk) await del(key).catch(() => {});
   return idbOk || localOk;
 }
 

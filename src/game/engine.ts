@@ -421,7 +421,11 @@ class Engine {
    */
   async save(): Promise<boolean> {
     if (saveOverwriteBlocked()) return false;
-    return this.write(await this.fullState());
+    const epoch = this.epoch;
+    const state = await this.fullState();
+    // A reset or import while the snapshot was in flight: the reply is the old run (#170).
+    if (epoch !== this.epoch) return false;
+    return this.write(state);
   }
 
   private saveMirror() {

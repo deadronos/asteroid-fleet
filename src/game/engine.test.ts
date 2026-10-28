@@ -173,3 +173,30 @@ describe('unload mirror save (#157)', () => {
     write.mockRestore();
   });
 });
+
+describe('autosave across a reset (#170)', () => {
+  it('drops a snapshot requested before replace instead of writing it over the new run', async () => {
+    const e = engine as unknown as {
+      host: { kind: string; post: (m: { t: string; id?: number }) => void } | null;
+      started: () => void;
+      write: (s: unknown) => Promise<boolean>;
+    };
+    const posted: { t: string; id?: number }[] = [];
+    const host = e.host;
+    e.host = { kind: 'local', post: (m) => posted.push(m) };
+    e.started();
+    const write = vi.spyOn(e, 'write').mockResolvedValue(true);
+    const old = newGame(1);
+    const pending = engine.save();
+    await Promise.resolve();
+    const req = posted.find((m) => m.t === 'snapshot')!;
+    const fresh = newGame(2);
+    engine.replace(fresh);
+    engine.onSimMessage({ t: 'snapshot', id: req.id!, state: old });
+    expect(await pending).toBe(false);
+    expect(write).toHaveBeenCalledTimes(1);
+    expect(write).toHaveBeenCalledWith(fresh);
+    write.mockRestore();
+    e.host = host;
+  });
+});
