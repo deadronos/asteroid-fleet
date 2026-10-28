@@ -1,6 +1,6 @@
 # Saves and migrations
 
-Source of truth: `src/sim/state.ts` (`SAVE_VERSION`), `src/game/migrate.ts`, `src/game/save.ts`, `src/game/slots.ts`, `src/game/fixtures/`, `src/game/save.test.ts`.
+Source of truth: `src/sim/state.ts` (`SAVE_VERSION`), `src/game/migrate.ts`, `src/game/save.ts`, `src/game/slots.ts`, `src/game/fixtures/`, `src/game/save.test.ts`; the start-over buttons in `src/ui/App.tsx` and `src/ui/Settings.tsx`.
 
 ## Format
 
@@ -41,7 +41,7 @@ A new `Operation` or `GameState` field also needs the `OP_KEYS` / `GAME_KEYS` en
 
 ## Storage
 
-- The primary save is under `asteroid-fleet-save` in IndexedDB (`idb-keyval`). The localStorage copy is written only when IndexedDB cannot hold it, and a stale copy is removed, so a large fleet does not fill the ~5 MB localStorage quota the slots use (#40).
+- The primary save is under `asteroid-fleet-save` in IndexedDB (`idb-keyval`). The localStorage copy is written only when IndexedDB cannot hold it, and a stale copy is removed, so a large fleet does not fill the ~5 MB localStorage quota the slots use (#40). When IndexedDB rejects a write that localStorage keeps, the older IndexedDB copy is deleted, because loads read IndexedDB first and it would shadow the newer save. If both stores reject the write, the old copy stays, since it is then the only save (#171).
 - Manual slots (`slots.ts`, `SLOT_COUNT = 3`) live in localStorage under `asteroid-fleet-slot-<n>`. Settings live under their own key (`game/settings.ts`), so a reset or import never touches them.
 - Autosave runs every 15 s from the engine. A failed autosave or slot write shows a toast once, until a write succeeds again.
 
@@ -52,3 +52,4 @@ Such a save is never deleted or overwritten:
 - The raw text is copied to `asteroid-fleet-save-backup` in both IndexedDB and localStorage. A later failure that is byte-for-byte the same does not rewrite it. A different failure goes to `asteroid-fleet-save-backup-<timestamp>`. Only the newest `MAX_BACKUPS = 5` are kept per store.
 - The game shows `SAVE_BACKUP_NOTICE` and pauses autosave so the original stays put. If both stores reject the copy, it shows the "could not be backed up" notice instead, and a reset or import then warns that the save will be lost.
 - A hard reset or successful import may reuse the primary key. Backup keys are left alone. A bad import is rejected and writes nothing.
+- Every way to start over from the notice or Settings (hard reset, "Start new game (keeps backup)", import) clears the active slot first, so the new run is not copied into a slot (#172).
