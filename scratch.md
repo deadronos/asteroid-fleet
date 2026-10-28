@@ -12,7 +12,7 @@ The #169 review was split into #170–#190. This is the remaining work, in sugge
 - #185: offline routes run `floor(t)` seconds (#198)
 - #188: held toggle hotkeys do not repeat (#198)
 - #189: a new run restarts the runner clock (#198)
-- #174: each carrier keeps its own rebuild queue and automation timer
+- #174: each carrier keeps its own rebuild queue and automation timer (#200)
 
 ## 2. Multi-carrier correctness
 
