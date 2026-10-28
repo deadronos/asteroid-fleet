@@ -51,41 +51,19 @@ CI runs on every pull request and on pushes to `main`, on Node 22 with pnpm 12. 
 
 ## Save migrations
 
-Saves are JSON documents stamped with `SAVE_VERSION` (`src/sim/state.ts`). On load, and again on import, `migrate()` (`src/game/migrate.ts`) brings an older save up to that version. It runs one step per version, in order: `migrations[n]` rewrites a version `n` save into version `n + 1`, then the next step runs, until `SAVE_VERSION`. Steps run on the raw JSON, before timers are restored: a wave or storm timer that means "never" is still `null` there, because that is how `Infinity` survives `JSON.stringify`.
-
-Every save schema change needs all three of these:
-
-1. Bump `SAVE_VERSION`.
-2. Add the `migrations[n]` step that upgrades the previous version to the new one.
-3. Check in a fixture of the previous version under `src/game/fixtures/` and a test that loads it and migrates it to the current version. `src/game/fixtures/save-v1.json` is the v1 fixture `save-v2.json` the v2 one (automation, #11) `save-v3.json` the v3 one (field records, #14) `save-v4.json` the v4 one (containers, #13), `save-v5.json` the v5 one (modules, #9) `save-v6.json` the v6 one (`miningIncomeAvg`, #38) and `save-v7.json` the v7 one (plain-text log, #72). Every fixture is also migrated and run through `step()` in `src/game/save.test.ts`.
-
-v3 added `fields`: when the carrier leaves a system it keeps a compact depletion record (`[index, oreFraction, respawn]` for each rock that is not full). On return the field is regenerated from the seed, the record applied, and refill added for the sim time spent away (depleted timers count down, partly mined rocks refill over `FIELD_REFILL_SECS`). All records together stay under 16 KB of save, tested in `src/sim/fields.test.ts`.
-
-v4 added `containers` (cargo dropped by destroyed barges, salvaged by haulers until it decays) and `Ship.bargeId` (the barge whose drone bay a drone is based at, `-1` for the carrier).
-
-v5 added `Ship.modules` (fitted modules, at most `MODULE_SLOTS[cls]`) and `recon` (clusters surveyed, rich vein asteroid ids and charted hazard indices in the current system; cleared on every jump).
-
-v6 (#38) guarantees `miningIncomeAvg` is a finite number: older saves lacked it, which made offline settlement pay nothing. `save-v5.json` is the fixture without it, and `validateSave` also repairs a non-finite value.
-
-v7 (#40): every asteroid now draws its rare-ore roll whether or not rare ore is researched, so researching it no longer shifts the rocks after the first rare roll and a restored depletion record stays on the right rocks. That changes how fields generate, so the v7 step drops the old `fields` records (the current system's rocks are saved as-is; other systems simply come back full). `validateSave` also rebuilds a missing or empty `systems` list from `seed` (early saves had `systems: []`).
-
-v10 (#75): per-carrier state moves into `ops: Operation[]`, so several carriers can be played at once later (#53). The carrier, hangars, ships, pirates, asteroids, containers, hazards, recon, `systemId`, warp, wave, storm, reserve timers, fx, `rng` and the income averages of a v9 save become operation `0`; credits, research, unlocks, cards, stats and the event log stay on the top level. `save-v9.json` is the fixture.
-
-v11 (#65): hull classes. `GameState.hulls` lists the unlocked classes (a v10 save has only `standard`) and each carrier gets `hullClass: 'standard'`. `save-v10.json` is the fixture.
-
-v15 (#71): run modifiers and challenge runs. `GameState.modifiers` (active run modifiers), `challenge` (the attempt in progress) and `challengesDone` (completed challenges, permanent). A v14 save gets none of them. `save-v14.json` is the fixture. The modifier framework is `src/sim/modifiers.ts`; each modifier is read through one hook there.
-
-The primary save lives in IndexedDB; the localStorage copy is only written when IndexedDB cannot hold it, and a stale one is removed, so a large fleet does not fill the localStorage quota the save slots use. A failed autosave or active-slot write shows a toast once, until a write succeeds again.
-
-A save that is corrupt, from a newer version than this build, or otherwise unknown is not deleted and not overwritten. The raw text is copied to `asteroid-fleet-save-backup` in both IndexedDB and the localStorage fallback (the same pair of stores as the primary key `asteroid-fleet-save`). A later failure that is byte-for-byte the same does not rewrite that copy. A different failure is written to `asteroid-fleet-save-backup-<timestamp>` so the earlier backup stays. Only the newest five backups (`MAX_BACKUPS`) are kept in each store. The game shows "Your save could not be loaded and was backed up." and pauses automatic saving so the original stays put. If both stores reject the copy, it shows "could not be backed up" instead, and a reset or import then warns that the save will be lost. A hard reset or a successful import may reuse the primary slot; backup keys are left alone. A bad import is rejected and does not write any key.
+Saves are versioned JSON and migrate step by step on load. The rules for changing the save schema, the version history and the backup behaviour for unreadable saves are in [docs/agents/save-and-migrations.md](docs/agents/save-and-migrations.md).
 
 ## Layout
 
-- `src/sim/`: deterministic simulation (seeded RNG, fixed 10 Hz tick), pure TypeScript with no React or three.js. `step(global, op)` in `tick.ts` is the whole game loop for one operation (carrier); the sim works on a `Sim`, the run-wide state and one operation bound together by `bind()` in `state.ts`. `actions.ts` holds every player command; each `Command` names its `carrierId`.
-- `src/game/`: the engine that interpolates positions for the renderer, the sim host (`host.ts`, `runner.ts`, `protocol.ts`) that runs the tick loop in a Web Worker, plus save/load.
+- `src/sim/`: deterministic simulation (seeded RNG, fixed 10 Hz tick), pure TypeScript with no React or three.js.
+- `src/game/`: the sim host that runs the tick loop in a Web Worker (falling back to the main thread), the main-thread engine mirror, and save/load.
 - `src/render/`: the 3D scene.
 - `src/ui/`: HTML/React panels over the canvas.
 
-The simulation runs in a Web Worker (`src/game/sim.worker.ts`); if the worker cannot start, the same runner falls back to the main thread. Not yet built: short expeditions, async PvP.
+How the layers fit together is in [docs/agents/architecture/overview.md](docs/agents/architecture/overview.md). Not yet built: short expeditions, async PvP.
 
 The engine is exposed as `__fleet` in the browser console for debugging and balancing.
+
+## Contributing and agent docs
+
+[AGENTS.md](AGENTS.md) indexes the docs in [docs/agents/](docs/agents/): workflow, conventions, testing and architecture.
