@@ -236,6 +236,9 @@ export function drone(s: Sim, ship: Ship, dt: number, ctx: Ctx, mining: 'greedy'
   let a = ctx.asteroids.get(ship.targetId);
   if (ship.mode === 'idle' || !a || a.ore <= 0) {
     a = pickAsteroid(s, ship, ctx, mining) ?? undefined;
+    // Cover only matters while pirates are about; otherwise an empty cover would idle the fleet (#156).
+    if (!a && mining === 'safe' && s.pirates.length === 0)
+      a = pickAsteroid(s, ship, ctx, 'greedy') ?? undefined;
     if (!a) {
       const bay = bayBarge(ship, ctx);
       if (ship.cargo > 0) ship.mode = 'toCarrier';
