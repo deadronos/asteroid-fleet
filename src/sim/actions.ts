@@ -186,7 +186,8 @@ export function order(s: Sim, c: Order): string | null {
       }
       if (s.credits < cost) return 'Not enough credits';
       s.credits -= cost;
-      const id = Math.max(...s.hangars.map((h) => h.id)) + 1;
+      // Ids are unique across every carrier: cards and stances name hangars globally (#173).
+      const id = Math.max(...stateOf(s).ops.flatMap((o) => o.hangars.map((h) => h.id))) + 1;
       s.hangars.push({
         id,
         type: c.hangarType,

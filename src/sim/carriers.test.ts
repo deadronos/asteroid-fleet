@@ -37,6 +37,19 @@ describe('buy a carrier (#78)', () => {
     expect(CARRIER_COST(2)).toBeGreaterThan(CARRIER_COST(1));
   });
 
+  it('buys a hangar without reusing an id another carrier holds (#173)', () => {
+    const g = ready();
+    buy(g);
+    // The newer carrier already holds the highest ids; the older one is the collision.
+    for (const carrierId of [g.ops[1].id, g.ops[0].id]) {
+      const before = g.ops.flatMap((o) => o.hangars.map((h) => h.id));
+      expect(apply(g, { type: 'buyHangar', hangarType: 'launch', carrierId })).toBeNull();
+      const ids = g.ops.flatMap((o) => o.hangars.map((h) => h.id));
+      expect(new Set(ids).size).toBe(ids.length);
+      expect(Math.max(...ids)).toBe(Math.max(...before) + 1);
+    }
+  });
+
   it('gives the new carrier unique ids, its own rng and a starting system', () => {
     const g = ready();
     buy(g);
