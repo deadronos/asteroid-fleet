@@ -101,20 +101,24 @@ function synergy(
 }
 
 function HangarBoard({
-  h,
+  hangarId,
   selected,
   onSelect,
   selShip,
   onShip,
 }: {
-  h: Hangar;
+  hangarId: number;
   selected: boolean;
   onSelect: () => void;
   selShip: number;
   onShip: (id: number) => void;
 }) {
   const s = useGame();
+  // Look the hangar up on every render: snapshots replace hangar objects, and the parent only
+  // re-renders when the hangar list changes, so a hangar passed as a prop goes stale (#152).
+  const h = s.hangars.find((x) => x.id === hangarId);
   const [over, setOver] = useState(-1);
+  if (!h) return null;
   const byId = shipIndex(s);
   const occ = boardOccupancy(byId, h);
   const cells: React.ReactNode[] = [];
@@ -515,7 +519,7 @@ export function FleetPanel() {
       {engine.view.hangars.map((h, i) => (
         <div key={h.id}>
           <HangarBoard
-            h={h}
+            hangarId={h.id}
             selected={sel === h.id}
             onSelect={() => setSel(h.id)}
             selShip={selShip}
