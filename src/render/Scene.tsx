@@ -1,4 +1,4 @@
-import { Stars } from '@react-three/drei';
+import { Stars, useGLTF } from '@react-three/drei';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import {
   Suspense,
@@ -24,7 +24,9 @@ import { Fleet } from './Fleet';
 import { CLASSES, FleetPass, MAX_ENTITIES, asteroidById, fleetFrame } from './frameState';
 import { GAS_FRAG, GAS_VERT, NEBULA_FRAG, NEBULA_VERT } from './geometry';
 import { FrameCap, RenderStats } from './RenderLoop';
+import { PanelViewOffset } from './viewOffset';
 import { ASTEROID_LOD, CAMERA_OFFSET, FLEET_LOD, MAX_ICONS } from './constants';
+import { CARRIER_MODEL, carrierModel, disposeCarrierModel, modelUrl } from './models';
 import { ICON_SHAPE, PALETTE, SHAPES } from '../ui/palette';
 
 const Effects = lazy(() => import('./Effects'));
@@ -150,8 +152,26 @@ function Explosions() {
 
 const HULL_COLOR = '#9aa7b8';
 const OTHER_HULL_COLOR = '#b8a08f';
+/** Multiplies another carrier's ochre hull toward grey-blue, so yours stands out. */
+const OTHER_HULL_TINT = '#a9b6d6';
 
-function CarrierHull({ hull = HULL_COLOR }: { hull?: string }) {
+/** The glTF carrier, with the old box hull as the fallback while it loads. */
+function CarrierHull({ other = false }: { other?: boolean }) {
+  return (
+    <Suspense fallback={<BoxHull hull={other ? OTHER_HULL_COLOR : HULL_COLOR} />}>
+      <CarrierModel tint={other ? OTHER_HULL_TINT : undefined} />
+    </Suspense>
+  );
+}
+
+function CarrierModel({ tint }: { tint?: string }) {
+  const gltf = useGLTF(modelUrl(CARRIER_MODEL), false, false);
+  const model = useMemo(() => carrierModel(gltf.scene, tint), [gltf, tint]);
+  useEffect(() => () => disposeCarrierModel(model), [model]);
+  return <primitive object={model} />;
+}
+
+function BoxHull({ hull }: { hull: string }) {
   return (
     <>
       <mesh>
@@ -303,7 +323,7 @@ function OtherCarriers() {
             else groups.current.delete(id);
           }}
         >
-          <CarrierHull hull={OTHER_HULL_COLOR} />
+          <CarrierHull other />
         </group>
       ))}
       <points geometry={geo} frustumCulled={false}>
@@ -401,6 +421,9 @@ const TIER_SKY: Record<number, [string, string]> = {
   3: ['#ff3d2e', '#ffb35a'],
 };
 
+const SUN_POS: [number, number, number] = [400, 150, -500];
+const RIM_POS: [number, number, number] = [-450, 90, -200];
+
 const Sky = memo(function Sky() {
   const sys = engine.view.systems[useSystemId()];
   const tier = sys.tier;
@@ -430,13 +453,14 @@ const Sky = memo(function Sky() {
         <sphereGeometry args={[900, 32, 16]} />
       </mesh>
       <Stars radius={500} depth={200} count={4000} factor={6} fade speed={0.3} />
-      <mesh position={[400, 150, -500]}>
+      <mesh position={SUN_POS}>
         <sphereGeometry args={[18 + bright * 10, 24, 16]} />
         <meshBasicMaterial color={sunColor} toneMapped={false} />
       </mesh>
-      <directionalLight position={[400, 150, -500]} intensity={1.2 + bright} color="#fff1dc" />
-      <ambientLight intensity={0.55} color="#8fa8ff" />
-      <directionalLight position={[-200, 120, 300]} intensity={0.6} color="#9fb8ff" />
+      {/* Warm key from the star, cool rim from the far side to pick out silhouettes. */}
+      <directionalLight position={SUN_POS} intensity={1.4 + bright} color="#ffe4bd" />
+      <directionalLight position={RIM_POS} intensity={1.1} color="#8fb2ff" />
+      <ambientLight intensity={0.45} color="#8fa8ff" />
       <hemisphereLight args={['#6f8cff', '#1a0f20', 0.35]} />
     </>
   );
@@ -608,6 +632,7 @@ export const Scene = memo(function Scene({
       <RenderStats />
       {quality === 'low' && <FrameCap fps={fpsCap} />}
       <CameraRig tactical={tactical} onAutoTactical={onAuto} />
+      <PanelViewOffset />
       {quality === 'high' && bloom && (
         <Suspense fallback={null}>
           <Effects />
