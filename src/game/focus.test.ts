@@ -81,6 +81,48 @@ describe('carrier focus', () => {
     expect(g0.ops[1].systemId).toBe(1);
   });
 
+  it('resolves an active wave when focus leaves that carrier', () => {
+    const state = two(1);
+    const op = state.ops[0];
+    op.wave.active = true;
+    op.wave.size = 8;
+    op.pirates.push({
+      id: state.nextId++,
+      pos: { x: 40, y: 0, z: 0 },
+      hull: 30,
+      maxHull: 45,
+      damage: 5,
+      speed: 9,
+      targetId: -1,
+      fireCooldown: 0,
+    });
+    const { host, out, g } = run(state);
+    out.length = 0;
+    host.post({ t: 'focus', carrierId: 99 });
+    const bus = out.filter((m) => m.t === 'events');
+    expect(bus).toHaveLength(1);
+    expect(bus[0].t === 'events' && bus[0].events.map((e) => [e.kind, e.carrierId])).toEqual([
+      ['WaveRepelled', 0],
+    ]);
+    const snap = out.find((m) => m.t === 'state');
+    expect(
+      snap?.t === 'state' &&
+        snap.snap.global.log.some((e) => e.kind === 'WaveRepelled' && e.carrierId === 0),
+    ).toBe(true);
+    expect(g().ops[0].wave.active).toBe(false);
+    expect(g().ops[0].pirates).toEqual([]);
+
+    const killed = g().stats.piratesKilled;
+    const lost = g().stats.shipsLost;
+    out.length = 0;
+    host.post({ t: 'focus', carrierId: 0 });
+    host.post({ t: 'focus', carrierId: 99 });
+    expect(g().stats.piratesKilled).toBe(killed);
+    expect(g().stats.shipsLost).toBe(lost);
+    expect(g().ops[0].wave.active).toBe(false);
+    expect(out.filter((m) => m.t === 'events')).toEqual([]);
+  });
+
   it('drops a stale frame in the mirror logic: frames carry the carrier id', () => {
     const { host, out } = run(two());
     host.post({ t: 'focus', carrierId: 99 });

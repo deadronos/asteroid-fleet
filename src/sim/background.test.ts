@@ -9,6 +9,7 @@ import {
   stepBackground,
 } from './background';
 import { order, settleOffline } from './actions';
+import { mulberry } from './math';
 import { newGame, bind, stateOf } from './state';
 import { stepOp, stepSim } from './tick';
 import { game } from './testing';
@@ -30,6 +31,41 @@ function frontier(seed = 7): Sim {
 }
 
 const snapshot = (s: Sim) => JSON.stringify({ ...stateOf(s), events: [], log: [], savedAt: 0 });
+
+/** Advance the op rng the way `rand` does, `n` times. */
+function rollRng(rng: number, n: number): number {
+  for (let i = 0; i < n; i++) rng = mulberry(rng)[1];
+  return rng;
+}
+
+/** One pirate. `hull` 0 is already dead and must not be part of a handover roll. */
+function pushPirate(s: Sim, hull = 40) {
+  s.pirates.push({
+    id: s.nextId++,
+    pos: { x: 80, y: 0, z: 0 },
+    hull,
+    maxHull: 45,
+    damage: 5,
+    speed: 9,
+    targetId: -1,
+    fireCooldown: 0,
+  });
+}
+
+/**
+ * Frontier fleet with a fight still on the map. `wave.size` is deliberately not the
+ * number of living pirates: the handover must roll who is left, not the scheduled wave.
+ */
+function underAttack(living = 6, seed = 7): Sim {
+  const s = frontier(seed);
+  s.wave.active = true;
+  s.wave.warning = false;
+  s.wave.size = 40;
+  s.wave.timer = 80;
+  for (let i = 0; i < living; i++) pushPirate(s);
+  pushPirate(s, 0);
+  return s;
+}
 
 function roundTrip(): string {
   const s = frontier(11);
@@ -126,6 +162,91 @@ describe('Tier A / Tier B handover', () => {
     expect(s.containers).toEqual([]);
     expect(s.wave.active).toBe(false);
     expect(s.ships.map((x) => x.id)).toEqual(ids);
+  });
+
+  it('resolves an active wave instead of deleting it', () => {
+    const s = underAttack();
+    const living = s.pirates.filter((p) => p.hull > 0).length;
+    const rng = s.rng;
+    const kills = s.stats.piratesKilled;
+    const lost = s.stats.shipsLost;
+    const fighters = s.ships.filter((x) => x.cls === 'fighter').length;
+    const drones = s.ships.filter((x) => x.cls === 'drone').length;
+    const hull = s.carrier.hull;
+    dematerialise(s);
+
+    const killed = s.stats.piratesKilled - kills;
+    const shipsLost = s.stats.shipsLost - lost;
+    expect(s.wave.active).toBe(false);
+    expect(s.pirates).toEqual([]);
+    expect(s.fx).toEqual([]);
+    expect(s.wave.timer).toBe(80);
+    expect(s.wave.size).toBe(40);
+    expect(s.wave.warning).toBe(false);
+    // One seeded roll per living pirate, not per `wave.size` and not per dead hull.
+    expect(s.rng).toBe(rollRng(rng, living));
+    expect(killed + shipsLost).toBeGreaterThan(0);
+    expect(killed).toBeLessThanOrEqual(living);
+    expect(shipsLost).toBeLessThanOrEqual(living);
+    expect(s.ships.filter((x) => x.cls === 'fighter').length).toBe(fighters - shipsLost);
+    expect(s.ships.filter((x) => x.cls === 'drone').length).toBe(drones);
+    expect(s.carrier.hull).toBe(hull);
+    const repelled = s.events.filter((e) => e.kind === 'WaveRepelled');
+    expect(repelled).toHaveLength(1);
+    expect(repelled[0].carrierId).toBe(s.id);
+    expect(s.log.filter((e) => e.kind === 'WaveRepelled')).toHaveLength(1);
+    const losses = s.events.filter((e) => e.kind === 'ShipLost');
+    expect(losses).toHaveLength(shipsLost);
+    expect(losses.every((e) => e.kind === 'ShipLost' && e.data.cause === 'destroyed')).toBe(true);
+
+    const again = underAttack();
+    dematerialise(again);
+    expect(snapshot(again)).toBe(snapshot(s));
+    expect(again.events).toEqual(s.events);
+  });
+
+  it('leaves a carrier with no active wave unchanged apart from the map', () => {
+    const s = frontier();
+    s.wave.warning = true;
+    s.wave.timer = 12;
+    s.wave.size = 4;
+    pushPirate(s);
+    s.fx.push({ kind: 'explosion', a: { x: 0, y: 0, z: 0 }, b: { x: 0, y: 0, z: 0 }, ttl: 1 });
+    const rng = s.rng;
+    const ids = s.ships.map((x) => x.id);
+    const stats = { ...s.stats };
+    const wave = { ...s.wave };
+    const events = s.events.length;
+    const log = s.log.length;
+    dematerialise(s);
+    expect(s.rng).toBe(rng);
+    expect(s.ships.map((x) => x.id)).toEqual(ids);
+    expect(s.stats).toEqual(stats);
+    expect(s.wave).toEqual(wave);
+    expect(s.events).toHaveLength(events);
+    expect(s.log).toHaveLength(log);
+    expect(s.pirates).toEqual([]);
+    expect(s.fx).toEqual([]);
+    expect(s.containers).toEqual([]);
+  });
+
+  it('does not resolve the same wave again when focus returns and leaves', () => {
+    const s = underAttack();
+    dematerialise(s);
+    const killed = s.stats.piratesKilled;
+    const lost = s.stats.shipsLost;
+    const ids = s.ships.map((x) => x.id);
+    materialise(s);
+    const rng = s.rng;
+    dematerialise(s);
+    // One handover roll, including after coming back to Tier A and leaving again.
+    expect(s.events.filter((e) => e.kind === 'WaveRepelled')).toHaveLength(1);
+    expect(s.stats.piratesKilled).toBe(killed);
+    expect(s.stats.shipsLost).toBe(lost);
+    expect(s.ships.map((x) => x.id)).toEqual(ids);
+    expect(s.rng).toBe(rng);
+    expect(killed + lost).toBeGreaterThan(0);
+    expect(s.wave.active).toBe(false);
   });
 
   it('materialise puts launched ships back by the carrier and Tier A carries on', () => {

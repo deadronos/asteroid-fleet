@@ -14,7 +14,7 @@ Source of truth: `host.ts`, `localHost.ts`, `sim.worker.ts`, `runner.ts`, `proto
 
 - It pumps every `PUMP_MS = 25` ms, accumulates wall time × speed, and runs whole ticks. It catches up at most `MAX_CATCHUP_TICKS = 600` ticks (one minute). A longer gap, such as a background tab, goes through `settleOffline` instead.
 - Backpressure: at most `MAX_INFLIGHT = 4` unacknowledged pump-driven messages. The main thread replies `{t:'ack'}` after handling each one.
-- Tiering: carriers in the focused system are Tier A (full `stepOp`). The others are dematerialised to Tier B (`stepBackground`). `retier()` handles the transitions on a jump or a focus change.
+- Tiering: carriers in the focused system are Tier A (full `stepOp`). The others are dematerialised to Tier B (`stepBackground`). `retier()` handles the transitions on a jump or a focus change. An active wave is resolved at that handover, and the focus handler drains the events (#177).
 - `adopt(state)` installs a new run (load, import, prestige, challenge) and resets event merging. It also restarts the wall clock, so a pump that was stalled does not settle the new run for that gap (#189).
 
 ## Messages (`protocol.ts`)
