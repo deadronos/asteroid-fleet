@@ -22,7 +22,7 @@ export * from './worldgen';
 export * from './economy';
 export { SEVERITY, emit } from './events';
 
-/** Bump together with a `migrations[n]` step and a fixture. See README "Save migrations". */
+/** Bump together with a `migrations[n]` step and a fixture. See docs/agents/save-and-migrations.md. */
 export const SAVE_VERSION = 17;
 
 interface Carry {
