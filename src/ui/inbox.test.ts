@@ -114,7 +114,7 @@ describe('inbox filters', () => {
     ev('ShipLost', 4, { cls: 'drone', cause: 'destroyed' }, { carrierId: 1 }),
     ev('VeinFound', 3, { veins: 1 }, { carrierId: 0 }),
     ev('Legacy', 2, { text: 'Docked.' }, { carrierId: 0, severity: 'info' }),
-    ev('WelcomeBack', 1, { credits: 10 }, { carrierId: 1 }),
+    ev('WelcomeBack', 1, { credits: 10, seconds: 60, hidden: false }, { carrierId: 1 }),
   ];
 
   it('filters by carrier, keeping All as the whole list', () => {
