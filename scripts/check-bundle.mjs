@@ -8,18 +8,17 @@ const KB = 1024;
 const BUDGET = {
   // Everything index.html loads before the first frame (entry + modulepreloads + css).
   // The scene (three.js + r3f), research tree and settings menu are lazy chunks that load
-  // right after first paint (#41), so this covers just the HUD shell. Measured 109.6 kB (~6% headroom) with the Doctrine panel
-  // lazy (#134).
+  // right after first paint (#41), so this covers just the HUD shell. Measured 113.3 kB (~3% headroom) at v0.0.9.
   initial: 117 * KB, // was 116; challenge runs panel (#71). Was 115 before the Admiralty panel (#68)
   // Any single JS chunk; three.js is the largest.
   chunk: 200 * KB,
   // Worst-case download: everything except the sim you don't run. The sim ships twice, as the
   // Web Worker bundle and as the lazy main-thread fallback chunk (only fetched when the worker
   // fails); a user gets one of them, so the total counts the larger once, not both.
-  // Measured 441.8 kB at the time of writing (#134), so under 1% headroom. Lazy panels move
+  // Measured 448.0 kB at v0.0.9 (~0.9% headroom at 452). Lazy panels move
   // bytes out of `initial` but not out of the total; reclaiming it needs less shipped code,
   // e.g. dropping drei's unused DRACO/Meshopt loaders from the r3f chunk.
-  total: 448 * KB, // was 447: glTF carrier, panel view offset, far-ship min size (#124); was 446: v0.0.5 review fixes (modal stack, eval-free SimView, #151); was 445: colour tokens (#136) + shape-coded tactical icons (#125); was 440; shared accessible Modal and side-panel tabs (#119)
+  total: 452 * KB, // was 448: v0.0.9 fixes (turrets #162, #156-#159) tipped it over; was 447: glTF carrier, panel view offset, far-ship min size (#124); was 446: v0.0.5 review fixes (modal stack, eval-free SimView, #151); was 445: colour tokens (#136) + shape-coded tactical icons (#125); was 440; shared accessible Modal and side-panel tabs (#119)
 };
 
 const dist = 'dist';
