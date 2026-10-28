@@ -187,6 +187,14 @@ describe('supply routes (#80)', () => {
     expect(g.ops[1].carrier.h2).toBeGreaterThan(0);
   });
 
+  it('settles routes for whole seconds and drops the remainder (#185)', () => {
+    const g = pair(0);
+    route(g, 'h2', 1);
+    g.ops[0].carrier.h2 = 1000;
+    settleOffline(g, 40.9);
+    expect(g.routes[0].moved).toBe(40);
+  });
+
   it('keeps flowing while away (offline settlement)', () => {
     const make = settled;
     const g = make();

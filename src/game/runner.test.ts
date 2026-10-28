@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { apply } from '../sim/actions';
+import { CHALLENGES } from '../sim/modifiers';
 import { emit, focused, focusOp, newGame } from '../sim/state';
 import { stressGame } from '../sim/stress';
 import { step, stepSim } from '../sim/tick';
-import type { GameState } from '../sim/types';
+import type { ChallengeId, GameState, ShipMode } from '../sim/types';
 import { createLocalHost } from './localHost';
+import { SimRunner } from './runner';
 import { MODES, encodeFrame, type OutMsg } from './protocol';
 
 const TICK_MS = 100;
@@ -139,7 +141,78 @@ describe('sim runner', () => {
   });
 });
 
+function stalledRunner() {
+  let now = 0;
+  const out: OutMsg[] = [];
+  const runner = new SimRunner(
+    (m) => out.push(m),
+    () => now,
+  );
+  runner.handle({ t: 'init', state: newGame(2), now: 0, settle: false });
+  runner.stop();
+  now = 120_000;
+  return { runner, out };
+}
+
+function welcomedBack(out: OutMsg[]) {
+  return out.some((m) => m.t === 'events' && m.events.some((e) => e.kind === 'WelcomeBack'));
+}
+
+describe('a new run ignores a stalled pump clock (#189)', () => {
+  it('replace does not settle the gap that happened before it', () => {
+    const { runner, out } = stalledRunner();
+    out.length = 0;
+    runner.handle({ t: 'replace', state: newGame(8), epoch: 4 });
+    runner.pump();
+    expect(welcomedBack(out)).toBe(false);
+  });
+
+  it('prestige, admiralty and challenge do not settle that gap either', () => {
+    const id = Object.keys(CHALLENGES)[0] as ChallengeId;
+    for (const send of [
+      (runner: SimRunner) => runner.handle({ t: 'prestige' }),
+      (runner: SimRunner) => runner.handle({ t: 'admiralty' }),
+      (runner: SimRunner) => runner.handle({ t: 'challenge', id }),
+    ]) {
+      const { runner, out } = stalledRunner();
+      out.length = 0;
+      send(runner);
+      runner.pump();
+      expect(welcomedBack(out)).toBe(false);
+    }
+  });
+});
+
+const EVERY_MODE = [
+  'docked',
+  'idle',
+  'toAsteroid',
+  'mining',
+  'toDropoff',
+  'toBarge',
+  'toCarrier',
+  'station',
+  'escort',
+  'attack',
+  'patrol',
+  'repairing',
+  'retreat',
+  'recall',
+  'carried',
+] as const satisfies readonly ShipMode[];
+
 describe('frame encoding', () => {
+  it('round-trips every ShipMode (#181)', () => {
+    const op = focusOp(newGame(1));
+    const ship = op.ships[0];
+    const at = op.ships.indexOf(ship);
+    for (const mode of EVERY_MODE) {
+      ship.mode = mode;
+      const { frame } = encodeFrame(op);
+      expect(MODES[frame.modes[at]]).toBe(mode);
+    }
+  });
+
   it('round-trips positions exactly and every mode', () => {
     const s = stressGame(200, 100, 10);
     for (let i = 0; i < 20; i++) stepSim(s);

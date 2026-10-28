@@ -113,7 +113,6 @@ export class SimRunner {
       case 'replace':
         this.epoch = msg.epoch;
         this.adopt(msg.state);
-        this.acc = 0;
         this.sendState();
         this.sendFrame();
         return;
@@ -177,9 +176,13 @@ export class SimRunner {
     if (this.dirty && !saturated && now - this.lastUi > 1000 / UI_HZ) this.sendState(now, true);
   }
 
-  /** A new state (a load, an import, a new run) starts with no open merges. */
+  /**
+   * A new state (a load, an import, a new run) starts with no open merges.
+   * The wall clock restarts too, so a pump that was stalled does not settle the new run (#189).
+   */
   private adopt(state: GameState) {
     this.state = state;
+    this.resetClock();
     this.resync();
     this.fieldsAt = null;
     this.events.reset();

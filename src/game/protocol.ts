@@ -31,6 +31,7 @@ export const MODES: ShipMode[] = [
   'repairing',
   'retreat',
   'recall',
+  'carried',
 ];
 const MODE_INDEX = new Map(MODES.map((m, i) => [m, i]));
 

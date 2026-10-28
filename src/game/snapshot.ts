@@ -77,7 +77,7 @@ export type FocusPart = Omit<Operation, PackedKey> & {
   asteroids: Float64Array;
 };
 
-// All modes, unlike the frame's MODES, which leaves out `carried`.
+// All modes, in the same order as the frame codec's `MODES` (#181).
 const SHIP_MODES: ShipMode[] = [
   'docked',
   'idle',

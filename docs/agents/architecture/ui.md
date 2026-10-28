@@ -17,7 +17,7 @@ Source of truth: `App.tsx`, `../game/engine.ts` (`useGame`), `hotkeys.ts`, `Moda
 
 ## Hotkeys and modals
 
-- All shortcuts go through the central registry in `hotkeys.ts` (`useHotkeys(list)`). It powers the `?` help overlay, so don't add raw `keydown` listeners.
+- All shortcuts go through the central registry in `hotkeys.ts` (`useHotkeys(list)`). It powers the `?` help overlay, so don't add raw `keydown` listeners. A held key does not repeat, so pause, tactical, the star map and help do not flip while the key is down (#188).
 - Modals use the shared accessible `Modal`, which pushes onto a modal stack (`pushModal`, `isTopModal`) so only the top one handles Escape and keys.
 - Side tabs use `Tabs` (ARIA tablist).
 

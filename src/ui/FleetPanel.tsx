@@ -322,13 +322,15 @@ function ShipDetail({ id }: { id: number }) {
           {SHIP_STATS[ship.cls].name} #{ship.id}
         </span>
         <span className="blurb grow">{SHIP_STATS[ship.cls].role}</span>
-        <button
-          disabled={ship.mode !== 'docked'}
-          onClick={() => engine.dispatch({ type: 'scrapShip', shipId: id })}
-          title="Scrap for 50 % of base cost (docked only)"
-        >
-          Scrap
-        </button>
+        {ship.mode !== 'carried' && (
+          <button
+            disabled={ship.mode !== 'docked'}
+            onClick={() => engine.dispatch({ type: 'scrapShip', shipId: id })}
+            title="Scrap for 50 % of base cost (docked only)"
+          >
+            Scrap
+          </button>
+        )}
       </div>
       <div className="hint">
         {modeLabel(ship)} · hull {Math.round(ship.hull)}/{Math.round(maxHull(s, ship.cls))}

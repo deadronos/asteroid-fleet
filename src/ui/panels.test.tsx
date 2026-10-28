@@ -72,6 +72,15 @@ describe('Hud', () => {
 });
 
 describe('FleetPanel', () => {
+  it('hides Scrap for a drone carried in a barge (#181)', async () => {
+    const s = game();
+    for (const ship of focused(s).ships) ship.mode = 'carried';
+    const m = await mount(<FleetPanel />, s);
+    cleanup = m.cleanup;
+    await click(m.el.querySelector<HTMLElement>('.ship-tile')!);
+    expect(m.button(/Scrap/)).toBeUndefined();
+  });
+
   it('disables +slot and hangar purchases when short of credits, and buys a slot when rich', async () => {
     const poor = game();
     focused(poor).credits = 0;

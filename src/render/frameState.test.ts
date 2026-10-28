@@ -31,6 +31,14 @@ describe('fillFleetFrame', () => {
     expect(f.entityOf(2)).toBe(-1);
   });
 
+  it('skips a carried drone the way it skips a docked ship (#181)', () => {
+    const ships = [ship(1, 'drone', 10, 'carried'), ship(2, 'drone', 5, 'idle')];
+    const f = fillFleetFrame(ships, [], prev, 1);
+    expect(f.count).toBe(1);
+    expect(Array.from(f.ids.slice(0, 1))).toEqual([2]);
+    expect(Array.from(f.shipEntity.slice(0, 2))).toEqual([-1, 0]);
+  });
+
   it('resets between frames', () => {
     const f = fillFleetFrame([ship(1, 'drone', 1)], [], prev, 1);
     expect(f.count).toBe(1);

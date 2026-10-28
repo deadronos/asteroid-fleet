@@ -65,7 +65,9 @@ export function fillFleetFrame(
   };
   for (let k = 0; k < ships.length && k < MAX_ENTITIES; k++) {
     const sh = ships[k];
-    out.shipEntity[k] = sh.mode === 'docked' ? -1 : put(sh, CLASS_INDEX[sh.cls]);
+    // A carried drone rides in a barge, so it has no place of its own on the map (#181).
+    out.shipEntity[k] =
+      sh.mode === 'docked' || sh.mode === 'carried' ? -1 : put(sh, CLASS_INDEX[sh.cls]);
   }
   for (const p of pirates) put(p, PIRATE_CLASS);
   out.count = n;

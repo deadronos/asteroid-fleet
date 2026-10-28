@@ -15,7 +15,7 @@ Source of truth: `host.ts`, `localHost.ts`, `sim.worker.ts`, `runner.ts`, `proto
 - It pumps every `PUMP_MS = 25` ms, accumulates wall time × speed, and runs whole ticks. It catches up at most `MAX_CATCHUP_TICKS = 600` ticks (one minute). A longer gap, such as a background tab, goes through `settleOffline` instead.
 - Backpressure: at most `MAX_INFLIGHT = 4` unacknowledged pump-driven messages. The main thread replies `{t:'ack'}` after handling each one.
 - Tiering: carriers in the focused system are Tier A (full `stepOp`). The others are dematerialised to Tier B (`stepBackground`). `retier()` handles the transitions on a jump or a focus change.
-- `adopt(state)` installs a new run (load, import, prestige, challenge) and resets event merging.
+- `adopt(state)` installs a new run (load, import, prestige, challenge) and resets event merging. It also restarts the wall clock, so a pump that was stalled does not settle the new run for that gap (#189).
 
 ## Messages (`protocol.ts`)
 
@@ -27,7 +27,7 @@ Source of truth: `host.ts`, `localHost.ts`, `sim.worker.ts`, `runner.ts`, `proto
   - `error`: a refused command's message.
   - `snapshot`: the full `GameState`, used by the save path.
 - `epoch`: a `replace` bumps the run generation. Event batches carry it, and the engine drops stale ones so an in-flight message cannot toast the previous run. `save()` checks it too: a `snapshot` requested before the `replace` holds the old run and is not written (#170).
-- Adding a ship mode means appending to `MODES`. Adding snapshot data means extending `encodeSnapshot` and `applySnapshot` together; `snapshot.test.ts` round-trips them.
+- Adding a ship mode means appending to `MODES` and to the snapshot's mode list. `carried` is in both; a frame that omits it draws a barge drone as docked until the next state (#181). Adding snapshot data means extending `encodeSnapshot` and `applySnapshot` together; `snapshot.test.ts` round-trips them.
 
 ## Events and toasts
 
