@@ -18,8 +18,6 @@ Every schema change needs all three:
 
 A new `Operation` or `GameState` field also needs the `OP_KEYS` / `GAME_KEYS` entry and `pnpm run gen:view` (see [architecture/sim.md](architecture/sim.md)).
 
-Known gap: there are no fixtures for v11, v12 or v16, so the 11→12, 12→13 and 16→17 steps are only covered by the chained runs from older fixtures.
-
 ## Version history
 
 | Version | Change                                                                                                                                                                                                                                                                                                                                 |
