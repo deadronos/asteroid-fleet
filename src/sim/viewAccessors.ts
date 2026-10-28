@@ -283,4 +283,10 @@ export class SimView {
   set fx(v: Operation['fx']) {
     this.op.fx = v;
   }
+  get noCoverAt(): Operation['noCoverAt'] {
+    return this.op.noCoverAt;
+  }
+  set noCoverAt(v: Operation['noCoverAt']) {
+    this.op.noCoverAt = v;
+  }
 }

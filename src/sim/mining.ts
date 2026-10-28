@@ -1,6 +1,13 @@
 // Mining and logistics: drones, barges, haulers and gas harvesters.
 
-import { DOCK_RADIUS, DRILL_VALUE, H2_STORM_YIELD, LASER_RATE, VEIN_BONUS } from './config';
+import {
+  COVER_BACKOFF,
+  DOCK_RADIUS,
+  DRILL_VALUE,
+  H2_STORM_YIELD,
+  LASER_RATE,
+  VEIN_BONUS,
+} from './config';
 import {
   CARRIER,
   card,
@@ -239,6 +246,10 @@ export function drone(s: Sim, ship: Ship, dt: number, ctx: Ctx, mining: 'greedy'
     // Cover only matters while pirates are about; otherwise an empty cover would idle the fleet (#156).
     if (!a && mining === 'safe' && s.pirates.length === 0)
       a = pickAsteroid(s, ship, ctx, 'greedy') ?? undefined;
+    if (!a && mining === 'safe' && ship.cargo === 0 && ship.cls === 'drone') {
+      s.noCoverAt = s.time;
+      ship.idleUntil = s.time + COVER_BACKOFF;
+    }
     if (!a) {
       const bay = bayBarge(ship, ctx);
       if (ship.cargo > 0) ship.mode = 'toCarrier';

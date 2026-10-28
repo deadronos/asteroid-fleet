@@ -174,6 +174,8 @@ function wantsLaunch(s: Sim, ship: Ship, ctx: Ctx): boolean {
       return sys.gasGiant && lvl(s, 'fusion') > 0 && s.pirates.length === 0;
     case 'repair':
       return s.ships.some((x) => x.mode !== 'docked' && x.hull < maxHull(s, x.cls) * 0.85);
+    case 'drone':
+      return !ship.idleUntil || s.time >= ship.idleUntil;
     default:
       return true;
   }
