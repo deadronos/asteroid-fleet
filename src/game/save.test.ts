@@ -12,9 +12,12 @@ import saveV7 from './fixtures/save-v7.json';
 import saveV8 from './fixtures/save-v8.json';
 import saveV9 from './fixtures/save-v9.json';
 import saveV10 from './fixtures/save-v10.json';
+import saveV11 from './fixtures/save-v11.json';
+import saveV12 from './fixtures/save-v12.json';
 import saveV13 from './fixtures/save-v13.json';
 import saveV14 from './fixtures/save-v14.json';
 import saveV15 from './fixtures/save-v15.json';
+import saveV16 from './fixtures/save-v16.json';
 import { set } from 'idb-keyval';
 import { applyMigrationSteps, migrate, type SaveBlob } from './migrate';
 import {
@@ -352,9 +355,12 @@ describe('migrate', () => {
     ['v8', saveV8],
     ['v9', saveV9],
     ['v10', saveV10],
+    ['v11', saveV11],
+    ['v12', saveV12],
     ['v13', saveV13],
     ['v14', saveV14],
     ['v15', saveV15],
+    ['v16', saveV16],
   ])('a migrated %s fixture keeps running through step()', (_, fixture) => {
     const r = migrate(fixture);
     expect(r.ok).toBe(true);
@@ -386,6 +392,43 @@ describe('migrate', () => {
     expect(again.ok).toBe(true);
     if (!again.ok) return;
     expect(again.state.ops[0].warp).toEqual({ targetSystem: 1, charge: 7, total: 7 });
+  });
+
+  it('migrates a v11 fixture to v12 with empty per-carrier alert rules (#79)', () => {
+    expect(saveV11.version).toBe(11);
+    expect('alerts' in saveV11).toBe(false);
+    const r = migrate(saveV11);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.state.version).toBe(SAVE_VERSION);
+    expect(r.state.alerts).toEqual({ fleet: {}, byCarrier: {} });
+    expect(r.state.hulls).toEqual(['standard']);
+  });
+
+  it('migrates a v12 fixture to v13 with zero Admiralty Marks (#68)', () => {
+    expect(saveV12.version).toBe(12);
+    expect('marks' in saveV12).toBe(false);
+    expect('admiralties' in saveV12.lifetime).toBe(false);
+    const r = migrate(saveV12);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.state.version).toBe(SAVE_VERSION);
+    expect(r.state.marks).toBe(0);
+    expect(r.state.lifetime).toMatchObject({
+      prestiges: saveV12.lifetime.prestiges,
+      admiralties: 0,
+      marksEarned: 0,
+    });
+  });
+
+  it('migrates a v16 fixture to v17, filling warp.total from the remaining charge', () => {
+    expect(saveV16.version).toBe(16);
+    expect(saveV16.ops[0].warp).toEqual({ targetSystem: 1, charge: 7 });
+    const r = migrate(saveV16);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.state.version).toBe(SAVE_VERSION);
+    expect(r.state.ops[0].warp).toEqual({ targetSystem: 1, charge: 7, total: 7 });
   });
 
   it('applies one migration step per version, in order', () => {
