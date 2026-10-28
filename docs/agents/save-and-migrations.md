@@ -20,24 +20,22 @@ A new `Operation` or `GameState` field also needs the `OP_KEYS` / `GAME_KEYS` en
 
 ## Version history
 
-| Version | Change                                                                                                                                                                                                                                                                                                                                 |
-| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| v2      | Automation settings and a per-hangar auto-buy target (#11).                                                                                                                                                                                                                                                                            |
-| v3      | `fields`: per-system depletion records (#14). Leaving a system keeps `[index, oreFraction, respawn]` for each rock that is not full. On return the field is regenerated from the seed, the record applied, and refill added for the time away (`FIELD_REFILL_SECS`). All records stay under 16 KB, tested in `src/sim/fields.test.ts`. |
-| v4      | `containers` (cargo dropped by destroyed barges, salvaged by haulers until it decays) and `Ship.bargeId` (`-1` for the carrier) (#13).                                                                                                                                                                                                 |
-| v5      | `Ship.modules` (at most `MODULE_SLOTS[cls]`) and `recon` (surveyed clusters, rich veins, charted hazards; cleared on every jump) (#9).                                                                                                                                                                                                 |
-| v6      | `miningIncomeAvg` is guaranteed finite. Older saves lacked it, so offline settlement paid nothing (#38).                                                                                                                                                                                                                               |
-| v7      | Every asteroid draws its rare-ore roll whether or not rare ore is researched, so fields generate differently. Old `fields` records are dropped (#40).                                                                                                                                                                                  |
-| v8      | Typed events replace plain-text log lines. Old lines keep their text (#72).                                                                                                                                                                                                                                                            |
-| v9      | Condition/action cards replace the fixed rules, and each rule becomes its preset card (#82).                                                                                                                                                                                                                                           |
-| v10     | Per-carrier state moves into `ops: Operation[]`, and the one carrier becomes operation `0` (#75).                                                                                                                                                                                                                                      |
-| v11     | Hull classes: `GameState.hulls`, `Carrier.hullClass = 'standard'` (#65).                                                                                                                                                                                                                                                               |
-| v12     | Per-carrier alert rules in Doctrine (#79).                                                                                                                                                                                                                                                                                             |
-| v13     | Admiralty Marks and the second prestige layer (#68).                                                                                                                                                                                                                                                                                   |
-| v14     | Admiralty upgrade shop (#69).                                                                                                                                                                                                                                                                                                          |
-| v15     | Run modifiers and challenge runs: `modifiers`, `challenge`, `challengesDone` (#71).                                                                                                                                                                                                                                                    |
-| v16     | Supply routes between carriers: `routes` (#80).                                                                                                                                                                                                                                                                                        |
-| v17     | A jump in progress stores its full charge time, `warp.total`.                                                                                                                                                                                                                                                                          |
+- **v2**: Automation settings and a per-hangar auto-buy target (#11).
+- **v3**: `fields`: per-system depletion records (#14). Leaving a system keeps `[index, oreFraction, respawn]` for each rock that is not full. On return the field is regenerated from the seed, the record applied, and refill added for the time away (`FIELD_REFILL_SECS`). All records stay under 16 KB, tested in `src/sim/fields.test.ts`.
+- **v4**: `containers` (cargo dropped by destroyed barges, salvaged by haulers until it decays) and `Ship.bargeId` (`-1` for the carrier) (#13).
+- **v5**: `Ship.modules` (at most `MODULE_SLOTS[cls]`) and `recon` (surveyed clusters, rich veins, charted hazards; cleared on every jump) (#9).
+- **v6**: `miningIncomeAvg` is guaranteed finite. Older saves lacked it, so offline settlement paid nothing (#38).
+- **v7**: Every asteroid draws its rare-ore roll whether or not rare ore is researched, so fields generate differently. Old `fields` records are dropped (#40).
+- **v8**: Typed events replace plain-text log lines. Old lines keep their text (#72).
+- **v9**: Condition/action cards replace the fixed rules, and each rule becomes its preset card (#82).
+- **v10**: Per-carrier state moves into `ops: Operation[]`, and the one carrier becomes operation `0` (#75).
+- **v11**: Hull classes: `GameState.hulls`, `Carrier.hullClass = 'standard'` (#65).
+- **v12**: Per-carrier alert rules in Doctrine (#79).
+- **v13**: Admiralty Marks and the second prestige layer (#68).
+- **v14**: Admiralty upgrade shop (#69).
+- **v15**: Run modifiers and challenge runs: `modifiers`, `challenge`, `challengesDone` (#71).
+- **v16**: Supply routes between carriers: `routes` (#80).
+- **v17**: A jump in progress stores its full charge time, `warp.total`.
 
 ## Storage
 
