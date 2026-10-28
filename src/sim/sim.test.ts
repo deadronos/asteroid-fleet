@@ -3,12 +3,11 @@ import { order, prestige, researchPayout, settleOffline, shipCost } from './acti
 import { fits, neighbours, occupancy } from './hangar';
 import { SOLAR_RATE } from './config';
 import { lvl } from './research';
-import { maxEnergy, upkeepRate, stateOf } from './state';
+import { addCarrier, maxEnergy, upkeepRate, stateOf } from './state';
 import { stepSim } from './tick';
 import type { Sim } from './types';
 import { game } from './testing';
 import { formatEvent } from '../ui/events';
-import { bind } from './view';
 
 const run = (s: Sim, seconds: number) => {
   for (let i = 0; i < seconds * 10; i++) stepSim(s);
@@ -117,9 +116,18 @@ describe('simulation', () => {
     s.miningIncomeAvg = 10;
     const g = stateOf(s);
     settleOffline(g, 3600, true);
-    const evs = g.ops.flatMap((o) => bind(g, o).events).filter((e) => e.kind === 'WelcomeBack');
+    const evs = g.events.filter((e) => e.kind === 'WelcomeBack');
     expect(evs.length).toBe(1);
     expect(evs[0].data).toMatchObject({ seconds: 3600, hidden: true });
+  });
+
+  it('puts the WelcomeBack on the focused carrier', () => {
+    const g = stateOf(game(9));
+    addCarrier(g);
+    g.focusId = g.ops[1].id;
+    settleOffline(g, 3600);
+    const evs = g.events.filter((e) => e.kind === 'WelcomeBack');
+    expect(evs.map((e) => e.carrierId)).toEqual([g.ops[1].id]);
   });
 
   it('reports an idle fleet when nothing was earned', () => {
@@ -127,7 +135,7 @@ describe('simulation', () => {
     s.miningIncomeAvg = 0;
     const g = stateOf(s);
     settleOffline(g, 3600);
-    const ev = g.ops.flatMap((o) => bind(g, o).events).find((e) => e.kind === 'WelcomeBack')!;
+    const ev = g.events.find((e) => e.kind === 'WelcomeBack')!;
     expect(ev.data).toMatchObject({ credits: 0 });
     expect(formatEvent(ev)).toMatch(/idle/);
   });

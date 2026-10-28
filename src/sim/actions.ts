@@ -29,6 +29,7 @@ import {
   createShip,
   emit,
   focused,
+  focusOp,
   jumpCost,
   maxEnergy,
   newGame,
@@ -482,9 +483,8 @@ export function settleOffline(
     report.rebuilt += r.rebuilt;
   }
   // One summary for the whole settlement, on the focused carrier's log.
-  const first = g.ops[0];
-  if (first)
-    emit(bind(g, first), 'WelcomeBack', {
+  if (g.ops.length)
+    emit(bind(g, focusOp(g)), 'WelcomeBack', {
       credits: Math.round(report.credits),
       seconds: t,
       hidden,
