@@ -78,6 +78,8 @@ export class SimRunner {
         if (!this.state || !this.state.ops.some((op) => op.id === msg.carrierId)) return;
         this.state.focusId = msg.carrierId;
         this.retier();
+        // A carrier leaving Tier A may have just resolved a wave (#177).
+        this.sendEvents();
         this.sendState();
         this.sendFrame();
         return;
