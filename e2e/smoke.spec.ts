@@ -21,9 +21,12 @@ test('app loads, renders the canvas, and opens settings without console errors',
 
   // First visit opens the help modal, which blocks the rest of the UI.
   await page.getByRole('button', { name: 'Take command' }).click();
+  // As in openApp: a slow start otherwise eats the 5 s below.
+  await engineReady(page);
 
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+  // Settings is a lazy chunk; on a busy CI runner the idle-time preload may not have run yet.
+  await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible({ timeout: 15_000 });
 
   // The sim runs in a worker under the Pages base path and keeps the mirror moving.
   const sim = () =>
