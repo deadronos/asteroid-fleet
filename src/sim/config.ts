@@ -10,7 +10,7 @@ import {
   type ShipClass,
   type Stance,
   type StanceSwitch,
-} from "./types";
+} from './types';
 
 export const TICK_HZ = 10;
 export const DT = 1 / TICK_HZ;
@@ -32,9 +32,9 @@ export interface ShipStats {
 
 export const SHIP_STATS: Record<ShipClass, ShipStats> = {
   drone: {
-    name: "Mining drone",
-    short: "Drone",
-    role: "Mines ore, small load",
+    name: 'Mining drone',
+    short: 'Drone',
+    role: 'Mines ore, small load',
     slots: 1,
     cost: 40,
     hull: 20,
@@ -43,12 +43,12 @@ export const SHIP_STATS: Record<ShipClass, ShipStats> = {
     damage: 0,
     range: 0,
     sensor: 0,
-    color: "#56b4e9",
+    color: '#56b4e9',
   },
   barge: {
-    name: "Mining barge",
-    short: "Barge",
-    role: "Mobile depot, compresses ore",
+    name: 'Mining barge',
+    short: 'Barge',
+    role: 'Mobile depot, compresses ore',
     slots: 4,
     cost: 600,
     hull: 220,
@@ -57,12 +57,12 @@ export const SHIP_STATS: Record<ShipClass, ShipStats> = {
     damage: 0,
     range: 0,
     sensor: 0,
-    color: "#e69f00",
+    color: '#e69f00',
   },
   hauler: {
-    name: "Hauler",
-    short: "Hauler",
-    role: "Shuttles barge to carrier",
+    name: 'Hauler',
+    short: 'Hauler',
+    role: 'Shuttles barge to carrier',
     slots: 2,
     cost: 280,
     hull: 90,
@@ -71,12 +71,12 @@ export const SHIP_STATS: Record<ShipClass, ShipStats> = {
     damage: 0,
     range: 0,
     sensor: 0,
-    color: "#f0e442",
+    color: '#f0e442',
   },
   fighter: {
-    name: "Fighter",
-    short: "Fighter",
-    role: "Escort and intercept",
+    name: 'Fighter',
+    short: 'Fighter',
+    role: 'Escort and intercept',
     slots: 2,
     cost: 240,
     hull: 60,
@@ -85,12 +85,12 @@ export const SHIP_STATS: Record<ShipClass, ShipStats> = {
     damage: 9,
     range: 9,
     sensor: 55,
-    color: "#d55e00",
+    color: '#d55e00',
   },
   scout: {
-    name: "Scout",
-    short: "Scout",
-    role: "Finds rich veins, early warning",
+    name: 'Scout',
+    short: 'Scout',
+    role: 'Finds rich veins, early warning',
     slots: 1,
     cost: 200,
     hull: 25,
@@ -99,12 +99,12 @@ export const SHIP_STATS: Record<ShipClass, ShipStats> = {
     damage: 0,
     range: 0,
     sensor: 80,
-    color: "#cc79a7",
+    color: '#cc79a7',
   },
   repair: {
-    name: "Repair drone",
-    short: "Repair",
-    role: "Heals barges and fighters",
+    name: 'Repair drone',
+    short: 'Repair',
+    role: 'Heals barges and fighters',
     slots: 1,
     cost: 320,
     hull: 35,
@@ -113,12 +113,12 @@ export const SHIP_STATS: Record<ShipClass, ShipStats> = {
     damage: 0,
     range: 6,
     sensor: 60,
-    color: "#2fd6a0",
+    color: '#2fd6a0',
   },
   harvester: {
-    name: "Gas harvester",
-    short: "Harvester",
-    role: "Skims H2 for fusion",
+    name: 'Gas harvester',
+    short: 'Harvester',
+    role: 'Skims H2 for fusion',
     slots: 3,
     cost: 800,
     hull: 120,
@@ -127,7 +127,7 @@ export const SHIP_STATS: Record<ShipClass, ShipStats> = {
     damage: 0,
     range: 0,
     sensor: 0,
-    color: "#b8a6ff",
+    color: '#b8a6ff',
   },
 };
 
@@ -150,32 +150,32 @@ export interface HangarTypeDef {
 
 export const HANGAR_TYPES: Record<HangarType, HangarTypeDef> = {
   launch: {
-    name: "Launch bay",
-    blurb: "Fast launch",
+    name: 'Launch bay',
+    blurb: 'Fast launch',
     launchInterval: 0.35,
     repairRate: 0.04,
     storage: 0,
     tier: 1,
   },
   drydock: {
-    name: "Dry dock",
-    blurb: "Fast repairs",
+    name: 'Dry dock',
+    blurb: 'Fast repairs',
     launchInterval: 1.2,
     repairRate: 0.2,
     storage: 0,
     tier: 2,
   },
   cargo: {
-    name: "Cargo bay",
-    blurb: "+1500 carrier ore storage",
+    name: 'Cargo bay',
+    blurb: '+1500 carrier ore storage',
     launchInterval: 1.0,
     repairRate: 0.04,
     storage: 1500,
     tier: 1,
   },
   fabricator: {
-    name: "Fabrication bay",
-    blurb: "Reserve rebuilds 40 % faster",
+    name: 'Fabrication bay',
+    blurb: 'Reserve rebuilds 40 % faster',
     launchInterval: 0.8,
     repairRate: 0.08,
     storage: 0,
@@ -187,15 +187,12 @@ export const HANGAR_TYPES: Record<HangarType, HangarTypeDef> = {
 /** What to do to unlock content gated behind a system tier (single source for every hint). */
 export function tierHint(tier: number): string {
   return tier >= 3
-    ? "Warp to a Deep space system (Star map / Carrier tab)"
-    : "Warp to a Frontier system (Star map / Carrier tab)";
+    ? 'Warp to a Deep space system (Star map / Carrier tab)'
+    : 'Warp to a Frontier system (Star map / Carrier tab)';
 }
 
 /** Why a hangar type can't be installed yet, or null. */
-export function hangarLocked(
-  type: HangarType,
-  furthestTier: number,
-): string | null {
+export function hangarLocked(type: HangarType, furthestTier: number): string | null {
   const t = HANGAR_TYPES[type].tier;
   if (furthestTier >= t) return null;
   return `${HANGAR_TYPES[type].name}s: ${tierHint(t)}`;
@@ -220,10 +217,10 @@ export const NEW_HANGAR_COST = (count: number) => {
 export const CARRIER_COST = (owned: number) => 20000 * 6 ** (owned - 1);
 
 export const DEFAULT_STANCE: Stance = {
-  engagement: "defensive",
-  underFire: "retreatHull",
+  engagement: 'defensive',
+  underFire: 'retreatHull',
   retreatAt: 0.3,
-  mining: "safe",
+  mining: 'safe',
 };
 
 // ---------- Rule cards (#82) ----------
@@ -255,12 +252,7 @@ const frac = (min: number, max: number, def: number): ValueDef => ({
   pct: true,
   def,
 });
-const kms = (
-  min: number,
-  max: number,
-  step: number,
-  def: number,
-): ValueDef => ({
+const kms = (min: number, max: number, step: number, def: number): ValueDef => ({
   min,
   max,
   step,
@@ -290,128 +282,116 @@ export interface ActionDef {
 }
 
 export const ACTION_DEFS: Record<ActionKind, ActionDef> = {
-  stance: { unlock: "fightersEscortOnWave", classes: SHIP_CLASSES },
-  fallBack: { unlock: "bargeFallBack", classes: SHIP_CLASSES },
-  unloadAtBarge: { unlock: "droneUnloadAtBarge", classes: ["drone"] },
-  callHauler: { unlock: "bargeCallHauler", classes: ["barge"] },
-  park: { unlock: "haulerPark", classes: ["hauler"] },
-  recall: { unlock: "recallOnLowShields", classes: SHIP_CLASSES },
-  shelter: { unlock: "harvesterStormShelter", classes: ["harvester"] },
-  reserveWarp: { unlock: "reserveWarpEnergy", classes: null },
+  stance: { unlock: 'fightersEscortOnWave', classes: SHIP_CLASSES },
+  fallBack: { unlock: 'bargeFallBack', classes: SHIP_CLASSES },
+  unloadAtBarge: { unlock: 'droneUnloadAtBarge', classes: ['drone'] },
+  callHauler: { unlock: 'bargeCallHauler', classes: ['barge'] },
+  park: { unlock: 'haulerPark', classes: ['hauler'] },
+  recall: { unlock: 'recallOnLowShields', classes: SHIP_CLASSES },
+  shelter: { unlock: 'harvesterStormShelter', classes: ['harvester'] },
+  reserveWarp: { unlock: 'reserveWarpEnergy', classes: null },
 };
 
 export const STANCE_SWITCHES: StanceSwitch[] = [
-  "engagement:aggressive",
-  "engagement:defensive",
-  "engagement:escort",
-  "engagement:passive",
-  "underFire:stand",
-  "underFire:retreatHull",
-  "underFire:retreatCargo",
-  "mining:greedy",
-  "mining:safe",
+  'engagement:aggressive',
+  'engagement:defensive',
+  'engagement:escort',
+  'engagement:passive',
+  'underFire:stand',
+  'underFire:retreatHull',
+  'underFire:retreatCargo',
+  'mining:greedy',
+  'mining:safe',
 ];
 
 export interface PresetDef {
-  card: Pick<RuleCard, "scope" | "when" | "then">;
+  card: Pick<RuleCard, 'scope' | 'when' | 'then'>;
   /** Index of the condition whose value the old rule's `param` set. */
   param?: number;
 }
 
 const preset = (
-  scope: RuleCard["scope"],
-  when: RuleCard["when"],
-  then: RuleCard["then"],
+  scope: RuleCard['scope'],
+  when: RuleCard['when'],
+  then: RuleCard['then'],
   param?: number,
 ): PresetDef => ({ card: { scope, when, then }, param });
-const cls = (c: ShipClass): RuleCard["scope"] => ({ kind: "class", cls: c });
-const FLEET: RuleCard["scope"] = { kind: "fleet" };
-const ALWAYS = [{ kind: "always" as const }];
+const cls = (c: ShipClass): RuleCard['scope'] => ({ kind: 'class', cls: c });
+const FLEET: RuleCard['scope'] = { kind: 'fleet' };
+const ALWAYS = [{ kind: 'always' as const }];
 
 /** The fixed rules from before #82, as cards. Behaviour is identical (cards.golden.test.ts). */
 export const PRESETS: Record<RuleId, PresetDef> = {
-  fightersEscortOnWave: preset(cls("fighter"), [{ kind: "wave" }], {
-    kind: "stance",
-    to: "engagement:escort",
+  fightersEscortOnWave: preset(cls('fighter'), [{ kind: 'wave' }], {
+    kind: 'stance',
+    to: 'engagement:escort',
   }),
   bargeCallHauler: preset(
-    cls("barge"),
-    [{ kind: "cargoAbove", value: 0.8 }],
-    { kind: "callHauler" },
+    cls('barge'),
+    [{ kind: 'cargoAbove', value: 0.8 }],
+    { kind: 'callHauler' },
     0,
   ),
-  bargeFallBack: preset(cls("barge"), [{ kind: "pirateWithin", value: 28 }], {
-    kind: "fallBack",
+  bargeFallBack: preset(cls('barge'), [{ kind: 'pirateWithin', value: 28 }], {
+    kind: 'fallBack',
   }),
   droneUnloadAtBarge: preset(
-    cls("drone"),
-    [{ kind: "carrierFarther", value: 15 }],
-    { kind: "unloadAtBarge" },
+    cls('drone'),
+    [{ kind: 'carrierFarther', value: 15 }],
+    { kind: 'unloadAtBarge' },
     0,
   ),
-  haulerPark: preset(cls("hauler"), ALWAYS, { kind: "park" }),
+  haulerPark: preset(cls('hauler'), ALWAYS, { kind: 'park' }),
   recallOnLowShields: preset(
     FLEET,
-    [{ kind: "shieldBelow", value: 0.2 }, { kind: "pirateWithin" }],
-    { kind: "recall" },
+    [{ kind: 'shieldBelow', value: 0.2 }, { kind: 'pirateWithin' }],
+    { kind: 'recall' },
     0,
   ),
-  reserveWarpEnergy: preset(FLEET, ALWAYS, { kind: "reserveWarp" }),
-  harvesterStormShelter: preset(cls("harvester"), [{ kind: "storm" }], {
-    kind: "shelter",
+  reserveWarpEnergy: preset(FLEET, ALWAYS, { kind: 'reserveWarp' }),
+  harvesterStormShelter: preset(cls('harvester'), [{ kind: 'storm' }], {
+    kind: 'shelter',
   }),
 };
 
-export const STARTER_RULES: RuleId[] = [
-  "droneUnloadAtBarge",
-  "bargeCallHauler",
-  "haulerPark",
-];
+export const STARTER_RULES: RuleId[] = ['droneUnloadAtBarge', 'bargeCallHauler', 'haulerPark'];
 
 // ---------- Zones ----------
 
 export const TIER_NAMES = {
-  1: "Starter",
-  2: "Frontier",
-  3: "Deep space",
+  1: 'Starter',
+  2: 'Frontier',
+  3: 'Deep space',
 } as const;
 
-export const ORE_BY_TIER: Record<
-  number,
-  { name: string; value: number; weight: number }[]
-> = {
+export const ORE_BY_TIER: Record<number, { name: string; value: number; weight: number }[]> = {
   1: [
-    { name: "Ferrite", value: 1, weight: 6 },
-    { name: "Silicate", value: 2, weight: 3 },
-    { name: "Cobaltite", value: 4, weight: 1 },
+    { name: 'Ferrite', value: 1, weight: 6 },
+    { name: 'Silicate', value: 2, weight: 3 },
+    { name: 'Cobaltite', value: 4, weight: 1 },
   ],
   2: [
-    { name: "Cobaltite", value: 4, weight: 5 },
-    { name: "Iridium", value: 8, weight: 3 },
-    { name: "Palladium", value: 14, weight: 1 },
+    { name: 'Cobaltite', value: 4, weight: 5 },
+    { name: 'Iridium', value: 8, weight: 3 },
+    { name: 'Palladium', value: 14, weight: 1 },
   ],
   3: [
-    { name: "Palladium", value: 14, weight: 4 },
-    { name: "Xenotite", value: 28, weight: 3 },
-    { name: "Void crystal", value: 60, weight: 1 },
+    { name: 'Palladium', value: 14, weight: 4 },
+    { name: 'Xenotite', value: 28, weight: 3 },
+    { name: 'Void crystal', value: 60, weight: 1 },
   ],
 };
 
 export const ZONE_UNLOCKS: Record<number, ShipClass[]> = {
-  1: ["drone", "barge", "hauler", "scout"],
-  2: ["fighter", "repair"],
+  1: ['drone', 'barge', 'hauler', 'scout'],
+  2: ['fighter', 'repair'],
   3: [],
 };
 /** Deep space also unlocks the fabrication bay (see HANGAR_TYPES tiers). */
 export const ZONE_RULE_UNLOCKS: Record<number, RuleId[]> = {
   1: STARTER_RULES,
-  2: [
-    "fightersEscortOnWave",
-    "bargeFallBack",
-    "recallOnLowShields",
-    "reserveWarpEnergy",
-  ],
-  3: ["harvesterStormShelter"],
+  2: ['fightersEscortOnWave', 'bargeFallBack', 'recallOnLowShields', 'reserveWarpEnergy'],
+  3: ['harvesterStormShelter'],
 };
 
 // ---------- Power ----------
@@ -420,8 +400,7 @@ export const ENERGY_MAX = 1000;
 export const SOLAR_RATE = 6; // energy/s at brightness 1
 export const REFINE_RATE = 12; // ore units/s at refinery level 0
 export const refineRate = (level: number) => REFINE_RATE * (1 + 0.5 * level);
-export const REFINERY_COST = (level: number) =>
-  Math.round(600 * Math.pow(2.2, level));
+export const REFINERY_COST = (level: number) => Math.round(600 * Math.pow(2.2, level));
 export const MAX_REFINERY = 8;
 export const REFINE_ENERGY = 0.35; // energy per ore unit
 export const FUSION_RATE = 25; // energy/s while burning H2
@@ -464,12 +443,9 @@ export const warpPayment = (cost: number, energy: number, h2: number) => {
 
 // ---------- Carrier turrets (#160) ----------
 
-export type TurretKind = "pd" | "heavy";
+export type TurretKind = 'pd' | 'heavy';
 /** Point-defense: short, quick, nearest pirate. Heavy battery: long, hard-hitting, toughest pirate. */
-export const TURRETS: Record<
-  TurretKind,
-  { range: number; damage: number; period: number }
-> = {
+export const TURRETS: Record<TurretKind, { range: number; damage: number; period: number }> = {
   pd: { range: 26, damage: 6, period: 0.25 },
   heavy: { range: 55, damage: 16, period: 0.9 },
 };
@@ -501,9 +477,9 @@ export interface HullDef {
 
 export const HULLS: Record<HullId, HullDef> = {
   standard: {
-    name: "Standard carrier",
-    blurb: "Balanced",
-    start: ["launch", "cargo"],
+    name: 'Standard carrier',
+    blurb: 'Balanced',
+    start: ['launch', 'cargo'],
     slots: 6,
     newSlots: 4,
     hull: 2000,
@@ -512,13 +488,13 @@ export const HULLS: Record<HullId, HullDef> = {
     warpCharge: 1,
     warpCost: 1,
     shield: 1,
-    turrets: ["pd"],
+    turrets: ['pd'],
     tier: 1,
   },
   light: {
-    name: "Light carrier",
-    blurb: "Fast, cheap warps; one hangar to start; frail",
-    start: ["launch"],
+    name: 'Light carrier',
+    blurb: 'Fast, cheap warps; one hangar to start; frail',
+    start: ['launch'],
     slots: 6,
     newSlots: 4,
     hull: 1200,
@@ -527,13 +503,13 @@ export const HULLS: Record<HullId, HullDef> = {
     warpCharge: 0.5,
     warpCost: 0.6,
     shield: 1,
-    turrets: ["pd"],
+    turrets: ['pd'],
     tier: 2,
   },
   fleet: {
-    name: "Fleet carrier",
-    blurb: "Three hangars to start, big energy pool; slow warps",
-    start: ["launch", "cargo", "launch"],
+    name: 'Fleet carrier',
+    blurb: 'Three hangars to start, big energy pool; slow warps',
+    start: ['launch', 'cargo', 'launch'],
     slots: 6,
     newSlots: 6,
     hull: 2600,
@@ -542,13 +518,13 @@ export const HULLS: Record<HullId, HullDef> = {
     warpCharge: 1.3,
     warpCost: 1.3,
     shield: 1,
-    turrets: ["pd", "pd"],
+    turrets: ['pd', 'pd'],
     tier: 2,
   },
   mining: {
-    name: "Mining mothership",
-    blurb: "Double refinery throughput; small hangars",
-    start: ["launch", "cargo"],
+    name: 'Mining mothership',
+    blurb: 'Double refinery throughput; small hangars',
+    start: ['launch', 'cargo'],
     slots: 4,
     newSlots: 3,
     hull: 2000,
@@ -557,13 +533,13 @@ export const HULLS: Record<HullId, HullDef> = {
     warpCharge: 1.2,
     warpCost: 1.2,
     shield: 1,
-    turrets: ["pd"],
+    turrets: ['pd'],
     tier: 3,
   },
   bastion: {
-    name: "Bastion",
-    blurb: "Heavy hull, shields regenerate twice as fast; weak refinery",
-    start: ["launch", "cargo"],
+    name: 'Bastion',
+    blurb: 'Heavy hull, shields regenerate twice as fast; weak refinery',
+    start: ['launch', 'cargo'],
     slots: 5,
     newSlots: 4,
     hull: 3500,
@@ -572,7 +548,7 @@ export const HULLS: Record<HullId, HullDef> = {
     warpCharge: 1.5,
     warpCost: 1.4,
     shield: 2,
-    turrets: ["pd", "pd", "heavy"],
+    turrets: ['pd', 'pd', 'heavy'],
     tier: 3,
   },
 };
@@ -664,51 +640,43 @@ export interface ModuleDef {
 
 export const MODULES: Record<ModuleId, ModuleDef> = {
   laser: {
-    name: "Mining laser",
-    short: "Laser",
-    desc: "+30 % mining and skimming rate; fighters +20 % damage",
+    name: 'Mining laser',
+    short: 'Laser',
+    desc: '+30 % mining and skimming rate; fighters +20 % damage',
     cost: 160,
-    fits: ["drone", "harvester", "fighter"],
+    fits: ['drone', 'harvester', 'fighter'],
     tier: 1,
   },
   drill: {
-    name: "Core drill",
-    short: "Drill",
-    desc: "Mined ore is worth +15 %",
+    name: 'Core drill',
+    short: 'Drill',
+    desc: 'Mined ore is worth +15 %',
     cost: 180,
-    fits: ["drone"],
+    fits: ['drone'],
     tier: 1,
   },
   tractor: {
-    name: "Tractor beam",
-    short: "Tractor",
-    desc: "+25 % speed",
+    name: 'Tractor beam',
+    short: 'Tractor',
+    desc: '+25 % speed',
     cost: 120,
-    fits: ["drone", "barge", "hauler", "scout", "repair", "harvester"],
+    fits: ['drone', 'barge', 'hauler', 'scout', 'repair', 'harvester'],
     tier: 1,
   },
   shield: {
-    name: "Shield emitter",
-    short: "Shield",
-    desc: "-35 % damage taken",
+    name: 'Shield emitter',
+    short: 'Shield',
+    desc: '-35 % damage taken',
     cost: 150,
-    fits: [
-      "drone",
-      "barge",
-      "hauler",
-      "fighter",
-      "scout",
-      "repair",
-      "harvester",
-    ],
+    fits: ['drone', 'barge', 'hauler', 'fighter', 'scout', 'repair', 'harvester'],
     tier: 2,
   },
   compressor: {
-    name: "Ore compressor",
-    short: "Compr.",
-    desc: "+40 % cargo hold",
+    name: 'Ore compressor',
+    short: 'Compr.',
+    desc: '+40 % cargo hold',
     cost: 140,
-    fits: ["drone", "barge", "hauler", "harvester"],
+    fits: ['drone', 'barge', 'hauler', 'harvester'],
     tier: 1,
   },
 };
@@ -734,14 +702,9 @@ export const SHIELD_TAKEN = 0.65;
 export const COMPRESSOR_CARGO = 1.4;
 
 /** Why a module can't go on this class yet, or null. */
-export function moduleLocked(
-  id: ModuleId,
-  cls: ShipClass,
-  furthestTier: number,
-): string | null {
+export function moduleLocked(id: ModuleId, cls: ShipClass, furthestTier: number): string | null {
   const m = MODULES[id];
-  if (!m.fits.includes(cls))
-    return `${m.name} does not fit a ${SHIP_STATS[cls].short}`;
+  if (!m.fits.includes(cls)) return `${m.name} does not fit a ${SHIP_STATS[cls].short}`;
   if (furthestTier < m.tier) return `${m.name}s: ${tierHint(m.tier)}`;
   return null;
 }
