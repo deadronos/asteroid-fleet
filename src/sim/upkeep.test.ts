@@ -1,11 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import { settleOffline } from './actions';
-import { DT, HANGAR_UPKEEP, SHIP_UPKEEP } from './config';
+import { DT, HANGAR_UPKEEP, REFINE_ENERGY, SHIP_UPKEEP } from './config';
 import { buildCtx } from './ctx';
-import { hangarUpkeep, maxEnergy, solarRate, upkeep, upkeepRate, stateOf } from './state';
+import {
+  hangarUpkeep,
+  maxEnergy,
+  refineEnergy,
+  solarRate,
+  upkeep,
+  upkeepRate,
+  stateOf,
+} from './state';
 import { stepSim } from './tick';
 import type { Sim } from './types';
-import { power } from './world';
+import { power, refine } from './world';
 import { game } from './testing';
 
 /** A calm game with every ship docked, no ore to refine and the carrier holding still. */
@@ -126,5 +134,31 @@ describe('solar and capacity', () => {
     s.modifiers = ['halfEnergy'];
     expect(maxEnergy(s)).toBeCloseTo(500);
     expect(solarRate(s)).toBeCloseTo(base);
+  });
+});
+
+/** Ore one energy-bound refine step gets through at `level`. */
+const refined = (level: number) => {
+  const s = calm();
+  s.powerMode = 'income';
+  s.carrier.refinery = level;
+  s.carrier.ore = 1000;
+  s.carrier.oreValue = 1000;
+  s.carrier.energy = 0.1; // energy-bound, not throughput-bound
+  refine(s, DT, buildCtx(s));
+  return 1000 - s.carrier.ore;
+};
+
+describe('refinery efficiency (#216)', () => {
+  it('cuts energy per ore by 7 % a level', () => {
+    const s = calm();
+    s.carrier.refinery = 0;
+    expect(refineEnergy(s)).toBeCloseTo(REFINE_ENERGY);
+    s.carrier.refinery = 8;
+    expect(refineEnergy(s)).toBeCloseTo(REFINE_ENERGY * 0.93 ** 8);
+  });
+
+  it('refines more ore from the same energy at a higher level', () => {
+    expect(refined(4) / refined(0)).toBeCloseTo(1 / 0.93 ** 4);
   });
 });

@@ -3,12 +3,11 @@
 
 import { order, shipCost } from '../actions';
 import { autoRebuildUnlocked } from '../automation';
-import { refineThroughput, solarRate, upkeepRate } from '../economy';
+import { refineEnergy, refineThroughput, solarRate, upkeepRate } from '../economy';
 import { lvl } from '../research';
 import {
   FUSION_RATE,
   MAX_REFINERY,
-  REFINE_ENERGY,
   REFINERY_COST,
   SOFT_HANGAR_SLOTS,
   SOFT_HANGARS,
@@ -29,7 +28,7 @@ export interface Policy {
 /** True when energy could feed a faster refinery: the current one draws less than solar (and fusion) spare. */
 function refineryIsLimit(s: Sim): boolean {
   const fusion = lvl(s, 'fusion') > 0 && s.carrier.h2 > 0 ? FUSION_RATE : 0;
-  return refineThroughput(s) * REFINE_ENERGY < solarRate(s) + fusion - upkeepRate(s);
+  return refineThroughput(s) * refineEnergy(s) < solarRate(s) + fusion - upkeepRate(s);
 }
 
 /** Ticks between policy passes: once a game second, like the automation pass. */

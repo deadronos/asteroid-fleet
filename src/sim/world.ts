@@ -8,7 +8,6 @@ import {
   DT,
   FUSION_H2,
   FUSION_RATE,
-  REFINE_ENERGY,
   HULLS,
 } from './config';
 import { SHIELD_HP, card, damageShip, inHazard, type Ctx } from './ctx';
@@ -24,6 +23,7 @@ import {
   jumpCost,
   maxEnergy,
   refineThroughput,
+  refineEnergy,
   solarRate,
   spawnAsteroid,
   stateOf,
@@ -71,7 +71,8 @@ export function refine(s: Sim, dt: number, ctx: Ctx) {
     floor = Math.max(floor, jumpCost(s, sys.distance, Math.max(0, sys.distance - 1)));
   }
   const avail = Math.max(0, c.energy - floor);
-  const amount = Math.min(c.ore, refineThroughput(s) * dt, avail / REFINE_ENERGY);
+  const perOre = refineEnergy(s);
+  const amount = Math.min(c.ore, refineThroughput(s) * dt, avail / perOre);
   if (amount <= 0) return;
   const value = (c.oreValue / c.ore) * amount;
   c.ore -= amount;
@@ -80,7 +81,7 @@ export function refine(s: Sim, dt: number, ctx: Ctx) {
     c.ore = 0;
     c.oreValue = 0;
   }
-  c.energy -= amount * REFINE_ENERGY;
+  c.energy -= amount * perOre;
   s.credits += value;
   ctx.income += value;
   ctx.mining += value;

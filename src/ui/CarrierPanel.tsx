@@ -2,7 +2,7 @@ import { engine, useGame } from '../game/engine';
 import {
   MAX_REFINERY,
   MINING_RATE,
-  REFINE_ENERGY,
+  REFINE_ENERGY_STEP,
   REFINERY_COST,
   HULLS,
   FUSION_RATE,
@@ -14,7 +14,7 @@ import {
 } from '../sim/config';
 import { warpBlocked } from '../sim/warpReason';
 import { lvl, repeatEffect } from '../sim/research';
-import { jumpCost, refineThroughput, solarRate, upkeep } from '../sim/state';
+import { jumpCost, refineEnergy, refineThroughput, solarRate, upkeep } from '../sim/state';
 import { cargoCap } from '../sim/ctx';
 import { SHIP_CLASSES, type Sim } from '../sim/types';
 import { fmt } from './format';
@@ -35,13 +35,16 @@ function throughput(s: Sim) {
   const haulerTransport = barges
     ? (haulers * cargoCap(s, 'hauler')) / ((2 * avgTrip) / SHIP_STATS.hauler.speed + 3)
     : Infinity;
-  const spare = Math.max(0, solarRate(s) - upkeep(s).total);
-  const refinery = Math.min(refineThroughput(s), spare / REFINE_ENERGY);
+  // Fusion counts while there is H2 to burn, as in the power step.
+  const fusion = lvl(s, 'fusion') > 0 && s.carrier.h2 > 0 ? FUSION_RATE : 0;
+  const spare = Math.max(0, solarRate(s) + fusion - upkeep(s).total);
+  // Separate rows so the readout says whether the refinery or the energy behind it is short (#216).
   const links = [
     { name: 'Mining', v: mining },
     { name: 'Drone transport', v: droneTransport },
     ...(barges ? [{ name: 'Hauler transport', v: haulers ? haulerTransport : 0 }] : []),
-    { name: 'Refinery (energy-limited)', v: refinery },
+    { name: 'Refinery', v: refineThroughput(s) },
+    { name: 'Energy for refining', v: spare / refineEnergy(s) },
   ];
   const min = Math.min(...links.map((l) => l.v));
   return { links, min };
@@ -151,7 +154,8 @@ export function CarrierPanel() {
       <h3>Refinery · level {s.carrier.refinery}</h3>
       <div className="row">
         <span className="grow hint" style={{ margin: 0 }}>
-          {refineThroughput(s).toFixed(0)} ore/s, {REFINE_ENERGY} energy per unit
+          {refineThroughput(s).toFixed(0)} ore/s, {refineEnergy(s).toFixed(2)} energy per unit (each
+          level −{Math.round((1 - REFINE_ENERGY_STEP) * 100)} %)
         </span>
         <button
           disabled={s.carrier.refinery >= MAX_REFINERY || s.credits < refCost}
