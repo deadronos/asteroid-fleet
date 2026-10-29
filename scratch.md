@@ -15,10 +15,9 @@ The #169 review was split into #170–#190. This is the remaining work, in sugge
 - #174: each carrier keeps its own rebuild queue and automation timer (#200)
 - #177: switching focus resolves an active wave before `dematerialise` (#199)
 - #183: the shop falls back to the focused carrier's hangar after a switch (#204)
-
-## 2. Multi-carrier correctness
-
-- [ ] #178 UI lists read `engine.state.ops` (focused only): use `engine.carriers`
+- #179: offline rolls no new pirate waves (the departure wave still resolves), and waves never take docked or carried ships (#206)
+- #178: carrier lists and rule-card hangar scopes cover every carrier (#205)
+- #176: carriers in one system share one live asteroid field (#207)
 
 ## 3. Rendering
 
@@ -31,7 +30,6 @@ The #169 review was split into #170–#190. This is the remaining work, in sugge
 - [ ] #186 `createShip` with `start` skips the slot fit
 - [ ] #187 `idleUntil` missing from the snapshot codec
 
-## Needs a decision from Lars first
+## Later
 
-- [ ] #176 should carriers in one system share a live field? Today each carrier mines its own copy, and the depletion record is consumed by whichever carrier enters next.
-- [ ] #179 offline: safe (as the README says) or risky (as #103 built)? Either way, `rollWave` must stop destroying docked ships.
+- Background (Tier B) carriers earn from `miningIncomeAvg` and do not deplete the shared field (#207). Making them deplete it would be a balance change.
