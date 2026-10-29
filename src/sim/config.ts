@@ -411,7 +411,12 @@ export const REFINE_RATE = 12; // ore units/s at refinery level 0
 export const refineRate = (level: number) => REFINE_RATE * (1 + 0.5 * level);
 export const REFINERY_COST = (level: number) => Math.round(600 * Math.pow(2.2, level));
 export const MAX_REFINERY = 8;
-export const REFINE_ENERGY = 0.35; // energy per ore unit
+export const REFINE_ENERGY = 0.35; // energy per ore unit at refinery level 0
+/**
+ * Each refinery level multiplies energy per ore by this. Refining is usually energy-bound, so
+ * without it refinery levels past the energy budget added nothing (#216).
+ */
+export const REFINE_ENERGY_STEP = 0.93;
 export const FUSION_RATE = 25; // energy/s while burning H2
 export const FUSION_H2 = 0.5; // H2 per second burnt
 /**

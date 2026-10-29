@@ -4,6 +4,8 @@ import {
   HANGAR_UPKEEP,
   HULLS,
   HULL_IDS,
+  REFINE_ENERGY,
+  REFINE_ENERGY_STEP,
   SHIP_STATS,
   SHIP_UPKEEP,
   SOLAR_CAPACITY_EXP,
@@ -54,6 +56,11 @@ export function refineThroughput(s: Sim): number {
     (1 + 0.1 * lvl(s, 'reactor')) *
     (1 + 0.25 * lvl(s, 'voidRefining'))
   );
+}
+
+/** Energy per ore unit refined: each refinery level makes the refinery more efficient. */
+export function refineEnergy(s: Sim): number {
+  return REFINE_ENERGY * REFINE_ENERGY_STEP ** s.carrier.refinery;
 }
 
 /** Jump energy between two system distances, with the hull's multiplier. */
