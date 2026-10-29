@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { settleOffline } from './actions';
 import { DT, HANGAR_UPKEEP, SHIP_UPKEEP } from './config';
 import { buildCtx } from './ctx';
-import { hangarUpkeep, solarRate, upkeep, upkeepRate, stateOf } from './state';
+import { hangarUpkeep, maxEnergy, solarRate, upkeep, upkeepRate, stateOf } from './state';
 import { stepSim } from './tick';
 import type { Sim } from './types';
 import { power } from './world';
@@ -109,5 +109,22 @@ describe('power upkeep', () => {
     setSolar(t, 0);
     settleOffline(stateOf(t), 3600);
     expect(t.carrier.energy).toBe(0);
+  });
+});
+
+describe('solar and capacity', () => {
+  it('grows solar with the square root of capacity upgrades', () => {
+    const s = calm();
+    const base = solarRate(s);
+    s.researchLevels.energyCap = 5; // ×2.25 capacity
+    expect(solarRate(s)).toBeCloseTo(base * 1.5);
+  });
+
+  it('leaves solar alone when a challenge halves the pool', () => {
+    const s = calm();
+    const base = solarRate(s);
+    s.modifiers = ['halfEnergy'];
+    expect(maxEnergy(s)).toBeCloseTo(500);
+    expect(solarRate(s)).toBeCloseTo(base);
   });
 });

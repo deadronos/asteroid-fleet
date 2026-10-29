@@ -12,7 +12,8 @@ A browser idle game with an autobattler setup, in 3D. The player is the admiral,
 - H2 is fusion fuel only, never direct warp fuel.
 - Reserves keep rebuilding on their cooldown while offline.
 - Offline time is settled at 50 % of recent mining income (salvage excluded). Offline, no new pirate waves roll; a wave already on the map at departure is resolved with events. Offline credits do not count toward RP.
-- RP = ⌊√(ore value delivered ÷ 10,000)⌋ × furthest tier.
+- RP = ⌊√(ore value delivered ÷ 10,000)⌋ × furthest tier × (1 + 15 % per Admiralty Mark ever earned).
+- Solar grows with the square root of the energy pool's capacity (hull and capacity upgrades, not challenge modifiers). Refining runs on solar once the pool settles, so this is what makes capacity upgrades raise income.
 - Stance resolution is most specific first: card > hangar > ship type > fleet.
 - Multiple carriers share credits and RP. Per-carrier resources (ore, H2, energy) move only through supply routes.
 

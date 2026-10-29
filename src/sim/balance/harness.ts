@@ -19,6 +19,7 @@
 // `apply`, like the UI), or a field to `Sample` and a column to `formatReport`.
 
 import { RP_DIVISOR, TICK_HZ, TIER_NAMES } from '../config';
+import { researchMult } from '../costs';
 import { focused, newGame } from '../state';
 import { stepSim } from '../tick';
 import { SHIP_CLASSES, type Sim, type ShipClass } from '../types';
@@ -81,7 +82,8 @@ export interface BalanceResult {
 
 /** `researchPayout` with the divisor as a parameter, so divisors can be compared in one run. */
 export function payout(s: Sim, divisor: number): number {
-  return Math.floor(Math.sqrt(s.stats.oreValueDelivered / divisor)) * s.stats.furthestTier;
+  const base = Math.floor(Math.sqrt(s.stats.oreValueDelivered / divisor)) * s.stats.furthestTier;
+  return Math.floor(base * researchMult(s));
 }
 
 function sample(s: Sim, o: BalanceOptions): Sample {

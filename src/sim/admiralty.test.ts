@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { admiralty, apply, marksPayout, prestige } from './actions';
+import { admiralty, apply, marksPayout, prestige, researchPayout } from './actions';
 import { admiraltyCost, admiraltyEffect, buyAdmiralty } from './admiralty';
 import { newGame } from './state';
 import { migrate } from '../game/migrate';
@@ -71,6 +71,15 @@ describe('Admiralty shop (#69)', () => {
 describe('Admiralty (#68)', () => {
   it('pays nothing for a fresh game', () => {
     expect(marksPayout(newGame())).toBe(0);
+  });
+
+  it('raises RP by 15 % per Mark ever earned', () => {
+    const g = newGame(3);
+    g.stats.oreValueDelivered = 1_000_000; // ⌊√100⌋ = 10
+    g.stats.furthestTier = 2;
+    expect(researchPayout(g)).toBe(20);
+    g.lifetime.marksEarned = 4;
+    expect(researchPayout(g)).toBe(32);
   });
 
   it('counts the run in progress toward lifetime RP', () => {

@@ -30,7 +30,7 @@ export const ADMIRALTY_UPGRADES: AdmiraltyUpgrade[] = [
   {
     id: 'admEnergy',
     name: 'Reactor Refit',
-    desc: 'Carrier energy capacity, diminishing toward +100 %',
+    desc: 'Carrier energy capacity (and with it solar), diminishing toward +100 %',
     base: 2,
     ratio: 1.7,
     cap: 1,

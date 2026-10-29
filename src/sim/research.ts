@@ -135,7 +135,7 @@ export const RESEARCH: ResearchNode[] = [
     id: 'energyCap',
     branch: 'Carrier',
     name: 'Capacitors',
-    desc: '+25 % energy capacity',
+    desc: '+25 % energy capacity; solar grows with capacity',
     maxLevel: 5,
     cost: lin(1, 1),
   },
@@ -516,7 +516,7 @@ export const RESEARCH: ResearchNode[] = [
     id: 'deepEnergy',
     branch: 'Carrier',
     name: 'Superconducting banks',
-    desc: 'Repeatable; energy capacity, diminishing toward +100 %',
+    desc: 'Repeatable; energy capacity (and with it solar), diminishing toward +100 %',
     maxLevel: Infinity,
     cost: geo(10, 1.25),
     repeat: {

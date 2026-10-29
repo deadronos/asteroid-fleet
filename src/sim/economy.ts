@@ -6,6 +6,7 @@ import {
   HULL_IDS,
   SHIP_STATS,
   SHIP_UPKEEP,
+  SOLAR_CAPACITY_EXP,
   SOLAR_RATE,
   refineRate,
   warpCost,
@@ -32,10 +33,13 @@ export function carrierMaxHull(s: Sim): number {
 }
 
 export function maxEnergy(s: Sim): number {
+  return ENERGY_MAX * energyMult(s) * capacityMult(s);
+}
+
+/** Energy pool multiplier from the hull and capacity upgrades, without challenge modifiers. */
+function capacityMult(s: Sim): number {
   return (
-    ENERGY_MAX *
     HULLS[s.carrier.hullClass].energy *
-    energyMult(s) *
     (1 + 0.25 * lvl(s, 'energyCap')) *
     (1 + repeatEffect(s, 'deepEnergy')) *
     (1 + admiraltyEffect(s, 'admEnergy'))
@@ -65,9 +69,14 @@ export function unlockHulls(s: Sim) {
     if ((all || HULLS[id].tier <= s.stats.furthestTier) && !s.hulls.includes(id)) s.hulls.push(id);
 }
 
-/** Solar recharge in the current system, energy/s, before storm boosts. */
+/** Solar recharge in the current system, energy/s, before storm boosts. Grows with capacity. */
 export function solarRate(s: Sim): number {
-  return SOLAR_RATE * s.systems[s.systemId].brightness * (1 + 0.2 * lvl(s, 'solar'));
+  return (
+    SOLAR_RATE *
+    s.systems[s.systemId].brightness *
+    (1 + 0.2 * lvl(s, 'solar')) *
+    capacityMult(s) ** SOLAR_CAPACITY_EXP
+  );
 }
 
 /** Energy/s drawn by `count` hangars. */
