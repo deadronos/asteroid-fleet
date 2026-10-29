@@ -11,19 +11,10 @@ A browser idle game with an autobattler setup, in full 3D. You are the admiral, 
 ```sh
 pnpm install
 pnpm run dev       # http://localhost:5173/asteroid-fleet/
-pnpm test          # simulation tests
-pnpm run test:e2e # Playwright smoke test against the built preview
-pnpm run build     # typecheck + production build into dist/
-pnpm run balance   # 2-hour headless economy run, prints income every 10 min
-pnpm run lint      # oxlint, type-aware via tsgolint (works with TypeScript 7)
-pnpm run format    # oxfmt; format:check verifies without writing
+pnpm test
 ```
 
-The game is published to GitHub Pages at https://deadronos.github.io/asteroid-fleet/ . Pushing a `v*` tag (for example `git tag v0.0.1 && git push origin v0.0.1`) deploys it, but only after the CI checks and the Playwright smoke test pass.
-
-pnpm keeps one package store on the machine, so another git worktree reuses packages that are already downloaded.
-
-CI runs on every pull request and on pushes to `main`, on Node 22 with pnpm 12. The checks are `pnpm install --frozen-lockfile`, `pnpm run lint`, `pnpm run format:check`, `pnpm run typecheck`, `pnpm test`, and `pnpm run build`. The two-hour `pnpm run balance` script is local only and is skipped in CI.
+The game is published to GitHub Pages at https://deadronos.github.io/asteroid-fleet/ . Every command, what CI checks, the bundle budget and how releases work are in [docs/agents/workflow.md](docs/agents/workflow.md).
 
 ## What is in this first playable slice
 
