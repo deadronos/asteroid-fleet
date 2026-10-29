@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { admiralty, apply, marksPayout, prestige } from './actions';
+import { admiralty, apply, marksPayout, prestige, researchPayout } from './actions';
 import { admiraltyCost, admiraltyEffect, buyAdmiralty } from './admiralty';
-import { newGame } from './state';
+import { newGame, spawnAsteroid } from './state';
+import { game } from './testing';
 import { migrate } from '../game/migrate';
 
 function richGame() {
@@ -26,8 +27,8 @@ describe('Admiralty shop (#69)', () => {
     g.admiralty.admYield = 5;
     expect(admiraltyCost(g, 'admYield')).toBeGreaterThan(c0 * 5);
     g.admiralty.admYield = 1000;
-    expect(admiraltyEffect(g, 'admYield')).toBeLessThanOrEqual(1.5);
-    expect(admiraltyEffect(g, 'admYield')).toBeGreaterThan(1.49);
+    expect(admiraltyEffect(g, 'admYield')).toBeLessThanOrEqual(1);
+    expect(admiraltyEffect(g, 'admYield')).toBeGreaterThan(0.99);
     g.admiralty.admYield = 1;
     const e1 = admiraltyEffect(g, 'admYield');
     g.admiralty.admYield = 2;
@@ -68,9 +69,28 @@ describe('Admiralty shop (#69)', () => {
   });
 });
 
+describe('Prospecting Charter (#214)', () => {
+  it('raises the ore value of new asteroids, not mining yield', () => {
+    const s = game(4);
+    const rock = () => spawnAsteroid(s, () => 0.5, { x: 20, y: 0, z: 0 }, s.systems[s.systemId]);
+    const base = rock().value;
+    s.admiralty.admYield = 3;
+    expect(rock().value).toBeCloseTo(base * (1 + admiraltyEffect(s, 'admYield')));
+  });
+});
+
 describe('Admiralty (#68)', () => {
   it('pays nothing for a fresh game', () => {
     expect(marksPayout(newGame())).toBe(0);
+  });
+
+  it('raises RP by 15 % per Mark ever earned', () => {
+    const g = newGame(3);
+    g.stats.oreValueDelivered = 1_000_000; // ⌊√100⌋ = 10
+    g.stats.furthestTier = 2;
+    expect(researchPayout(g)).toBe(20);
+    g.lifetime.marksEarned = 4;
+    expect(researchPayout(g)).toBe(32);
   });
 
   it('counts the run in progress toward lifetime RP', () => {

@@ -401,6 +401,12 @@ export const ZONE_RULE_UNLOCKS: Record<number, RuleId[]> = {
 
 export const ENERGY_MAX = 1000;
 export const SOLAR_RATE = 6; // energy/s at brightness 1
+/**
+ * Solar grows with the pool: × (capacity ÷ ENERGY_MAX)^exp, counting the hull and capacity
+ * upgrades but not challenge modifiers. Refining runs on solar once the pool settles, so without
+ * this, capacity upgrades never raised income (#214).
+ */
+export const SOLAR_CAPACITY_EXP = 0.5;
 export const REFINE_RATE = 12; // ore units/s at refinery level 0
 export const refineRate = (level: number) => REFINE_RATE * (1 + 0.5 * level);
 export const REFINERY_COST = (level: number) => Math.round(600 * Math.pow(2.2, level));
@@ -618,11 +624,13 @@ export const GAS_PIRATE_HARVESTER_BIAS = 3;
 // ---------- Prestige ----------
 
 /**
- * RP = floor(sqrt(ore value delivered / D)) * furthest tier.
+ * RP = floor(sqrt(ore value delivered / D)) * furthest tier * (1 + RP_PER_MARK * Marks earned).
  * The concept doc's placeholder uses D = 1,000,000; this build uses 10,000 so a
  * first run pays out in about an hour. Tune here.
  */
 export const RP_DIVISOR = 10_000;
+/** RP bonus per Admiralty Mark ever earned, so each Admiralty reset climbs back faster (#214). */
+export const RP_PER_MARK = 0.15;
 /** Admiralty Marks = floor(sqrt(lifetime RP / D)), less Marks already paid (#68). */
 export const MARKS_DIVISOR = 50;
 export const OFFLINE_EFFICIENCY = 0.5;

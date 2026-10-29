@@ -19,18 +19,19 @@ const pct = (e: number) => Math.round(e * 100);
 
 export const ADMIRALTY_UPGRADES: AdmiraltyUpgrade[] = [
   {
+    // Id kept from when it raised mining yield, so saves keep their levels (#214).
     id: 'admYield',
     name: 'Prospecting Charter',
-    desc: 'Mining yield, diminishing toward +150 %',
+    desc: 'Ore value of new asteroids, diminishing toward +100 %',
     base: 1,
     ratio: 1.6,
-    cap: 1.5,
-    label: (e) => `+${pct(e)} % mining yield`,
+    cap: 1,
+    label: (e) => `+${pct(e)} % ore value`,
   },
   {
     id: 'admEnergy',
     name: 'Reactor Refit',
-    desc: 'Carrier energy capacity, diminishing toward +100 %',
+    desc: 'Carrier energy capacity (and with it solar), diminishing toward +100 %',
     base: 2,
     ratio: 1.7,
     cap: 1,

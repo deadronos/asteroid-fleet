@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { engine, useGame } from '../game/engine';
-import { marksPayout, researchPayout } from '../sim/costs';
+import { marksPayout, researchMult, researchPayout } from '../sim/costs';
 import {
   CARRIER_COST,
   HULLS,
   MARKS_DIVISOR,
   RP_DIVISOR,
+  RP_PER_MARK,
   SHIP_STATS,
   TIER_NAMES,
 } from '../sim/config';
@@ -148,10 +149,11 @@ export function ResearchPanel() {
         <details>
           <summary className="hint">How RP works</summary>
           <p className="hint">
-            RP = ⌊√(ore value delivered ÷ {fmt(RP_DIVISOR)})⌋ × furthest zone tier. This run:{' '}
-            {fmt(s.stats.oreValueDelivered)} delivered, furthest {TIER_NAMES[tier]} (×{tier}).
-            Prestige resets credits, ships, slots and position; research, unlocked ships and rules,
-            doctrine and discovered systems persist.
+            RP = ⌊√(ore value delivered ÷ {fmt(RP_DIVISOR)})⌋ × furthest zone tier × (1 +{' '}
+            {Math.round(RP_PER_MARK * 100)} % per Admiralty Mark earned). This run:{' '}
+            {fmt(s.stats.oreValueDelivered)} delivered, furthest {TIER_NAMES[tier]} (×{tier}), Marks
+            ×{researchMult(s).toFixed(2)}. Prestige resets credits, ships, slots and position;
+            research, unlocked ships and rules, doctrine and discovered systems persist.
           </p>
         </details>
         {!confirm ? (

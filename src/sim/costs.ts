@@ -1,6 +1,6 @@
 // Small pure costs and payouts the UI reads. Kept apart from `actions.ts` so the panels do not
 // pull the command interpreter (and the whole sim behind it) into the initial bundle.
-import { MARKS_DIVISOR, RP_DIVISOR, SHIP_STATS } from './config';
+import { MARKS_DIVISOR, RP_DIVISOR, RP_PER_MARK, SHIP_STATS } from './config';
 import type { GameState, Sim, ShipClass } from './types';
 
 export const RETROFIT_COST = 800;
@@ -10,8 +10,14 @@ export function shipCost(s: Sim, cls: ShipClass): number {
   return Math.round(SHIP_STATS[cls].cost * Math.pow(1.07, n));
 }
 
-export function researchPayout(s: Pick<GameState, 'stats'>): number {
-  return Math.floor(Math.sqrt(s.stats.oreValueDelivered / RP_DIVISOR)) * s.stats.furthestTier;
+export function researchPayout(s: Pick<GameState, 'stats' | 'lifetime'>): number {
+  const base = Math.floor(Math.sqrt(s.stats.oreValueDelivered / RP_DIVISOR)) * s.stats.furthestTier;
+  return Math.floor(base * researchMult(s));
+}
+
+/** RP multiplier from Admiralty Marks ever earned. */
+export function researchMult(s: Pick<GameState, 'lifetime'>): number {
+  return 1 + RP_PER_MARK * s.lifetime.marksEarned;
 }
 
 /** Lifetime RP counting the run in progress, as an Admiralty reset would bank it. */

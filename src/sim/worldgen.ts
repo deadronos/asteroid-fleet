@@ -5,6 +5,7 @@ import {
   ORE_BY_TIER,
   STARTER_RULES,
 } from './config';
+import { admiraltyEffect } from './admiralty';
 import { addPreset } from './cards';
 import { challengeBonus } from './modifiers';
 import { onSphere, seeded, v3 } from './math';
@@ -111,6 +112,7 @@ export function spawnAsteroid(
       (1 + 0.1 * lvl(s, 'rich')) *
       (1 + richBonus) *
       (1 + challengeBonus(s)) *
+      (1 + admiraltyEffect(s, 'admYield')) *
       rare,
     radius: 0.8 + (maxOre / 300) * 1.6,
     respawn: 0,
