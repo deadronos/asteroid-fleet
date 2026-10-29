@@ -1,9 +1,10 @@
 import { presetCard } from '../sim/cards';
-import { PRESETS } from '../sim/config';
+import { HULLS, PRESETS, warpCost } from '../sim/config';
 import { OP_KEYS, SAVE_VERSION, makeSystems } from '../sim/state';
 import {
   ROUTE_RESOURCES,
   type GameState,
+  type HullId,
   type RuleCard,
   type RuleId,
   type Severity,
@@ -190,6 +191,28 @@ export const migrations: Record<number, Migration> = {
       delete automation.rebuildQueue;
       delete automation.timer;
     }
+    return save;
+  },
+  // v19: a jump in progress stores what it cost, so a cancel refunds what was paid (#184).
+  // A warp already charging has no record of the split, so treat it as paid in energy (the old refund).
+  18: (save) => {
+    if (Array.isArray(save.ops))
+      for (const op of save.ops) {
+        const w = isRecord(op) && isRecord(op.warp) ? op.warp : null;
+        if (!w) continue;
+        const systems = Array.isArray(save.systems) ? save.systems : [];
+        const dist = (id: unknown) => {
+          const sys = typeof id === 'number' ? systems[id] : undefined;
+          return isRecord(sys) && typeof sys.distance === 'number' ? sys.distance : 0;
+        };
+        const carrier = isRecord(op.carrier) ? op.carrier : {};
+        const hull =
+          typeof carrier.hullClass === 'string' ? HULLS[carrier.hullClass as HullId] : undefined;
+        const levels = isRecord(save.researchLevels) ? save.researchLevels : {};
+        const sensors = typeof levels.sensors === 'number' ? levels.sensors : 0;
+        const mult = (hull?.warpCost ?? 1) * (1 - 0.05 * sensors);
+        w.paid = { energy: warpCost(dist(op.systemId), dist(w.targetSystem), mult), h2: 0 };
+      }
     return save;
   },
 };

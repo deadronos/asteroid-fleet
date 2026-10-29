@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PRESETS } from '../sim/config';
-import { OP_KEYS, SAVE_VERSION, newGame } from '../sim/state';
+import { order } from '../sim/actions';
+import { OP_KEYS, SAVE_VERSION, focused, newGame } from '../sim/state';
 import { step } from '../sim/tick';
 import saveV1 from './fixtures/save-v1.json';
 import saveV2 from './fixtures/save-v2.json';
@@ -19,6 +20,7 @@ import saveV14 from './fixtures/save-v14.json';
 import saveV15 from './fixtures/save-v15.json';
 import saveV16 from './fixtures/save-v16.json';
 import saveV17 from './fixtures/save-v17.json';
+import saveV18 from './fixtures/save-v18.json';
 import { set } from 'idb-keyval';
 import { applyMigrationSteps, migrate, type SaveBlob } from './migrate';
 import {
@@ -367,6 +369,7 @@ describe('migrate', () => {
     ['v15', saveV15],
     ['v16', saveV16],
     ['v17', saveV17],
+    ['v18', saveV18],
   ])('a migrated %s fixture keeps running through step()', (_, fixture) => {
     const r = migrate(fixture);
     expect(r.ok).toBe(true);
@@ -436,7 +439,7 @@ describe('migrate', () => {
     const again = migrate(old);
     expect(again.ok).toBe(true);
     if (!again.ok) return;
-    expect(again.state.ops[0].warp).toEqual({ targetSystem: 1, charge: 7, total: 7 });
+    expect(again.state.ops[0].warp).toMatchObject({ targetSystem: 1, charge: 7, total: 7 });
   });
 
   it('migrates a v11 fixture to v12 with empty per-carrier alert rules (#79)', () => {
@@ -473,7 +476,7 @@ describe('migrate', () => {
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.state.version).toBe(SAVE_VERSION);
-    expect(r.state.ops[0].warp).toEqual({ targetSystem: 1, charge: 7, total: 7 });
+    expect(r.state.ops[0].warp).toMatchObject({ targetSystem: 1, charge: 7, total: 7 });
   });
 
   it('applies one migration step per version, in order', () => {
@@ -871,5 +874,23 @@ describe('decodeSave', () => {
     expect(error(JSON.stringify({ version: 'x' }))).toMatch(/does not recognise/);
     expect(error(encodeRaw({ version: SAVE_VERSION, ships: [] }))).toMatch(/damaged/);
     expect(error(encodeRaw([1, 2]))).toMatch(/damaged/);
+  });
+});
+
+describe('v18 -> v19 warp payment (#184)', () => {
+  it('migrates a v18 save with an active warp and cancels it without error', () => {
+    expect(saveV18.version).toBe(18);
+    expect(saveV18.ops[0].warp).not.toBeNull();
+    const r = migrate(saveV18);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.state.version).toBe(SAVE_VERSION);
+    const w = r.state.ops[0].warp!;
+    expect(w.paid).toEqual({ energy: expect.any(Number), h2: 0 });
+    const s = focused(r.state);
+    const before = s.carrier.energy;
+    expect(order(s, { type: 'cancelWarp' })).toBeNull();
+    expect(s.warp).toBeNull();
+    expect(s.carrier.energy).toBeGreaterThan(before);
   });
 });

@@ -38,6 +38,7 @@ A new `Operation` or `GameState` field also needs the `OP_KEYS` / `GAME_KEYS` en
 - **v16**: Supply routes between carriers: `routes` (#80).
 - **v17**: A jump in progress stores its full charge time, `warp.total`.
 - **v18**: Each carrier keeps its own rebuild queue and automation timer. The toggles and credit floor stay on the run (#174).
+- **v19**: A jump in progress stores `warp.paid` (`{ energy, h2 }`), so a cancel refunds 75% of each part actually paid (#184). Older saves with a charging warp get all-energy, the base jump cost with the hull and sensors discount, which is what the old refund assumed.
 
 ## Storage
 

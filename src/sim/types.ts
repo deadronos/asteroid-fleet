@@ -294,6 +294,8 @@ export interface Warp {
   charge: number; // seconds remaining
   /** Charge time at the start of the jump. */
   total: number;
+  /** What the jump cost, split between energy and H2; a cancel refunds 75% of each. */
+  paid: { energy: number; h2: number };
 }
 
 export type FxKind =
