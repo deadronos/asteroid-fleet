@@ -209,7 +209,11 @@ export class SimRunner {
     for (const op of g.ops) {
       const wantLive = op.systemId === here;
       const isLive = this.live.has(op.id);
-      if (wantLive === isLive) continue;
+      if (wantLive === isLive) {
+        // A carrier bought while focus is elsewhere enters its system holding a field (#176).
+        if (!wantLive && op.asteroids.length > 0) leaveField(bind(g, op));
+        continue;
+      }
       if (wantLive) {
         const s = bind(g, op);
         materialise(s);

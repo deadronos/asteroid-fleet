@@ -204,6 +204,25 @@ describe('shared asteroid field (#176)', () => {
     expect(g().fields[0].rocks.map((r) => r[0])).toEqual([2]);
   });
 
+  it('keeps a carrier bought while focus is elsewhere off the field', () => {
+    const g = newGame(5);
+    g.lifetime.admiralties = 3;
+    g.credits = 1e7;
+    const { host, pump, g: live } = run(g);
+    const a = live().ops[0];
+    a.asteroids[2].ore = 0;
+    a.asteroids[2].respawn = 80;
+    bind(live(), a).warp = { targetSystem: 1, charge: 0, total: 1 };
+    pump(1);
+    expect(live().fields[0].rocks.map((r) => r[0])).toEqual([2]);
+    host.post({ t: 'cmd', cmd: { type: 'buyCarrier', carrierId: a.id } });
+    pump(1);
+    const b = live().ops[1];
+    expect(b.systemId).toBe(0);
+    expect(b.asteroids).toHaveLength(0);
+    expect(live().fields[0].rocks.map((r) => r[0])).toEqual([2]);
+  });
+
   it('relinks carriers in one system after a save round trip', () => {
     const g = sharing();
     g.ops[0].asteroids[1].ore = 5;
