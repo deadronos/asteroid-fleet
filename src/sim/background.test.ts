@@ -140,6 +140,51 @@ describe('background model', () => {
     expect(s.carrier.hull).toBe(hull);
   });
 
+  it('never takes a docked or carried ship, whatever the wave size', () => {
+    const s = frontier(3);
+    s.wave.timer = 1;
+    s.wave.size = 50;
+    const fighters = s.ships.filter((x) => x.cls === 'fighter');
+    fighters[0].mode = 'docked';
+    fighters[1].mode = 'carried';
+    fighters[2].mode = 'docked';
+    const safe = new Set(fighters.map((x) => x.id));
+    expect(lossBuffer(s)).toBe(0);
+    for (let i = 0; i < 5; i++) {
+      s.wave.timer = 0;
+      stepBackground(s);
+    }
+    expect(s.stats.shipsLost).toBe(0);
+    expect(fighters.every((x) => s.ships.includes(x) && safe.has(x.id))).toBe(true);
+  });
+
+  it('stops at the exposed ships when a wave outruns them', () => {
+    const s = frontier(3);
+    const fighters = s.ships.filter((x) => x.cls === 'fighter');
+    fighters[1].mode = 'docked';
+    fighters[2].mode = 'carried';
+    s.wave.size = 60;
+    s.wave.timer = 0;
+    expect(lossBuffer(s)).toBe(1);
+    const r = stepBackground(s);
+    expect(r.lost).toBe(1);
+    expect(s.ships).toContain(fighters[1]);
+    expect(s.ships).toContain(fighters[2]);
+  });
+
+  it('keeps rolling waves for a carrier in live background play', () => {
+    const s = frontier(5);
+    const lostBefore = s.stats.shipsLost;
+    runBackground(s, 8 * 3600);
+    expect(s.stats.shipsLost).toBeGreaterThan(lostBefore);
+  });
+
+  it('rolls no wave when waves are off', () => {
+    const s = frontier(5);
+    runBackground(s, 8 * 3600, { waves: false });
+    expect(s.stats.shipsLost).toBe(0);
+  });
+
   it('loses nothing when there is no loss buffer', () => {
     const s = game(4);
     s.systems[s.systemId].tier = 3;
@@ -308,7 +353,7 @@ describe('Tier C', () => {
     expect(JSON.stringify({ ...g, savedAt: 0 })).toBe(JSON.stringify({ ...other, savedAt: 0 }));
   });
 
-  it('an 8 h settle on the frontier leaves no fx, no ShipLost and a grace period', () => {
+  it('an 8 h settle on the frontier rolls no wave, loses no ship and leaves a grace period', () => {
     const s = frontier(5);
     const g = stateOf(s);
     g.events.length = 0;
@@ -316,7 +361,10 @@ describe('Tier C', () => {
     const t0 = performance.now();
     settleOffline(g, 8 * 3600);
     expect(performance.now() - t0).toBeLessThan(2000);
-    expect(s.stats.shipsLost).toBeGreaterThan(lostBefore);
+    expect(s.stats.shipsLost).toBe(lostBefore);
+    expect(g.events.some((e) => e.kind === 'WaveRepelled' || e.kind === 'PirateWaveIncoming')).toBe(
+      false,
+    );
     expect(s.fx).toEqual([]);
     expect(g.events.some((e) => e.kind === 'ShipLost')).toBe(false);
     expect(s.wave.timer).toBeGreaterThanOrEqual(RETURN_GRACE_S);

@@ -6,7 +6,7 @@
 // operation and the run-wide state, never on what else was stepped. A wave already on the
 // map is rolled the same way when the carrier leaves Tier A, before its pirates are
 // dropped (#177). `settleOffline` plays the same model over the time away (Tier C): that
-// wave is reported, and later waves stay quiet (ships can be lost with no event).
+// wave is reported; no new wave rolls offline (#179).
 
 import { STORM_DURATION, STORM_GAP, WAVE_INTERVAL, WAVE_INTERVAL_JITTER } from './config';
 import { queueRebuild } from './automation';
@@ -36,6 +36,8 @@ export interface BackgroundOpts {
   efficiency?: number;
   /** Emit wave, storm and rebuild events. Off for the quiet part of an offline settle. */
   events?: boolean;
+  /** Roll pirate waves. Off for offline settlement, where no new wave comes (#179). */
+  waves?: boolean;
 }
 
 export interface BackgroundReport {
@@ -47,9 +49,12 @@ export interface BackgroundReport {
 /** Classes a background wave may destroy, cheapest to lose first. Never a barge (Q9, #49). */
 const BUFFER_ORDER: ShipClass[] = ['fighter', 'drone', 'scout', 'repair', 'hauler', 'harvester'];
 
+/** A ship out in the field. Docked and carried ships are safe from a wave. */
+const exposed = (x: Ship) => x.mode !== 'docked' && x.mode !== 'carried';
+
 /**
- * Ships a background wave may take: those the free reserves will rebuild, plus fighters,
- * which are there to be shot at. Losses per wave are capped at this.
+ * Ships a background wave may take: launched ones the free reserves will rebuild, plus
+ * launched fighters, which are there to be shot at. Losses per wave are capped at this.
  */
 export function lossBuffer(s: Sim): number {
   const reserve = new Set(
@@ -59,7 +64,7 @@ export function lossBuffer(s: Sim): number {
   );
   let n = 0;
   for (const x of s.ships)
-    if (x.cls === 'fighter' || (x.cls !== 'barge' && reserve.has(x.cls))) n++;
+    if (exposed(x) && (x.cls === 'fighter' || (x.cls !== 'barge' && reserve.has(x.cls)))) n++;
   return n;
 }
 
@@ -137,7 +142,7 @@ export function stepBackground(s: Sim, dt = BG_DT, opts: BackgroundOpts = {}): B
   c.energy = Math.min(maxEnergy(s), Math.max(0, c.energy + energyNet(s) * dt));
   if (c.energy > 0) c.shield = Math.min(1, c.shield + 0.03 * dt);
 
-  rep.lost = timers(s, dt, ev);
+  rep.lost = timers(s, dt, ev, opts.waves ?? true);
   rep.rebuilt = rebuild(s, dt, ev);
   return rep;
 }
@@ -162,22 +167,24 @@ export function runBackground(
 }
 
 /** Wave and storm timers, as in `threats`. Returns ships lost to a wave. */
-function timers(s: Sim, dt: number, ev: boolean): number {
+function timers(s: Sim, dt: number, ev: boolean, waves: boolean): number {
   const sys = s.systems[s.systemId];
   if (sys.tier === 1) return 0;
   let lost = 0;
   const w = s.wave;
-  w.timer -= dt;
-  if (!w.warning && w.timer <= waveWarning(s)) {
-    w.warning = true;
-    w.size = waveSize(s);
-    if (ev) emit(s, 'PirateWaveIncoming', { size: w.size, eta: Math.ceil(w.timer) });
-  }
-  if (w.timer <= 0) {
-    w.warning = false;
-    lost = rollWave(s, w.size, ev);
-    if (ev) emit(s, 'WaveRepelled', {});
-    w.timer = WAVE_INTERVAL(sys.tier) * randRange(s, ...WAVE_INTERVAL_JITTER);
+  if (waves) {
+    w.timer -= dt;
+    if (!w.warning && w.timer <= waveWarning(s)) {
+      w.warning = true;
+      w.size = waveSize(s);
+      if (ev) emit(s, 'PirateWaveIncoming', { size: w.size, eta: Math.ceil(w.timer) });
+    }
+    if (w.timer <= 0) {
+      w.warning = false;
+      lost = rollWave(s, w.size, ev);
+      if (ev) emit(s, 'WaveRepelled', {});
+      w.timer = WAVE_INTERVAL(sys.tier) * randRange(s, ...WAVE_INTERVAL_JITTER);
+    }
   }
   const st = s.storm;
   if (st.active > 0) {
@@ -197,11 +204,11 @@ function timers(s: Sim, dt: number, ev: boolean): number {
 /**
  * Resolve a wave of `size` against the launched fighters: each pirate the fighters
  * cannot hold off takes one ship, capped at the loss buffer and taken from it in
- * `BUFFER_ORDER`. The carrier and barges are never lost here.
+ * `BUFFER_ORDER`. Docked and carried ships, the carrier and barges are never lost here.
  */
 function rollWave(s: Sim, size: number, ev: boolean): number {
   let defence = 0;
-  for (const x of s.ships) if (x.cls === 'fighter' && x.mode !== 'docked') defence++;
+  for (const x of s.ships) if (x.cls === 'fighter' && exposed(x)) defence++;
   const p = size / (size + 2 * defence + 1);
   let hits = 0;
   for (let i = 0; i < size; i++) if (rand(s) < p) hits++;
@@ -216,7 +223,7 @@ function rollWave(s: Sim, size: number, ev: boolean): number {
     if (cls !== 'fighter' && !reserve.has(cls)) continue;
     for (let i = s.ships.length - 1; i >= 0 && lost < n; i--) {
       const x = s.ships[i];
-      if (x.cls !== cls) continue;
+      if (x.cls !== cls || !exposed(x)) continue;
       s.ships.splice(i, 1);
       lose(s, x, ev);
       lost++;
