@@ -1,5 +1,21 @@
 import type { CarrierBrief } from '../game/snapshot';
 
+/**
+ * Every carrier in the run. After the first worker snapshot `engine.state.ops` holds only the
+ * focused operation, so the list comes from the briefs; the ops stand in before one arrives (#178).
+ */
+export function carrierRoster(
+  briefs: readonly CarrierBrief[],
+  ops: readonly { id: number; systemId: number; hangars: readonly { id: number }[] }[],
+): { id: number; systemId: number; hangars: number[] }[] {
+  if (briefs.length > 0) return [...briefs];
+  return ops.map((op) => ({
+    id: op.id,
+    systemId: op.systemId,
+    hangars: op.hangars.map((h) => h.id),
+  }));
+}
+
 /** Carriers with hotkeys 1–9. */
 export const HOTKEYS = 9;
 

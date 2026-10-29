@@ -5,6 +5,7 @@ import { updateSettings, useSettings } from '../game/settings';
 import { setActiveSlot } from '../game/slots';
 import { SHIP_STATS } from '../sim/config';
 import { SHIP_CLASSES } from '../sim/types';
+import { carrierRoster } from './carriers';
 import { downloadFile } from './download';
 import { resolveAlert } from '../game/toasts';
 import { formatEvent, toneClass } from './events';
@@ -96,7 +97,7 @@ export function LogPanel({
 }) {
   const s = useGame();
   const st = s.stats;
-  const choices = carrierChoices(engine.state.ops, s.systems);
+  const choices = carrierChoices(carrierRoster(engine.carriers, engine.state.ops), s.systems);
   const selected = activeCarrier(
     carrier,
     choices.map((c) => c.id),
