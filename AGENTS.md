@@ -1,21 +1,28 @@
 # Asteroid Fleet
 
-A browser idle/autobattler game in 3D: a deterministic TypeScript simulation in a Web Worker, rendered with React Three Fiber. pnpm, Vite, Vitest, Playwright, oxlint and oxfmt.
+A browser idle/autobattler game in 3D: a deterministic TypeScript simulation in a Web Worker, rendered with React Three Fiber. pnpm, Vite, Vitest, Playwright, oxlint and oxfmt. Run `pnpm install` once per checkout.
 
-Before calling a change done, run `pnpm run lint && pnpm run format:check && pnpm run typecheck && pnpm test`.
+Before calling a change done, run `pnpm run lint && pnpm run format:check && pnpm run typecheck && pnpm test`. CI also runs the build, the bundle budget and e2e; [workflow.md](docs/agents/workflow.md) says when to run those locally.
+
+## Rules that apply everywhere
+
+- `src/sim/` stays deterministic and pure: randomness only through `rand(s)`, never `Math.random()`, and no DOM, React or three.js.
+- Any change to the shape of `GameState` or `Operation` needs a save migration.
+- Branch from current `main`. Bring the branch up to date with `main` before opening a PR. Never merge a PR without the user's approval.
+- `scratch.md` at the repo root is the maintainer's work queue. Don't act on its items unless the user asks.
 
 ## Read what your task needs
 
-- [docs/agents/workflow.md](docs/agents/workflow.md): commands, CI, bundle budget, releases, commit style
-- [docs/agents/conventions.md](docs/agents/conventions.md): TypeScript, comments, lint, performance idioms, naming
-- [docs/agents/testing.md](docs/agents/testing.md): test helpers, golden/scale/balance suites, e2e
-- [docs/agents/architecture/overview.md](docs/agents/architecture/overview.md): layers, import rules, data flow (start here for any code change)
-  - [sim.md](docs/agents/architecture/sim.md): state model, tick, determinism, commands, tuning
-  - [host-and-protocol.md](docs/agents/architecture/host-and-protocol.md): worker, runner, messages, events, engine
-  - [rendering.md](docs/agents/architecture/rendering.md): scene, per-frame data, LOD, models
-  - [ui.md](docs/agents/architecture/ui.md): `useGame`, panels, hotkeys, modals, styling
-- [docs/agents/save-and-migrations.md](docs/agents/save-and-migrations.md): read this before changing `GameState` or `Operation`
-- [docs/agents/game-design.md](docs/agents/game-design.md): what the game is and which design decisions are settled
+- [docs/agents/workflow.md](docs/agents/workflow.md): before running anything beyond the gate above, or before a commit, PR or release
+- [docs/agents/conventions.md](docs/agents/conventions.md): before writing code (TypeScript, comments, lint, performance idioms, naming)
+- [docs/agents/testing.md](docs/agents/testing.md): before adding or changing tests, or when a golden, scale or e2e test fails
+- [docs/agents/architecture/overview.md](docs/agents/architecture/overview.md): before any code change (layers, import rules, data flow)
+  - [sim.md](docs/agents/architecture/sim.md): before touching `src/sim/`
+  - [host-and-protocol.md](docs/agents/architecture/host-and-protocol.md): before touching the worker, runner, messages or engine in `src/game/`
+  - [rendering.md](docs/agents/architecture/rendering.md): before touching `src/render/`
+  - [ui.md](docs/agents/architecture/ui.md): before touching `src/ui/`
+- [docs/agents/save-and-migrations.md](docs/agents/save-and-migrations.md): before changing `GameState`, `Operation` or save/load code
+- [docs/agents/game-design.md](docs/agents/game-design.md): before changing gameplay or balance, to see which design decisions are settled
 
 ## Keep docs and code in step
 
