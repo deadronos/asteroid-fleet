@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { order, prestige } from './actions';
-import { conditionHolds } from './cards';
+import { apply, order, prestige } from './actions';
+import { conditionHolds, firing } from './cards';
 import { CARD_SLOTS, PRESETS } from './config';
 import { buildCtx, stanceOf } from './ctx';
 import { effectiveStance, stanceSource } from './doctrine';
-import { createShip, enterSystem, unlockRule, stateOf } from './state';
+import { bind, createShip, enterSystem, newGame, unlockRule, stateOf } from './state';
 import { stepSim } from './tick';
 import type { Sim, RuleCard, RuleId, Ship } from './types';
 import { game as freshGame } from './testing';
@@ -277,5 +277,51 @@ describe('rule cards (#82)', () => {
     expect(s.cards.at(-1)!.id).toBe(id);
     expect(order(s, { type: 'deleteCard', id })).toBeNull();
     expect(s.cards).toHaveLength(CARD_SLOTS - 1);
+  });
+});
+
+describe('hangar-scoped cards across carriers (#178)', () => {
+  it("adds and edits a card scoped to another carrier's hangar through apply", () => {
+    const g = newGame(3);
+    g.lifetime.admiralties = 3;
+    g.credits = 1e7;
+    expect(apply(g, { type: 'buyCarrier', carrierId: g.ops[0].id })).toBeNull();
+    g.focusId = g.ops[0].id;
+    for (const id of Object.keys(PRESETS) as RuleId[]) unlockRule(bind(g, g.ops[0]), id);
+    const theirs = g.ops[1].hangars[0].id;
+    expect(g.ops[0].hangars.map((h) => h.id)).not.toContain(theirs);
+    const card = stanceCard({ kind: 'hangar', id: theirs }, 'engagement:escort');
+    expect(apply(g, { type: 'addCard', card, carrierId: g.ops[0].id })).toBeNull();
+    const added = g.cards.at(-1)!;
+    expect(added.scope).toEqual({ kind: 'hangar', id: theirs });
+    const edited = stanceCard({ kind: 'hangar', id: theirs }, 'engagement:defensive');
+    expect(
+      apply(g, { type: 'updateCard', id: added.id, card: edited, carrierId: g.ops[0].id }),
+    ).toBeNull();
+    expect(
+      apply(g, {
+        type: 'addCard',
+        card: stanceCard({ kind: 'hangar', id: 9999 }, 'engagement:escort'),
+        carrierId: g.ops[0].id,
+      }),
+    ).toMatch(/nothing/);
+  });
+
+  it("applies to the owning carrier's ships only", () => {
+    const g = newGame(3);
+    g.lifetime.admiralties = 3;
+    g.credits = 1e7;
+    expect(apply(g, { type: 'buyCarrier', carrierId: g.ops[0].id })).toBeNull();
+    const theirs = g.ops[1].hangars[0].id;
+    const card: RuleCard = {
+      id: 1,
+      ...stanceCard({ kind: 'hangar', id: theirs }, 'engagement:escort'),
+    };
+    const s0 = bind(g, g.ops[0]);
+    const s1 = bind(g, g.ops[1]);
+    const mine = s0.ships[0];
+    expect(firing(s0, [card], mine)).toBeNull();
+    s1.ships.push({ ...mine, hangarId: theirs });
+    expect(firing(s1, [card], s1.ships.at(-1)!)).toBe(card);
   });
 });

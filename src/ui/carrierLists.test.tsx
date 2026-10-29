@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { useState } from 'react';
+import { act, useState } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { engine } from '../game/engine';
 import { encodeSnapshot } from '../game/snapshot';
@@ -67,5 +67,24 @@ describe('carrier lists in a mirror holding only the focused operation (#178)', 
     await click(m.button(/New card/)!);
     const scope = m.el.querySelector('.card-edit select');
     expect(optionValues(scope)).toContain(JSON.stringify({ kind: 'hangar', id: otherHangar }));
+  });
+
+  it("shows no error for a card scoped to another carrier's hangar", async () => {
+    const { mirror, otherHangar } = mirrorOfTwo();
+    const m = await mount(<RuleCards />, mirror);
+    cleanup = m.cleanup;
+    await click(m.button(/New card/)!);
+    const scope = m.el.querySelector<HTMLSelectElement>('.card-edit select')!;
+    await act(async () => {
+      const desc = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')!;
+      (desc as { set(this: HTMLSelectElement, v: string): void }).set.call(
+        scope,
+        JSON.stringify({ kind: 'hangar', id: otherHangar }),
+      );
+      scope.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    expect(scope.value).toBe(JSON.stringify({ kind: 'hangar', id: otherHangar }));
+    expect(m.el.querySelector('.card-edit .err, .card-edit .error')).toBeNull();
+    expect(m.el.querySelector('.card-edit')?.textContent).not.toMatch(/does nothing/);
   });
 });

@@ -13,7 +13,7 @@ import {
 } from './config';
 import { cargoCap } from './ctx';
 import { dist, dist2 } from './math';
-import { maxEnergy, maxHull } from './state';
+import { maxEnergy, maxHull, stateOf } from './state';
 import {
   type ActionKind,
   type CardScope,
@@ -129,8 +129,14 @@ const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v
 /**
  * Check and normalise a card from the UI or a save. Returns an error message,
  * or null with `card` cleaned in place (values clamped, stray fields dropped).
+ * A hangar scope may name a hangar of any carrier (#178). `hangarIds` lists them when the
+ * caller holds only one operation (the UI mirror); the sim reads them off the whole game.
  */
-export function checkCard(s: Sim, card: Omit<RuleCard, 'id'>): string | null {
+export function checkCard(
+  s: Sim,
+  card: Omit<RuleCard, 'id'>,
+  hangarIds: readonly number[] = stateOf(s).ops.flatMap((o) => o.hangars.map((h) => h.id)),
+): string | null {
   const then = card.then;
   const action = ACTION_DEFS[then?.kind];
   if (!action) return 'Pick an action';
@@ -141,7 +147,7 @@ export function checkCard(s: Sim, card: Omit<RuleCard, 'id'>): string | null {
     sc?.kind === 'fleet' ||
     (!!action.classes &&
       (sc?.kind === 'hangar'
-        ? s.hangars.some((h) => h.id === sc.id)
+        ? hangarIds.includes(sc.id)
         : sc?.kind === 'class' && action.classes.includes(sc.cls)));
   if (!fits) return 'That action does nothing for these units';
   const when = card.when;

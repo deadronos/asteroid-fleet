@@ -100,7 +100,7 @@ function Editor({
   // Hangars of every carrier: the mirror holds only the focused operation (#178).
   const hangarIds = carrierRoster(engine.carriers, engine.state.ops).flatMap((c) => c.hangars);
   // The sim's own check, on a copy, so the editor can say what is wrong before sending.
-  const err = checkCard(s, structuredClone(d));
+  const err = checkCard(s, structuredClone(d), hangarIds);
   const setCond = (i: number, c: Condition) =>
     setD({ ...d, when: d.when.map((x, j) => (j === i ? c : x)) });
   const pickCond = (i: number, kind: ConditionKind) => {
