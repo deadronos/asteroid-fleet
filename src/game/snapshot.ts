@@ -103,8 +103,9 @@ const moduleIndex = new Map(MODULE_IDS.map((m, i) => [m, i]));
 
 const MAX_MODULES = Math.max(...Object.values(MODULE_SLOTS));
 // id cls hangarId mode pos×3 hull cargo cargoValue h2 targetId escortId hasStation station×3
-// bargeId fireCooldown hasHold holdCard holdUntil nModules modules×MAX_MODULES
-const SHIP_ROW = 23 + MAX_MODULES;
+// bargeId fireCooldown hasHold holdCard holdUntil nModules idleUntil (NaN for none)
+// modules×MAX_MODULES
+const SHIP_ROW = 24 + MAX_MODULES;
 // id pos×3 hull maxHull damage speed targetId fireCooldown
 const PIRATE_ROW = 10;
 // id pos×3 ore maxOre value radius respawn
@@ -153,7 +154,8 @@ export function encodeSnapshot(
       ships[o + 21] = sh.hold.until;
     }
     ships[o + 22] = sh.modules.length;
-    for (let i = 0; i < sh.modules.length; i++) ships[o + 23 + i] = moduleIndex.get(sh.modules[i])!;
+    ships[o + 23] = sh.idleUntil ?? NaN;
+    for (let i = 0; i < sh.modules.length; i++) ships[o + 24 + i] = moduleIndex.get(sh.modules[i])!;
     o += SHIP_ROW;
   }
 
@@ -285,8 +287,10 @@ export function applySnapshot(prevState: GameState | null, snap: UiSnapshot): Ga
     if (shipRows[o + 19]) sh.hold = { card: shipRows[o + 20], until: shipRows[o + 21] };
     else delete sh.hold;
     const modules: ModuleId[] = [];
-    for (let i = 0; i < shipRows[o + 22]; i++) modules.push(MODULE_IDS[shipRows[o + 23 + i]]);
+    for (let i = 0; i < shipRows[o + 22]; i++) modules.push(MODULE_IDS[shipRows[o + 24 + i]]);
     sh.modules = modules;
+    if (Number.isNaN(shipRows[o + 23])) delete sh.idleUntil;
+    else sh.idleUntil = shipRows[o + 23];
     ships.push(sh);
   }
 
