@@ -13,7 +13,7 @@ Source of truth: `tick.ts`, `ctx.ts`, `view.ts`, `state.ts`, `types.ts`, `config
 ## The tick
 
 - Fixed step: `TICK_HZ = 10`, `DT = 0.1` (`config.ts`).
-- `step(g, op)` moves the run clock and plays one operation. Other carriers in the same system go through `stepOp`, and carriers elsewhere through `stepBackground` (Tier B, one aggregate step per second, `background.ts`). Dropping a carrier to Tier B resolves a wave that is still active, with the same roll as a background wave (#177). Offline time is Tier C: `settleOffline` (`actions.ts`) runs the background model over the time away.
+- `step(g, op)` moves the run clock and plays one operation. Other carriers in the same system go through `stepOp`, and carriers elsewhere through `stepBackground` (Tier B, one aggregate step per second, `background.ts`). Dropping a carrier to Tier B resolves a wave that is still active, with the same roll as a background wave (#177). Offline time is Tier C: `settleOffline` (`actions.ts`) runs the background model over the time away, rolling later waves quietly. A wave already on the map is resolved with events first (#177).
 - `stepSim(s)` is the test and benchmark entry point for one bound operation.
 - `stepOp` runs in a fixed order: fx decay → power → threats → launch → each ship's behaviour → turrets → pirates → hazards → refine → field → containers → reserves → automation → drift → cleanup → challenge check → income averages → warp. Order matters for determinism and for golden tests, so don't reorder it casually.
 - Behaviour per ship class lives in `mining.ts` (drone, barge, hauler, harvester) and `combat.ts` (fighter, scout, repair, pirates). Environment is in `world.ts`, jumps in `warp.ts`, supply routes in `routes.ts`.
