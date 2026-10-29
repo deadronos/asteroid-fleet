@@ -10,7 +10,7 @@ import {
   refineRate,
   warpCost,
 } from './config';
-import { findSpace } from './hangar';
+import { findSpace, fits } from './hangar';
 import { energyMult, shipBanned } from './modifiers';
 import { admiraltyEffect } from './admiralty';
 import { lvl, repeatEffect } from './research';
@@ -121,7 +121,9 @@ export function createShip(
   let hangar: Hangar | undefined;
   let at = start ?? -1;
   if (preferredHangar !== undefined && start !== undefined) {
+    // An explicit slot is honoured only if the span is in range and free; no fallback.
     hangar = s.hangars.find((h) => h.id === preferredHangar);
+    if (!hangar || !fits(s, hangar, cls, start)) return null;
   } else {
     const space = findSpace(s, cls, preferredHangar);
     if (!space) return null;
