@@ -14,10 +14,10 @@ The #169 review was split into #170–#190. This is the remaining work, in sugge
 - #189: a new run restarts the runner clock (#198)
 - #174: each carrier keeps its own rebuild queue and automation timer (#200)
 - #177: switching focus resolves an active wave before `dematerialise` (#199)
+- #183: the shop falls back to the focused carrier's hangar after a switch (#204)
 
 ## 2. Multi-carrier correctness
 
-- [ ] #183 shop keeps a stale hangar after a carrier switch: key `FleetPanel` by carrier
 - [ ] #178 UI lists read `engine.state.ops` (focused only): use `engine.carriers`
 
 ## 3. Rendering
