@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { stressGame } from '../sim/stress';
 import { stateOf } from '../sim/state';
 import { stepSim } from '../sim/tick';
-import type { GameState, Sim } from '../sim/types';
+import type { GameState, Ship, Sim } from '../sim/types';
 import { OTHER_ROW, applySnapshot, encodeSnapshot } from './snapshot';
 
 function busyGame(): Sim {
@@ -81,6 +81,51 @@ describe('UI snapshot', () => {
     expect(s.ships.some((x) => x.hold)).toBe(true);
     expect(Object.keys(s.fields).length).toBeGreaterThan(0);
     expect(roundTrip(s, null)).toEqual(expected(s, []));
+  });
+
+  it('round-trips every Ship key, optional ones included', () => {
+    const s = busyGame();
+    // `Required<Ship>` makes a new Ship field a type error here until it is set below.
+    const full: Required<Ship> = {
+      id: 987654,
+      cls: 'drone',
+      hangarId: s.hangars[0].id,
+      mode: 'toBarge',
+      pos: { x: 1.5, y: -2.5, z: 3.5 },
+      hull: 12.25,
+      cargo: 4,
+      cargoValue: 88.5,
+      h2: 3.75,
+      targetId: 17,
+      escortId: 18,
+      station: { x: 7, y: 8, z: 9 },
+      bargeId: 19,
+      fireCooldown: 0.625,
+      modules: ['drill'],
+      hold: { card: 2, until: s.time + 9.5 },
+      idleUntil: s.time + 6.25,
+    };
+    s.ships.push(full);
+    const bare = s.ships.find((x) => x.idleUntil === undefined && x.hold === undefined)!;
+    const out = roundTrip(s, null).ops[0].ships;
+    const got = out.find((x) => x.id === full.id)!;
+    expect(Object.keys(got).sort()).toEqual(Object.keys(full).sort());
+    for (const k of Object.keys(full) as (keyof Ship)[])
+      expect({ [k]: got[k] }).toEqual({ [k]: full[k] });
+    // Absent optional keys stay absent, not undefined or NaN.
+    expect('idleUntil' in out.find((x) => x.id === bare.id)!).toBe(false);
+  });
+
+  it('keeps the drone cover backoff (#187)', () => {
+    const s = busyGame();
+    const drone = s.ships.find((x) => x.cls === 'drone')!;
+    drone.idleUntil = s.time + 4;
+    const prev = roundTrip(s, null);
+    expect(prev.ops[0].ships.find((x) => x.id === drone.id)!.idleUntil).toBe(drone.idleUntil);
+    // An expired backoff cleared in the sim must clear on the reused mirror ship too.
+    delete drone.idleUntil;
+    const next = roundTrip(s, prev, false);
+    expect('idleUntil' in next.ops[0].ships.find((x) => x.id === drone.id)!).toBe(false);
   });
 
   it('updates the previous mirror in place', () => {
