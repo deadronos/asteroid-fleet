@@ -172,6 +172,9 @@ export class SimRunner {
     const saturated = this.inflight >= MAX_INFLIGHT;
     if (ticks > 0) {
       this.dirty = true;
+      // A jump sends its state first, so the mirror never draws the old field around the new origin (#182).
+      if (this.fieldsAt !== null && focusOp(s).systemId !== this.fieldsAt)
+        this.sendState(now, true);
       if (!saturated) this.sendFrame(true);
     }
     this.sendEvents();

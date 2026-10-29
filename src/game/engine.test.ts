@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { focusOp, newGame } from '../sim/state';
 import type { SimEvent } from '../sim/types';
 import { engine } from './engine';
+import { encodeSnapshot } from './snapshot';
 import { ACTIVE_SLOT_KEY } from './slots';
 import { TOAST_MS, VISIBLE_CAP, WAITING_CAP } from './toasts';
 
@@ -242,5 +243,26 @@ describe('autosave across a reset (#170)', () => {
     expect(write).toHaveBeenCalledWith(fresh);
     write.mockRestore();
     e.host = host;
+  });
+});
+
+describe('jump of the focused carrier (#182)', () => {
+  it('counts a cut and drops the old system asteroids when the state carries a new systemId', () => {
+    const g = newGame(4);
+    engine.replace(g);
+    expect(focusOp(engine.state).asteroids.length).toBeGreaterThan(0);
+    const cuts = engine.cuts;
+    const jumped = structuredClone(g);
+    const op = focusOp(jumped);
+    op.systemId = 1;
+    op.asteroids = [];
+    const { snap } = encodeSnapshot(jumped, true);
+    engine.onSimMessage({ t: 'state', snap, offline: null });
+    expect(engine.cuts).toBe(cuts + 1);
+    expect(focusOp(engine.state).systemId).toBe(1);
+    expect(focusOp(engine.state).asteroids).toHaveLength(0);
+    // The same system again is not a cut.
+    engine.onSimMessage({ t: 'state', snap: encodeSnapshot(jumped, false).snap, offline: null });
+    expect(engine.cuts).toBe(cuts + 1);
   });
 });
