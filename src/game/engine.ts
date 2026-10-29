@@ -212,7 +212,12 @@ class Engine {
   /** A new state replaces the mirror. Positions keep coming from frames in between. */
   private adopt(state: GameState) {
     const first = this.ships.size === 0 && this.pirates.size === 0;
-    const switched = focusOp(state).id !== focusOp(this.state).id;
+    const was = focusOp(this.state);
+    const now = focusOp(state);
+    // A jump moves the carrier in one tick, so a new system is a cut like a new carrier.
+    const jumped = now.id === was.id && now.systemId !== was.systemId;
+    if (jumped) this.cuts++;
+    const switched = now.id !== was.id || jumped;
     this.state = state;
     const mirrored = focusOp(state).id;
     if (this.pendingFocus === mirrored) this.pendingFocus = null;

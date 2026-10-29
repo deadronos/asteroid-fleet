@@ -22,7 +22,7 @@ Source of truth: `host.ts`, `localHost.ts`, `sim.worker.ts`, `runner.ts`, `proto
 - `InMsg` (main → sim): `init`, `cmd`, `focus`, `speed`, `pause`, `prestige`, `admiralty`, `challenge`, `replace`, `ack`, `snapshot`.
 - `OutMsg` (sim → main):
   - `frame`: every pump, focused carrier only. Ids, positions (Float64 so mirrors save exactly), mode bytes (`MODES` index), and targets as typed arrays, transferred.
-  - `state`: about 5 Hz. A `UiSnapshot` (`snapshot.ts`) packs ships, pirates and asteroids as rows of one Float64Array each, with a `focus` part and a `global` part, plus `carriers` and `others` summaries. Fields are sent only when the system changed.
+  - `state`: about 5 Hz. A `UiSnapshot` (`snapshot.ts`) packs ships, pirates and asteroids as rows of one Float64Array each, with a `focus` part and a `global` part, plus `carriers` and `others` summaries. Fields are sent only when the system changed. A jump of the focused carrier also sends a state in the jump tick, ahead of that tick's frame; `Engine.adopt` counts it as a cut like a focus switch (#182).
   - `events`: drained sim events, merged and ranked.
   - `error`: a refused command's message.
   - `snapshot`: the full `GameState`, used by the save path.

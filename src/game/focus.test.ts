@@ -233,3 +233,23 @@ describe('shared asteroid field (#176)', () => {
     expect(a.asteroids[1].ore).toBe(3);
   });
 });
+
+describe('jump of the focused carrier (#182)', () => {
+  it('sends a state with the new system and its field in the jump tick, before the frame', () => {
+    const { out, pump, g } = run(newGame(5));
+    out.length = 0;
+    bind(g(), g().ops[0]).warp = {
+      targetSystem: 1,
+      charge: 0,
+      total: 1,
+      paid: { energy: 0, h2: 0 },
+    };
+    pump(1);
+    const kinds = out.map((m) => m.t);
+    const state = out.find((m) => m.t === 'state');
+    if (state?.t !== 'state') throw new Error('no state in the jump tick');
+    expect(kinds.indexOf('state')).toBeLessThan(kinds.indexOf('frame'));
+    const mirror = applySnapshot(null, state.snap);
+    expect(focusOp(mirror).systemId).toBe(1);
+  });
+});
