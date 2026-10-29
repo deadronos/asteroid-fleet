@@ -468,8 +468,8 @@ export interface OfflineReport {
 }
 
 /**
- * Offline, the background model keeps rolling pirate waves quietly (ships can be lost with no
- * event); a wave already on the map at departure is resolved with events. The fleet earns only
+ * Offline, no new pirate waves roll; a wave already on the map at departure is resolved with
+ * events. The fleet earns only
  * what safe mining yielded recently (salvage excluded), at reduced efficiency. Offline credits
  * do not count toward prestige research. Energy recharges from solar minus fleet upkeep over
  * the elapsed time (never below zero; mining income is already net of upkeep). Reserves keep
@@ -501,9 +501,9 @@ export function settleOffline(
 }
 
 function settleOp(s: Sim, t: number): { credits: number; rebuilt: number } {
-  // Report the wave already on the map. Later waves stay quiet (ships can be lost with no event).
+  // Report the wave already on the map. No new wave rolls while away (#179).
   dematerialise(s, { events: true });
-  const r = runBackground(s, t, { efficiency: OFFLINE_EFFICIENCY, events: false });
+  const r = runBackground(s, t, { efficiency: OFFLINE_EFFICIENCY, events: false, waves: false });
   s.carrier.shield = 1;
   // Never come back to an imminent wave.
   if (s.systems[s.systemId].tier > 1 && s.wave.timer < RETURN_GRACE_S) {
