@@ -289,4 +289,16 @@ export class SimView {
   set noCoverAt(v: Operation['noCoverAt']) {
     this.op.noCoverAt = v;
   }
+  get rebuildQueue(): Operation['rebuildQueue'] {
+    return this.op.rebuildQueue;
+  }
+  set rebuildQueue(v: Operation['rebuildQueue']) {
+    this.op.rebuildQueue = v;
+  }
+  get automationTimer(): Operation['automationTimer'] {
+    return this.op.automationTimer;
+  }
+  set automationTimer(v: Operation['automationTimer']) {
+    this.op.automationTimer = v;
+  }
 }

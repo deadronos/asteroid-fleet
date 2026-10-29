@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { admiralty, apply, prestige, startChallenge } from './actions';
+import { automation } from './automation';
 import { CARRIER_COST } from './config';
+import { destroyShip } from './ctx';
 import { CHALLENGES } from './modifiers';
 import { migrate } from '../game/migrate';
 import type { ChallengeId } from './types';
-import { newGame } from './state';
+import { bind, newGame } from './state';
 import { step } from './tick';
 
 function ready(admiralties = 3) {
@@ -105,5 +107,33 @@ describe('buy a carrier (#78)', () => {
     buy(g);
     const next = startChallenge(g, Object.keys(CHALLENGES)[0] as ChallengeId);
     expect(next?.ops).toHaveLength(2);
+  });
+
+  it('rebuilds a loss onto the carrier that lost it (#174)', () => {
+    const g = ready();
+    buy(g);
+    g.researchLevels.autoRebuild = 1;
+    const a = bind(g, g.ops[0]);
+    const b = bind(g, g.ops[1]);
+    expect(
+      apply(g, { type: 'setAutomation', patch: { autoRebuild: true }, carrierId: a.id }),
+    ).toBeNull();
+    g.credits = 1e7;
+    const lost = b.ships.find((x) => x.cls === 'drone')!;
+    const { cls, hangarId } = lost;
+    b.ships = b.ships.filter((x) => x !== lost);
+    destroyShip(b, lost, 'destroyed');
+    expect(b.rebuildQueue).toEqual([{ cls, hangarId }]);
+    expect(a.rebuildQueue).toEqual([]);
+    const left = b.ships.filter((x) => x.cls === cls && x.hangarId === hangarId).length;
+    a.automationTimer = 0.1;
+    b.automationTimer = 0.1;
+    const aCount = a.ships.length;
+    automation(a, 0.1);
+    automation(b, 0.1);
+    expect(a.ships.length).toBe(aCount);
+    expect(b.ships.filter((x) => x.cls === cls && x.hangarId === hangarId)).toHaveLength(left + 1);
+    expect(a.rebuildQueue).toHaveLength(0);
+    expect(b.rebuildQueue).toHaveLength(0);
   });
 });

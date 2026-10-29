@@ -18,8 +18,7 @@ export const engagementUnlocked = (s: Sim) =>
 /** Remember a lost ship so paid auto-rebuild can replace it. */
 export function queueRebuild(s: Sim, ship: Ship) {
   if (!s.automation.autoRebuild || !autoRebuildUnlocked(s)) return;
-  const q = s.automation.rebuildQueue;
-  q.push({ cls: ship.cls, hangarId: ship.hangarId });
+  s.rebuildQueue.push({ cls: ship.cls, hangarId: ship.hangarId });
   trimQueue(s);
 }
 
@@ -27,7 +26,7 @@ export function queueRebuild(s: Sim, ship: Ship) {
 export const rebuildQueueCap = (s: Sim) => s.hangars.reduce((n, h) => n + h.slots, 0);
 
 function trimQueue(s: Sim) {
-  const q = s.automation.rebuildQueue;
+  const q = s.rebuildQueue;
   const extra = q.length - rebuildQueueCap(s);
   if (extra > 0) q.splice(0, extra); // drop the oldest
 }
@@ -46,33 +45,34 @@ function tryBuy(s: Sim, cls: ShipClass, hangarId: number): boolean {
 
 export function automation(s: Sim, dt: number) {
   const a = s.automation;
-  a.timer -= dt;
-  if (a.timer > 0) return;
-  a.timer = AUTOMATION_INTERVAL;
+  s.automationTimer -= dt;
+  if (s.automationTimer > 0) return;
+  s.automationTimer = AUTOMATION_INTERVAL;
 
   // Also heals saves written before the queue was gated and capped.
-  if (!a.autoRebuild) a.rebuildQueue.length = 0;
+  if (!a.autoRebuild) s.rebuildQueue.length = 0;
   else trimQueue(s);
 
   if (a.autoRebuild && autoRebuildUnlocked(s)) {
     // Oldest loss first; stop at the first one we cannot pay for, so order holds.
-    while (a.rebuildQueue.length > 0) {
-      const next = a.rebuildQueue[0];
+    const q = s.rebuildQueue;
+    while (q.length > 0) {
+      const next = q[0];
       if (shipBanned(s, next.cls)) {
-        a.rebuildQueue.shift(); // a modifier forbids it: it would block the queue forever
+        q.shift(); // a modifier forbids it: it would block the queue forever
         continue;
       }
       const home = s.hangars.some((h) => h.id === next.hangarId) ? next.hangarId : s.hangars[0].id;
       const fits = s.hangars.some((h) => firstFit(s, h, next.cls) >= 0);
       if (!fits) {
-        a.rebuildQueue.shift(); // no room anywhere: the player rearranged; drop it
+        q.shift(); // no room anywhere: the player rearranged; drop it
         continue;
       }
       const cost = shipCost(s, next.cls);
       if (!s.unlocked.includes(next.cls) || s.credits - cost < a.creditFloor) break;
       if (!createShip(s, next.cls, home)) break;
       s.credits -= cost;
-      a.rebuildQueue.shift();
+      q.shift();
       emit(s, 'ShipRebuilt', { cls: next.cls, cost });
     }
   }
