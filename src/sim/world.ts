@@ -26,6 +26,7 @@ import {
   refineThroughput,
   solarRate,
   spawnAsteroid,
+  stateOf,
   upkeepRate,
 } from './state';
 import type { Sim, Vec3 } from './types';
@@ -103,6 +104,9 @@ export function hazards(s: Sim, dt: number) {
 // ---------- field, reserves, carrier ----------
 
 export function field(s: Sim, dt: number) {
+  // Carriers sharing a field (#176) must not each tick it: the first one holding it does.
+  const first = stateOf(s).ops.find((op) => op.asteroids === s.asteroids);
+  if (first && first.id !== s.id) return;
   const sys = s.systems[s.systemId];
   let scouts = -1;
   let centers: Vec3[] | null = null;

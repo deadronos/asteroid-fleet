@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bind, createShip, focusOp, newGame } from '../sim/state';
+import { addCarrier, bind, createShip, focusOp, newGame } from '../sim/state';
 import type { GameState } from '../sim/types';
 import { createLocalHost } from './localHost';
 import { applySnapshot } from './snapshot';
@@ -170,5 +170,66 @@ describe('snapshot of a focused carrier', () => {
     const mirror = applySnapshot(prev, msg.snap);
     expect(focusOp(mirror).id).toBe(99);
     expect(focusOp(mirror).fx).toHaveLength(0);
+  });
+});
+
+/** Two carriers on one field in system 0, through `addCarrier`. */
+function sharing(): GameState {
+  const g = newGame(5);
+  addCarrier(g);
+  return g;
+}
+
+describe('shared asteroid field (#176)', () => {
+  it('holds one array per system while carriers are on the map, and a record when none is', () => {
+    const { host, pump, g } = run(sharing());
+    const [a, b] = g().ops;
+    expect(a.asteroids).toBe(b.asteroids);
+    a.asteroids[2].ore = 0;
+    a.asteroids[2].respawn = 80;
+    // A jumps away. Focus follows A, so B drops to the background in the same step and the
+    // last carrier off the map leaves the record.
+    bind(g(), a).warp = { targetSystem: 1, charge: 0, total: 1 };
+    pump(1);
+    expect(a.systemId).toBe(1);
+    expect(b.asteroids).toHaveLength(0);
+    expect(g().fields[0].rocks.map((r) => r[0])).toEqual([2]);
+    // Focus B: it rejoins the field and the record is consumed.
+    host.post({ t: 'focus', carrierId: b.id });
+    expect(b.asteroids[2].ore).toBe(0);
+    expect(g().fields[0]).toBeUndefined();
+    expect(a.asteroids).toHaveLength(0);
+    // Focus A back, then B again through a save: nothing is lost either way.
+    host.post({ t: 'focus', carrierId: a.id });
+    expect(g().fields[0].rocks.map((r) => r[0])).toEqual([2]);
+  });
+
+  it('keeps a carrier bought while focus is elsewhere off the field', () => {
+    const g = newGame(5);
+    g.lifetime.admiralties = 3;
+    g.credits = 1e7;
+    const { host, pump, g: live } = run(g);
+    const a = live().ops[0];
+    a.asteroids[2].ore = 0;
+    a.asteroids[2].respawn = 80;
+    bind(live(), a).warp = { targetSystem: 1, charge: 0, total: 1 };
+    pump(1);
+    expect(live().fields[0].rocks.map((r) => r[0])).toEqual([2]);
+    host.post({ t: 'cmd', cmd: { type: 'buyCarrier', carrierId: a.id } });
+    pump(1);
+    const b = live().ops[1];
+    expect(b.systemId).toBe(0);
+    expect(b.asteroids).toHaveLength(0);
+    expect(live().fields[0].rocks.map((r) => r[0])).toEqual([2]);
+  });
+
+  it('relinks carriers in one system after a save round trip', () => {
+    const g = sharing();
+    g.ops[0].asteroids[1].ore = 5;
+    g.ops[1].asteroids[1].ore = 3; // an older save held a separate copy per carrier
+    const { g: live } = run(JSON.parse(JSON.stringify(g)));
+    const [a, b] = live().ops;
+    expect(a.asteroids).toBe(b.asteroids);
+    expect(a.asteroids[1].ore).toBe(3);
   });
 });
