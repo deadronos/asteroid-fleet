@@ -502,7 +502,7 @@ function ShipShop({ hangarId }: { hangarId: number }) {
 }
 
 export function FleetPanel() {
-  const [picked, setSel] = useState(() => engine.view.hangars[0]?.id ?? 1);
+  const [picked, setPicked] = useState(() => engine.view.hangars[0]?.id ?? 1);
   const [selShip, setSelShip] = useState(-1);
   // Hangar boards and the shop subscribe themselves; this only needs the list shape.
   const f = useGame(
@@ -534,7 +534,7 @@ export function FleetPanel() {
           <HangarBoard
             hangarId={h.id}
             selected={sel === h.id}
-            onSelect={() => setSel(h.id)}
+            onSelect={() => setPicked(h.id)}
             selShip={selShip}
             onShip={(id) => {
               setSelShip(id === selShip ? -1 : id);
