@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { focusOp, newGame } from '../sim/state';
+import { bind, createShip, focusOp, newGame } from '../sim/state';
 import type { GameState } from '../sim/types';
 import { createLocalHost } from './localHost';
 import { applySnapshot } from './snapshot';
@@ -84,31 +84,54 @@ describe('carrier focus', () => {
   it('resolves an active wave when focus leaves that carrier', () => {
     const state = two(1);
     const op = state.ops[0];
+    const sim = bind(state, op);
+    // Launched fighters are in the loss buffer, so the focus drain carries ShipLost (#202).
+    for (let i = 0; i < 3; i++) {
+      const fighter = createShip(sim, 'fighter');
+      if (!fighter) throw new Error('no hangar space for a fighter');
+      fighter.mode = 'idle';
+    }
     op.wave.active = true;
     op.wave.size = 8;
-    op.pirates.push({
-      id: state.nextId++,
-      pos: { x: 40, y: 0, z: 0 },
-      hull: 30,
-      maxHull: 45,
-      damage: 5,
-      speed: 9,
-      targetId: -1,
-      fireCooldown: 0,
-    });
+    // Three living pirates: this seed's roll destroys one fighter and repels the wave.
+    for (let i = 0; i < 3; i++) {
+      op.pirates.push({
+        id: state.nextId++,
+        pos: { x: 40, y: 0, z: 0 },
+        hull: 30,
+        maxHull: 45,
+        damage: 5,
+        speed: 9,
+        targetId: -1,
+        fireCooldown: 0,
+      });
+    }
     const { host, out, g } = run(state);
     out.length = 0;
     host.post({ t: 'focus', carrierId: 99 });
     const bus = out.filter((m) => m.t === 'events');
     expect(bus).toHaveLength(1);
     expect(bus[0].t === 'events' && bus[0].events.map((e) => [e.kind, e.carrierId])).toEqual([
+      ['ShipLost', 0],
       ['WaveRepelled', 0],
     ]);
+    expect(bus[0].t === 'events' && bus[0].events[0]).toMatchObject({
+      count: 1,
+      data: { cls: 'fighter', cause: 'destroyed' },
+    });
     const snap = out.find((m) => m.t === 'state');
     expect(
       snap?.t === 'state' &&
         snap.snap.global.log.some((e) => e.kind === 'WaveRepelled' && e.carrierId === 0),
     ).toBe(true);
+    expect(
+      snap?.t === 'state' &&
+        snap.snap.global.log.some(
+          (e) => e.kind === 'ShipLost' && e.carrierId === 0 && e.data.cls === 'fighter',
+        ),
+    ).toBe(true);
+    expect(g().ops[0].ships.filter((ship) => ship.cls === 'fighter')).toHaveLength(2);
+    expect(g().stats.shipsLost).toBe(1);
     expect(g().ops[0].wave.active).toBe(false);
     expect(g().ops[0].pirates).toEqual([]);
 

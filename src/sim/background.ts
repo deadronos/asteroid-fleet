@@ -5,7 +5,8 @@
 // timers and are rolled with the operation's own rng, so the result depends only on the
 // operation and the run-wide state, never on what else was stepped. A wave already on the
 // map is rolled the same way when the carrier leaves Tier A, before its pirates are
-// dropped (#177). `settleOffline` plays the same model over the time away (Tier C).
+// dropped (#177). `settleOffline` plays the same model over the time away (Tier C): that
+// wave is reported, and later waves stay quiet (ships can be lost with no event).
 
 import { STORM_DURATION, STORM_GAP, WAVE_INTERVAL, WAVE_INTERVAL_JITTER } from './config';
 import { queueRebuild } from './automation';
@@ -33,7 +34,7 @@ export const BG_DT = 1;
 export interface BackgroundOpts {
   /** Share of the yield paid out: 1 in the background, `OFFLINE_EFFICIENCY` offline. */
   efficiency?: number;
-  /** Emit wave, storm and rebuild events. Off offline, where a summary replaces them. */
+  /** Emit wave, storm and rebuild events. Off for the quiet part of an offline settle. */
   events?: boolean;
 }
 
@@ -85,19 +86,21 @@ export function energyNet(s: Sim): number {
 
 /**
  * Leave Tier A. An active wave is resolved first, with one background roll per pirate
- * still alive, so a focus switch is not a free escape (#177). Then everything that only
- * exists on the map is dropped. Ships keep their mode, cargo and hull, so upkeep and the
- * loss buffer read the same as they did in the last Tier A step.
+ * still alive, so a focus switch is not a free escape (#177). `events` defaults on;
+ * pass false to apply the roll without reporting it. Then everything that only exists
+ * on the map is dropped. Ships keep their mode, cargo and hull, so upkeep and the loss
+ * buffer read the same as they did in the last Tier A step.
  */
-export function dematerialise(s: Sim) {
+export function dematerialise(s: Sim, opts: Pick<BackgroundOpts, 'events'> = {}) {
   // Resolve now. A later background step has no pirates to fight, and leaving the wave
   // active would clear it for free if focus came back before that step (#177).
+  const ev = opts.events ?? true;
   if (s.wave.active) {
     let remaining = 0;
     for (const p of s.pirates) if (p.hull > 0) remaining++;
-    if (remaining > 0) rollWave(s, remaining, true);
+    if (remaining > 0) rollWave(s, remaining, ev);
     s.wave.active = false;
-    emit(s, 'WaveRepelled', {});
+    if (ev) emit(s, 'WaveRepelled', {});
   }
   s.pirates.length = 0;
   s.fx.length = 0;

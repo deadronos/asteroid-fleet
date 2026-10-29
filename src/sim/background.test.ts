@@ -205,6 +205,22 @@ describe('Tier A / Tier B handover', () => {
     expect(again.events).toEqual(s.events);
   });
 
+  it('resolves an active wave without events when asked', () => {
+    const a = underAttack();
+    const b = underAttack();
+    const events = b.events.length;
+    const log = b.log.length;
+    dematerialise(a);
+    dematerialise(b, { events: false });
+    // Same roll. The snapshot drops events and the log, so only the report may differ.
+    expect(snapshot(a)).toBe(snapshot(b));
+    expect(a.events.some((e) => e.kind === 'WaveRepelled' || e.kind === 'ShipLost')).toBe(true);
+    expect(b.events).toHaveLength(events);
+    expect(b.log).toHaveLength(log);
+    expect(b.wave.active).toBe(false);
+    expect(b.pirates).toEqual([]);
+  });
+
   it('leaves a carrier with no active wave unchanged apart from the map', () => {
     const s = frontier();
     s.wave.warning = true;
@@ -271,6 +287,27 @@ describe('Tier A / Tier B handover', () => {
 });
 
 describe('Tier C', () => {
+  it('emits the departure wave before WelcomeBack and settles deterministically', () => {
+    const s = underAttack();
+    const g = stateOf(s);
+    g.events.length = 0;
+    const lostBefore = s.stats.shipsLost;
+    const other = structuredClone(g);
+    settleOffline(g, 60);
+    settleOffline(other, 60);
+
+    const kinds = g.events.map((e) => e.kind);
+    expect(kinds.at(-1)).toBe('WelcomeBack');
+    expect(kinds.at(-2)).toBe('WaveRepelled');
+    const shipLost = kinds.filter((k) => k === 'ShipLost');
+    expect(shipLost.length).toBeGreaterThan(0);
+    expect(shipLost.length).toBe(s.stats.shipsLost - lostBefore);
+    expect(kinds.slice(0, -2).every((k) => k === 'ShipLost')).toBe(true);
+    expect(kinds.filter((k) => k === 'WaveRepelled')).toHaveLength(1);
+
+    expect(JSON.stringify({ ...g, savedAt: 0 })).toBe(JSON.stringify({ ...other, savedAt: 0 }));
+  });
+
   it('an 8 h settle on the frontier leaves no fx, no ShipLost and a grace period', () => {
     const s = frontier(5);
     const g = stateOf(s);
