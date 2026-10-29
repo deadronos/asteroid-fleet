@@ -1,6 +1,6 @@
 # Next up: #169 review follow-ups
 
-The #169 review was split into #170–#190. This is the remaining work, in suggested order.
+The #169 review was split into #170–#190. All of #170–#190 is done (released in v0.0.11).
 
 ## Done
 
@@ -18,17 +18,11 @@ The #169 review was split into #170–#190. This is the remaining work, in sugge
 - #179: offline rolls no new pirate waves (the departure wave still resolves), and waves never take docked or carried ships (#206)
 - #178: carrier lists and rule-card hangar scopes cover every carrier (#205)
 - #176: carriers in one system share one live asteroid field (#207)
-
-## 3. Rendering
-
-- [ ] #180 low-quality frame cap freezes the camera (R3F `advance` with `frameloop: 'never'`)
-- [ ] #182 camera eases across a jump: treat a `systemId` change as a cut in `adopt`
-
-## 4. Small sim fixes
-
-- [ ] #184 cancel warp refunds only energy: store the payment split on `s.warp` (needs a save migration)
-- [ ] #186 `createShip` with `start` skips the slot fit
-- [ ] #187 `idleUntil` missing from the snapshot codec
+- #187: `idleUntil` round-trips in the snapshot ship rows (#208)
+- #186: `createShip` refuses an explicit slot that is out of range or taken (#209)
+- #184: cancelling a warp refunds 75% of the energy and H2 paid; save v19 (#211)
+- #180: the low-quality frame cap no longer freezes the camera clock (#212)
+- #182: a jump is a camera cut and swaps the field in the jump tick (#210)
 
 ## Later
 
