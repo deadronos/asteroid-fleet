@@ -6,7 +6,7 @@ Source of truth: the code itself, plus `.oxlintrc.json` and `.oxfmtrc.json`. Whe
 
 - Strict mode, with no unused locals or parameters. Named exports only (the one exception is `render/Effects.tsx`, a lazy default). No `enum` or `namespace`: use string-literal unions, with a runtime list beside them when one is needed (`SHIP_CLASSES`, `ALERT_MODES`, `MODES`).
 - Data tables are `Record<Union, Def>` objects in `config.ts` and friends (`SHIP_STATS`, `HULLS`, `MODULES`, `MODIFIERS`). Adding a union member then fails to compile until every table has an entry. Lean on that, and use `satisfies` where a list must cover a type (`OP_KEYS`).
-- Prefer plain functions over classes. Classes are used for stateful runtime objects (`SimRunner`, `EventAggregator`, `ToastQueue`, `PointGrid`, `Engine`).
+- Prefer plain functions over classes. Classes are used for stateful runtime objects (`SimRunner`, `EventAggregator`, `ToastQueue`, `PointGrid`, `Engine`), plus the generated `SimView` and the React error boundary `SceneBoundary`, which must be a class.
 - Fallible operations return a value instead of throwing: `string | null` refusals (`order`), `{ ok: true, ... } | { ok: false, reason }` results (`migrate`, `decodeSave`).
 - Casts are fine at three.js, DOM and JSON boundaries (`no-unsafe-type-assertion` is off). Elsewhere, narrow properly.
 

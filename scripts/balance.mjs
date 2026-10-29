@@ -1,6 +1,6 @@
 // Headless balance harness (#59). Loads the TypeScript sim through Vite's module
 // runner, so no build step or extra dependency is needed. See src/sim/balance/harness.ts.
-//   npm run balance -- --hours 6 --rp-divisor 1e4,1e5,1e6
+//   pnpm run balance --hours 6 --rp-divisor 1e4,1e5,1e6
 import { fileURLToPath } from 'node:url';
 import { runnerImport } from 'vite';
 

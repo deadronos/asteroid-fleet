@@ -1,12 +1,12 @@
 // Headless balance harness (#59): runs one operation of the deterministic sim
 // for N game hours under a scripted policy and reports pacing. No rendering, no
-// worker; `npm run balance` drives it through scripts/balance.mjs.
+// worker; `pnpm run balance` drives it through scripts/balance.mjs.
 //
-//   npm run balance                                  # 4 h, seed 42, RP_DIVISOR
-//   npm run balance -- --hours 8 --rp-divisor 1e4,1e5,1e6
-//   npm run balance -- --sample 1 --hours 0.5        # minute-by-minute opening
-//   npm run balance -- --research autoRebuild=1,slots=2   # a run after prestige
-//   npm run balance -- --json > run.json             # for plotting or diffing
+//   pnpm run balance                               # 4 h, seed 42, RP_DIVISOR
+//   pnpm run balance --hours 8 --rp-divisor 1e4,1e5,1e6
+//   pnpm run balance --sample 1 --hours 0.5        # minute-by-minute opening
+//   pnpm run balance --research autoRebuild=1,slots=2   # a run after prestige
+//   pnpm run balance --json > run.json             # for plotting or diffing
 //
 // Same seed and flags give the same numbers. The table samples credits,
 // earnings, ore value delivered (the prestige input), the RP a prestige would
@@ -249,7 +249,7 @@ export function formatReport(r: BalanceResult): string {
 
 // ---------- CLI ----------
 
-export const USAGE = `Usage: npm run balance -- [options]
+export const USAGE = `Usage: pnpm run balance [options]
   --hours <n>          game hours to simulate (default ${DEFAULT_OPTIONS.hours})
   --seed <n>           newGame seed (default ${DEFAULT_OPTIONS.seed})
   --rp-divisor <list>  comma-separated divisors to compare, e.g. 1e4,1e5,1e6 (default RP_DIVISOR = ${RP_DIVISOR})

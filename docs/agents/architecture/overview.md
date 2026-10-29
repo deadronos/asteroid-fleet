@@ -11,7 +11,7 @@ Source of truth: `src/main.tsx`, `src/sim/tick.ts`, `src/game/runner.ts`, `src/g
 | `src/render/` | React Three Fiber scene.                                                                                             | `sim/`, `game/`, `ui/palette`, `ui/hotkeys` |
 | `src/ui/`     | HTML/React panels over the canvas.                                                                                   | `sim/`, `game/`, `render/focus`             |
 
-Tests may cross these lines (for example a sim test importing a `game/` helper); production code may not. `sim/` must stay importable from a Web Worker and from Node (the balance harness), so nothing in it may touch `window`, `document`, React or three.js. The only wall-clock read in `sim/` is `savedAt: Date.now()` in `newGame`.
+Tests may cross these lines (for example a sim test importing a `game/` helper); production code may not. `sim/` must stay importable from a Web Worker and from Node (the balance harness), so nothing in it may touch `window`, `document`, React or three.js. The only wall-clock read in the game sim is `savedAt: Date.now()` in `newGame`. The Node-only balance harness (`sim/balance/`) also times its own run with `performance.now()`, which never feeds into a game.
 
 ## Data flow
 
