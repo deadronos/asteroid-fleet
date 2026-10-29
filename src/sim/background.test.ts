@@ -206,18 +206,19 @@ describe('Tier A / Tier B handover', () => {
   });
 
   it('resolves an active wave without events when asked', () => {
-    const s = underAttack();
-    const events = s.events.length;
-    const log = s.log.length;
-    const lost = s.stats.shipsLost;
-    const killed = s.stats.piratesKilled;
-    dematerialise(s, { events: false });
-    expect(s.wave.active).toBe(false);
-    expect(s.pirates).toEqual([]);
-    expect(s.stats.shipsLost).toBeGreaterThan(lost);
-    expect(s.stats.piratesKilled).toBeGreaterThan(killed);
-    expect(s.events).toHaveLength(events);
-    expect(s.log).toHaveLength(log);
+    const a = underAttack();
+    const b = underAttack();
+    const events = b.events.length;
+    const log = b.log.length;
+    dematerialise(a);
+    dematerialise(b, { events: false });
+    // Same roll. The snapshot drops events and the log, so only the report may differ.
+    expect(snapshot(a)).toBe(snapshot(b));
+    expect(a.events.some((e) => e.kind === 'WaveRepelled' || e.kind === 'ShipLost')).toBe(true);
+    expect(b.events).toHaveLength(events);
+    expect(b.log).toHaveLength(log);
+    expect(b.wave.active).toBe(false);
+    expect(b.pirates).toEqual([]);
   });
 
   it('leaves a carrier with no active wave unchanged apart from the map', () => {

@@ -6,7 +6,7 @@
 // operation and the run-wide state, never on what else was stepped. A wave already on the
 // map is rolled the same way when the carrier leaves Tier A, before its pirates are
 // dropped (#177). `settleOffline` plays the same model over the time away (Tier C): that
-// wave is reported, and later waves stay quiet.
+// wave is reported, and later waves stay quiet (ships can be lost with no event).
 
 import { STORM_DURATION, STORM_GAP, WAVE_INTERVAL, WAVE_INTERVAL_JITTER } from './config';
 import { queueRebuild } from './automation';
