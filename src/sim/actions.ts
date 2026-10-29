@@ -291,18 +291,14 @@ export function order(s: Sim, c: Order): string | null {
       s.carrier.h2 -= pay.h2;
       const total =
         WARP_CHARGE * HULLS[s.carrier.hullClass].warpCharge * (1 - 0.15 * lvl(s, 'warpCharge'));
-      s.warp = { targetSystem: to.id, charge: total, total };
+      s.warp = { targetSystem: to.id, charge: total, total, paid: pay };
       emit(s, 'WarpCharging', { system: to.name });
       return null;
     }
     case 'cancelWarp': {
       if (!s.warp) return null;
-      const from = s.systems[s.systemId];
-      const to = s.systems[s.warp.targetSystem];
-      s.carrier.energy = Math.min(
-        maxEnergy(s),
-        s.carrier.energy + jumpCost(s, from.distance, to.distance) * 0.75,
-      );
+      s.carrier.energy = Math.min(maxEnergy(s), s.carrier.energy + s.warp.paid.energy * 0.75);
+      s.carrier.h2 += s.warp.paid.h2 * 0.75;
       s.warp = null;
       emit(s, 'WarpCancelled', {});
       return null;

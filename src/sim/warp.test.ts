@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { order } from './actions';
+import { maxEnergy } from './economy';
 import { DOCK_RADIUS, WARP_H2_PER_ENERGY, warpCost } from './config';
 import { stepSim } from './tick';
 import type { Sim, Ship } from './types';
@@ -123,5 +124,38 @@ describe('warp payment', () => {
     expect(s.warp).toBeNull();
     expect(s.carrier.energy).toBe(c - 100);
     expect(s.carrier.h2).toBe(5);
+  });
+});
+
+describe('cancelling a paid warp (#184)', () => {
+  it('refunds 75% of the energy and of the H2 that were actually paid', () => {
+    const { s, c } = cost();
+    s.carrier.energy = c - 100;
+    s.carrier.h2 = 40;
+    const paidH2 = Math.ceil(100 * WARP_H2_PER_ENERGY);
+    expect(order(s, { type: 'warp', systemId: 1 })).toBeNull();
+    expect(order(s, { type: 'cancelWarp' })).toBeNull();
+    expect(s.warp).toBeNull();
+    expect(s.carrier.energy).toBeCloseTo((c - 100) * 0.75);
+    expect(s.carrier.h2).toBeCloseTo(40 - paidH2 + paidH2 * 0.75);
+  });
+
+  it('refunds 75% of the energy paid when H2 was not needed', () => {
+    const { s, c } = cost();
+    s.carrier.energy = c + 50;
+    s.carrier.h2 = 40;
+    expect(order(s, { type: 'warp', systemId: 1 })).toBeNull();
+    expect(order(s, { type: 'cancelWarp' })).toBeNull();
+    expect(s.carrier.energy).toBeCloseTo(50 + c * 0.75);
+    expect(s.carrier.h2).toBe(40);
+  });
+
+  it('never refunds energy above the cap', () => {
+    const { s, c } = cost();
+    s.carrier.energy = c;
+    expect(order(s, { type: 'warp', systemId: 1 })).toBeNull();
+    s.carrier.energy = maxEnergy(s);
+    expect(order(s, { type: 'cancelWarp' })).toBeNull();
+    expect(s.carrier.energy).toBe(maxEnergy(s));
   });
 });

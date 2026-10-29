@@ -189,7 +189,7 @@ describe('shared asteroid field (#176)', () => {
     a.asteroids[2].respawn = 80;
     // A jumps away. Focus follows A, so B drops to the background in the same step and the
     // last carrier off the map leaves the record.
-    bind(g(), a).warp = { targetSystem: 1, charge: 0, total: 1 };
+    bind(g(), a).warp = { targetSystem: 1, charge: 0, total: 1, paid: { energy: 0, h2: 0 } };
     pump(1);
     expect(a.systemId).toBe(1);
     expect(b.asteroids).toHaveLength(0);
@@ -212,7 +212,7 @@ describe('shared asteroid field (#176)', () => {
     const a = live().ops[0];
     a.asteroids[2].ore = 0;
     a.asteroids[2].respawn = 80;
-    bind(live(), a).warp = { targetSystem: 1, charge: 0, total: 1 };
+    bind(live(), a).warp = { targetSystem: 1, charge: 0, total: 1, paid: { energy: 0, h2: 0 } };
     pump(1);
     expect(live().fields[0].rocks.map((r) => r[0])).toEqual([2]);
     host.post({ t: 'cmd', cmd: { type: 'buyCarrier', carrierId: a.id } });
