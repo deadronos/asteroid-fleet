@@ -340,7 +340,10 @@ export function order(s: Sim, c: Order): string | null {
       if (p.autoRebuild !== undefined) {
         if (p.autoRebuild && !autoRebuildUnlocked(s)) return 'Research replacement orders first';
         a.autoRebuild = p.autoRebuild;
-        if (!p.autoRebuild) a.rebuildQueue.length = 0;
+        if (!p.autoRebuild) {
+          // The toggle is run-wide, so every carrier drops its queue (#174).
+          for (const op of stateOf(s).ops) op.rebuildQueue.length = 0;
+        }
       }
       if (p.creditFloor !== undefined) {
         if (!Number.isFinite(p.creditFloor)) return 'Invalid credit floor';

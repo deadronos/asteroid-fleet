@@ -144,7 +144,7 @@ export function reserves(s: Sim, dt: number, ctx: Ctx) {
       if (createShip(s, cls)) {
         emit(s, 'ReserveRebuilt', { cls });
         // The free reserve covered this loss; do not also pay for it.
-        const q = s.automation.rebuildQueue;
+        const q = s.rebuildQueue;
         const i = q.findIndex((x) => x.cls === cls);
         if (i >= 0) q.splice(i, 1);
       }

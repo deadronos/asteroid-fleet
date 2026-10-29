@@ -2,6 +2,7 @@
 import { act } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { engine } from '../game/engine';
+import { apply } from '../sim/actions';
 import { focused, newGame } from '../sim/state';
 import { CarrierPanel } from './CarrierPanel';
 import { FleetPanel } from './FleetPanel';
@@ -72,6 +73,23 @@ describe('Hud', () => {
 });
 
 describe('FleetPanel', () => {
+  it("counts the focused carrier's rebuild queue (#174)", async () => {
+    const s = game();
+    s.lifetime.admiralties = 3;
+    s.credits = 1e7;
+    s.researchLevels.autoRebuild = 1;
+    expect(apply(s, { type: 'buyCarrier', carrierId: s.ops[0].id })).toBeNull();
+    s.focusId = s.ops[0].id;
+    s.ops[0].rebuildQueue.push({ cls: 'drone', hangarId: s.ops[0].hangars[0].id });
+    for (let i = 0; i < 3; i++) {
+      s.ops[1].rebuildQueue.push({ cls: 'drone', hangarId: s.ops[1].hangars[0].id });
+    }
+    const m = await mount(<FleetPanel />, s);
+    cleanup = m.cleanup;
+    expect(m.el.textContent).toContain('(1 queued)');
+    expect(m.el.textContent).not.toContain('(3 queued)');
+  });
+
   it('hides Scrap for a drone carried in a barge (#181)', async () => {
     const s = game();
     for (const ship of focused(s).ships) ship.mode = 'carried';

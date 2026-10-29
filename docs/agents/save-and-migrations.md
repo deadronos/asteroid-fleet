@@ -38,6 +38,7 @@ A new `Operation` or `GameState` field also needs the `OP_KEYS` / `GAME_KEYS` en
 | v15     | Run modifiers and challenge runs: `modifiers`, `challenge`, `challengesDone` (#71).                                                                                                                                                                                                                                                    |
 | v16     | Supply routes between carriers: `routes` (#80).                                                                                                                                                                                                                                                                                        |
 | v17     | A jump in progress stores its full charge time, `warp.total`.                                                                                                                                                                                                                                                                          |
+| v18     | Each carrier keeps its own rebuild queue and automation timer. The toggles and credit floor stay on the run (#174).                                                                                                                                                                                                                    |
 
 ## Storage
 

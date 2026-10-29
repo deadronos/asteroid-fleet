@@ -255,7 +255,7 @@ function rebuild(s: Sim, dt: number, ev: boolean): number {
     if (createShip(s, cls)) {
       n++;
       if (ev) emit(s, 'ReserveRebuilt', { cls });
-      const q = s.automation.rebuildQueue;
+      const q = s.rebuildQueue;
       const i = q.findIndex((x) => x.cls === cls);
       if (i >= 0) q.splice(i, 1);
     }
