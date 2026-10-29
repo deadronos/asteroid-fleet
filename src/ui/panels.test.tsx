@@ -90,6 +90,25 @@ describe('FleetPanel', () => {
     expect(m.el.textContent).not.toContain('(3 queued)');
   });
 
+  it("builds into the focused carrier's hangar after a carrier switch (#183)", async () => {
+    const s = game();
+    s.lifetime.admiralties = 3;
+    s.credits = 1e7;
+    expect(apply(s, { type: 'buyCarrier', carrierId: s.ops[0].id })).toBeNull();
+    const dispatch = vi.spyOn(engine, 'dispatch').mockImplementation(() => {});
+    const m = await mount(<FleetPanel />, s);
+    cleanup = m.cleanup;
+    const mine = s.ops[1].hangars.map((h) => h.id);
+    expect(mine).not.toContain(s.ops[0].hangars[0].id);
+
+    s.focusId = s.ops[1].id;
+    await act(async () => engine.focusCarrier(s.ops[1].id));
+    await click(m.el.querySelector<HTMLElement>('.shop button:not(:disabled)')!);
+    const buy = dispatch.mock.calls.map((c) => c[0]).find((c) => c.type === 'buyShip');
+    expect(buy).toBeDefined();
+    expect(mine).toContain((buy as { hangarId: number }).hangarId);
+  });
+
   it('hides Scrap for a drone carried in a barge (#181)', async () => {
     const s = game();
     for (const ship of focused(s).ships) ship.mode = 'carried';
