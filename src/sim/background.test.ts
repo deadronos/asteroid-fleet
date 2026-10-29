@@ -205,6 +205,21 @@ describe('Tier A / Tier B handover', () => {
     expect(again.events).toEqual(s.events);
   });
 
+  it('resolves an active wave without events when asked', () => {
+    const s = underAttack();
+    const events = s.events.length;
+    const log = s.log.length;
+    const lost = s.stats.shipsLost;
+    const killed = s.stats.piratesKilled;
+    dematerialise(s, { events: false });
+    expect(s.wave.active).toBe(false);
+    expect(s.pirates).toEqual([]);
+    expect(s.stats.shipsLost).toBeGreaterThan(lost);
+    expect(s.stats.piratesKilled).toBeGreaterThan(killed);
+    expect(s.events).toHaveLength(events);
+    expect(s.log).toHaveLength(log);
+  });
+
   it('leaves a carrier with no active wave unchanged apart from the map', () => {
     const s = frontier();
     s.wave.warning = true;
@@ -271,6 +286,27 @@ describe('Tier A / Tier B handover', () => {
 });
 
 describe('Tier C', () => {
+  it('emits the departure wave before WelcomeBack and settles deterministically', () => {
+    const s = underAttack();
+    const g = stateOf(s);
+    g.events.length = 0;
+    const lostBefore = s.stats.shipsLost;
+    const other = structuredClone(g);
+    settleOffline(g, 60);
+    settleOffline(other, 60);
+
+    const kinds = g.events.map((e) => e.kind);
+    expect(kinds.at(-1)).toBe('WelcomeBack');
+    expect(kinds.at(-2)).toBe('WaveRepelled');
+    const shipLost = kinds.filter((k) => k === 'ShipLost');
+    expect(shipLost.length).toBeGreaterThan(0);
+    expect(shipLost.length).toBe(s.stats.shipsLost - lostBefore);
+    expect(kinds.slice(0, -2).every((k) => k === 'ShipLost')).toBe(true);
+    expect(kinds.filter((k) => k === 'WaveRepelled')).toHaveLength(1);
+
+    expect(JSON.stringify({ ...g, savedAt: 0 })).toBe(JSON.stringify({ ...other, savedAt: 0 }));
+  });
+
   it('an 8 h settle on the frontier leaves no fx, no ShipLost and a grace period', () => {
     const s = frontier(5);
     const g = stateOf(s);
