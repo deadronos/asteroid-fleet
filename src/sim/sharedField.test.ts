@@ -15,7 +15,7 @@ function twoCarriers(): { g: GameState; a: Sim; b: Sim } {
 }
 
 const warp = (s: Sim, to: number) => {
-  s.warp = { targetSystem: to, charge: 0, total: 1 };
+  s.warp = { targetSystem: to, charge: 0, total: 1, paid: { energy: 0, h2: 0 } };
   executeJump(s);
 };
 const deplete = (s: Sim, i: number) => {
