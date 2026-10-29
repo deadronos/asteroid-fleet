@@ -3,7 +3,17 @@
 
 import { order, shipCost } from '../actions';
 import { autoRebuildUnlocked } from '../automation';
-import { SOFT_HANGAR_SLOTS, SOFT_HANGARS, REFINERY_COST, MAX_REFINERY, warpCost } from '../config';
+import { refineThroughput, solarRate, upkeepRate } from '../economy';
+import { lvl } from '../research';
+import {
+  FUSION_RATE,
+  MAX_REFINERY,
+  REFINE_ENERGY,
+  REFINERY_COST,
+  SOFT_HANGAR_SLOTS,
+  SOFT_HANGARS,
+  warpCost,
+} from '../config';
 import { SHIP_CLASSES, type Sim, type HangarType, type ShipClass } from '../types';
 
 export interface Policy {
@@ -14,6 +24,12 @@ export interface Policy {
   setup?(s: Sim): void;
   /** Called every `ACT_INTERVAL_TICKS`; spends credits and decides warps. */
   act(s: Sim): void;
+}
+
+/** True when energy could feed a faster refinery: the current one draws less than solar (and fusion) spare. */
+function refineryIsLimit(s: Sim): boolean {
+  const fusion = lvl(s, 'fusion') > 0 && s.carrier.h2 > 0 ? FUSION_RATE : 0;
+  return refineThroughput(s) * REFINE_ENERGY < solarRate(s) + fusion - upkeepRate(s);
 }
 
 /** Ticks between policy passes: once a game second, like the automation pass. */
@@ -87,12 +103,11 @@ export const STEADY_DEFAULTS: SteadyParams = {
 };
 
 /**
- * "Steady": a patient player. Drones first, a barge and hauler per eight drones,
- * one scout, fighters and a repair drone once the frontier unlocks them; the
- * refinery whenever ore backs up; warps one system outward once the fleet is
- * big enough and has lost nothing for a while, banking energy (defense power)
- * for the jump. If a system mauls the fleet it warps back and never goes that
- * far again. No modules, no research spending.
+ * "Steady": a patient player. Drones first, a barge and hauler per eight drones, one scout,
+ * fighters and a repair drone once the frontier unlocks them; the refinery whenever ore backs
+ * up and energy is not the limit; warps one system outward once the fleet is big enough and has
+ * lost nothing for a while, banking energy (defense power) for the jump. If a system mauls the
+ * fleet it warps back and never goes that far again. No modules, no research spending.
  */
 export function steadyPolicy(p: Partial<SteadyParams> = {}): Policy {
   const k = { ...STEADY_DEFAULTS, ...p };
@@ -155,10 +170,12 @@ export function steadyPolicy(p: Partial<SteadyParams> = {}): Policy {
         return;
       if (s.powerMode !== 'balanced') order(s, { type: 'setPower', mode: 'balanced' });
 
-      // Refinery first while ore waits on the carrier, then up to five ship buys a pass.
+      // Refinery first while ore waits on the carrier and energy can feed a faster one, then up to
+      // five ship buys a pass.
       if (
         s.carrier.refinery < MAX_REFINERY &&
         s.carrier.ore > 300 &&
+        refineryIsLimit(s) &&
         s.credits >= REFINERY_COST(s.carrier.refinery)
       )
         order(s, { type: 'upgradeRefinery' });
