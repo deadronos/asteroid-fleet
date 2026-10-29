@@ -23,7 +23,7 @@ export * from './economy';
 export { SEVERITY, emit } from './events';
 
 /** Bump together with a `migrations[n]` step and a fixture. See docs/agents/save-and-migrations.md. */
-export const SAVE_VERSION = 17;
+export const SAVE_VERSION = 18;
 
 interface Carry {
   research: number;
@@ -107,6 +107,8 @@ function buildOp(
     incomeAvg: 0,
     miningIncomeAvg: 0,
     fx: [],
+    rebuildQueue: [],
+    automationTimer: 0,
   };
 }
 
@@ -156,15 +158,11 @@ export function newGame(seed = 1337, carry?: Carry): GameState {
     },
     alerts: carry?.alerts ?? { fleet: {}, byCarrier: {} },
     cards: carry?.cards ?? [],
-    automation: carry?.automation
-      ? { ...carry.automation, rebuildQueue: [], timer: 0 }
-      : {
-          autoBuy: false,
-          autoRebuild: false,
-          creditFloor: 0,
-          rebuildQueue: [],
-          timer: 0,
-        },
+    automation: {
+      autoBuy: carry?.automation?.autoBuy ?? false,
+      autoRebuild: carry?.automation?.autoRebuild ?? false,
+      creditFloor: carry?.automation?.creditFloor ?? 0,
+    },
     stats: {
       oreValueDelivered: 0,
       creditsEarned: 0,

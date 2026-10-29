@@ -3,8 +3,9 @@
 // A carrier the player is not looking at runs here instead of in `stepOp`: one aggregate
 // step per second, no ship positions, no pirates on the map. Waves still come on the same
 // timers and are rolled with the operation's own rng, so the result depends only on the
-// operation and the run-wide state, never on what else was stepped. `settleOffline` plays
-// the same model over the time away (Tier C).
+// operation and the run-wide state, never on what else was stepped. A wave already on the
+// map is rolled the same way when the carrier leaves Tier A, before its pirates are
+// dropped (#177). `settleOffline` plays the same model over the time away (Tier C).
 
 import { STORM_DURATION, STORM_GAP, WAVE_INTERVAL, WAVE_INTERVAL_JITTER } from './config';
 import { queueRebuild } from './automation';
@@ -83,14 +84,24 @@ export function energyNet(s: Sim): number {
 }
 
 /**
- * Leave Tier A: drop everything that only exists on the map. Ships keep their mode, cargo
- * and hull, so upkeep and the loss buffer read the same as they did in the last Tier A step.
+ * Leave Tier A. An active wave is resolved first, with one background roll per pirate
+ * still alive, so a focus switch is not a free escape (#177). Then everything that only
+ * exists on the map is dropped. Ships keep their mode, cargo and hull, so upkeep and the
+ * loss buffer read the same as they did in the last Tier A step.
  */
 export function dematerialise(s: Sim) {
+  // Resolve now. A later background step has no pirates to fight, and leaving the wave
+  // active would clear it for free if focus came back before that step (#177).
+  if (s.wave.active) {
+    let remaining = 0;
+    for (const p of s.pirates) if (p.hull > 0) remaining++;
+    if (remaining > 0) rollWave(s, remaining, true);
+    s.wave.active = false;
+    emit(s, 'WaveRepelled', {});
+  }
   s.pirates.length = 0;
   s.fx.length = 0;
   s.containers.length = 0;
-  if (s.wave.active) s.wave.active = false;
 }
 
 /**
@@ -241,7 +252,7 @@ function rebuild(s: Sim, dt: number, ev: boolean): number {
     if (createShip(s, cls)) {
       n++;
       if (ev) emit(s, 'ReserveRebuilt', { cls });
-      const q = s.automation.rebuildQueue;
+      const q = s.rebuildQueue;
       const i = q.findIndex((x) => x.cls === cls);
       if (i >= 0) q.splice(i, 1);
     }

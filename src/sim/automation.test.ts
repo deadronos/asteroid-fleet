@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { order, shipCost } from './actions';
+import { apply, order, shipCost } from './actions';
 import { AUTOMATION_INTERVAL, automation, rebuildQueueCap } from './automation';
 import { destroyShip } from './ctx';
 import { ZONE_RULE_UNLOCKS } from './config';
 import { buyResearch } from './research';
 import { stepSim } from './tick';
 import type { Sim, ShipClass } from './types';
-import { stateOf } from './state';
+import { bind, newGame, stateOf } from './state';
 import { game } from './testing';
 
 const pass = (s: Sim) => automation(s, AUTOMATION_INTERVAL);
@@ -90,7 +90,7 @@ describe('auto-rebuild', () => {
     pass(s);
     expect(count(s, 'barge', 2)).toBe(1);
     expect(before - s.credits).toBe(cost);
-    expect(s.automation.rebuildQueue).toHaveLength(0);
+    expect(s.rebuildQueue).toHaveLength(0);
   });
 
   it('waits above the credit floor, then rebuilds', () => {
@@ -110,7 +110,7 @@ describe('auto-rebuild', () => {
     const s = game(3);
     buyResearchFree(s, 'autoRebuild');
     lose(s, 'drone');
-    expect(s.automation.rebuildQueue).toHaveLength(0);
+    expect(s.rebuildQueue).toHaveLength(0);
   });
 
   it('clears the queue when switched off and caps it at hangar capacity', () => {
@@ -119,20 +119,36 @@ describe('auto-rebuild', () => {
     order(s, { type: 'setAutomation', patch: { autoRebuild: true } });
     const cap = rebuildQueueCap(s);
     for (let i = 0; i < cap + 20; i++) {
-      s.automation.rebuildQueue.push({ cls: 'drone', hangarId: 1 });
+      s.rebuildQueue.push({ cls: 'drone', hangarId: 1 });
     }
     pass(s);
-    expect(s.automation.rebuildQueue.length).toBeLessThanOrEqual(cap);
+    expect(s.rebuildQueue.length).toBeLessThanOrEqual(cap);
     lose(s, 'drone');
-    expect(s.automation.rebuildQueue.length).toBeLessThanOrEqual(cap);
+    expect(s.rebuildQueue.length).toBeLessThanOrEqual(cap);
     order(s, { type: 'setAutomation', patch: { autoRebuild: false } });
-    expect(s.automation.rebuildQueue).toHaveLength(0);
+    expect(s.rebuildQueue).toHaveLength(0);
+  });
+
+  it("clears every carrier's queue when switched off (#174)", () => {
+    const g = newGame(5);
+    g.lifetime.admiralties = 3;
+    g.credits = 1e7;
+    g.researchLevels.autoRebuild = 1;
+    expect(apply(g, { type: 'buyCarrier', carrierId: g.ops[0].id })).toBeNull();
+    const a = bind(g, g.ops[0]);
+    const b = bind(g, g.ops[1]);
+    expect(order(a, { type: 'setAutomation', patch: { autoRebuild: true } })).toBeNull();
+    a.rebuildQueue.push({ cls: 'drone', hangarId: a.hangars[0].id });
+    b.rebuildQueue.push({ cls: 'drone', hangarId: b.hangars[0].id });
+    order(a, { type: 'setAutomation', patch: { autoRebuild: false } });
+    expect(a.rebuildQueue).toHaveLength(0);
+    expect(b.rebuildQueue).toHaveLength(0);
   });
 
   it('does not queue losses before the research', () => {
     const s = game(3);
     lose(s, 'drone');
-    expect(s.automation.rebuildQueue).toHaveLength(0);
+    expect(s.rebuildQueue).toHaveLength(0);
   });
 });
 

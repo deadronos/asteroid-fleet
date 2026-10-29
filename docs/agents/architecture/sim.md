@@ -1,11 +1,11 @@
 # Simulation (`src/sim/`)
 
-Source of truth: `tick.ts`, `ctx.ts`, `view.ts`, `state.ts`, `types.ts`, `config.ts`, `actions.ts`.
+Source of truth: `tick.ts`, `ctx.ts`, `view.ts`, `state.ts`, `types.ts`, `config.ts`, `actions.ts`, `background.ts`.
 
 ## State model
 
 - `GameState` (`types.ts`) is plain, JSON-serialisable data, and the whole of it is the save. Anything that cannot round-trip through `JSON.stringify` does not belong in it. One exception: timers use `Infinity` for "never", which is stored as `null` and restored on load (see [save-and-migrations.md](../save-and-migrations.md)).
-- Run-wide fields (credits, research, cards, doctrine, systems, log...) sit on `GameState`. Per-carrier fields (carrier, hangars, ships, pirates, asteroids, warp, wave, rng...) sit on one `Operation` in `GameState.ops` (#75). Hangar ids are still unique across the run, because rule cards and stances name a hangar by id alone (#173).
+- Run-wide fields (credits, research, cards, doctrine, systems, log...) sit on `GameState`. Per-carrier fields (carrier, hangars, ships, pirates, asteroids, warp, wave, rng...) sit on one `Operation` in `GameState.ops` (#75). Hangar ids are still unique across the run, because rule cards and stances name a hangar by id alone (#173). Each carrier keeps its own rebuild queue and automation timer. The auto-buy and auto-rebuild toggles and the credit floor stay on the run, because credits are shared (#174).
 - A `Sim` is a `GameState` and one `Operation` bound together by `bind(g, op)` (`view.ts`). Most sim functions take a `Sim` and read both halves through one flat object. `stateOf(s)` gets the `GameState` back. `focused(g)` binds the operation the player is looking at.
 - `SimView` (`viewAccessors.ts`) is **generated** by `pnpm run gen:view` from `OP_KEYS` and `GAME_KEYS` in `view.ts`. When you add a field to `Operation` or `GameState`, add it to the matching list (a `satisfies` check fails to compile otherwise), then run `gen:view`. `view.test.ts` fails until you do. Never edit `viewAccessors.ts` by hand.
 - `state.ts` re-exports the public surface of `view.ts`, `worldgen.ts`, `economy.ts` and `events.ts` so imports stay stable. Import from `./state` unless you are inside one of those modules.
@@ -13,7 +13,7 @@ Source of truth: `tick.ts`, `ctx.ts`, `view.ts`, `state.ts`, `types.ts`, `config
 ## The tick
 
 - Fixed step: `TICK_HZ = 10`, `DT = 0.1` (`config.ts`).
-- `step(g, op)` moves the run clock, plays one operation through `stepOp`, then runs the supply routes (`stepRoutes`). It does not touch other carriers: the runner (`src/game/runner.ts`) steps those in `stepOthers`, through `stepOp` for carriers in the viewed system (Tier A) and `stepBackground` for the rest (Tier B, one aggregate step per second, `background.ts`). Offline time is Tier C: `settleOffline` (`actions.ts`) runs the background model over the time away.
+- `step(g, op)` moves the run clock, plays one operation through `stepOp`, then runs the supply routes (`stepRoutes`). It does not touch other carriers: the runner (`src/game/runner.ts`) steps those in `stepOthers`, through `stepOp` for carriers in the viewed system (Tier A) and `stepBackground` for the rest (Tier B, one aggregate step per second, `background.ts`). Dropping a carrier to Tier B resolves a wave that is still active, with the same roll as a background wave (#177). Offline time is Tier C: `settleOffline` (`actions.ts`) runs the background model over the time away.
 - `stepSim(s)` does the same for one bound operation and is the test and benchmark entry point.
 - `stepOp` runs in a fixed order: fx decay → power → threats → launch → each ship's behaviour → turrets → pirates → hazards → refine → field → containers → reserves → automation → drift → cleanup → challenge check → income averages → warp. Order matters for determinism and for golden tests, so don't reorder it casually.
 - Behaviour per ship class lives in `mining.ts` (drone, barge, hauler, harvester) and `combat.ts` (fighter, scout, repair, pirates). Environment is in `world.ts`, jumps in `warp.ts`, supply routes in `routes.ts`.

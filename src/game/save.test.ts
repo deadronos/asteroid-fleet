@@ -18,6 +18,7 @@ import saveV13 from './fixtures/save-v13.json';
 import saveV14 from './fixtures/save-v14.json';
 import saveV15 from './fixtures/save-v15.json';
 import saveV16 from './fixtures/save-v16.json';
+import saveV17 from './fixtures/save-v17.json';
 import { set } from 'idb-keyval';
 import { applyMigrationSteps, migrate, type SaveBlob } from './migrate';
 import {
@@ -116,9 +117,9 @@ describe('migrate', () => {
       autoBuy: false,
       autoRebuild: false,
       creditFloor: 0,
-      rebuildQueue: [],
-      timer: 0,
     });
+    expect(result.state.ops[0].rebuildQueue).toEqual([]);
+    expect(result.state.ops[0].automationTimer).toBe(0);
     for (const h of result.state.ops[0].hangars) expect(h.target).toEqual({});
     // The fixture module itself stays a v1 document.
     expect(saveV1.version).toBe(1);
@@ -286,8 +287,12 @@ describe('migrate', () => {
       // Timers are compared below: JSON null comes back as Infinity.
       if (k === 'id' || k === 'wave' || k === 'storm') continue;
       if (k === 'carrier') continue;
+      // v18 moves the rebuild queue and its timer onto the operation (#174).
+      if (k === 'rebuildQueue' || k === 'automationTimer') continue;
       expect.soft(op[k]).toEqual((saveV9 as SaveBlob)[k]);
     }
+    expect(op.rebuildQueue).toEqual([]);
+    expect(op.automationTimer).toBe(saveV9.automation.timer);
     // v11 adds the hull class.
     expect(op.carrier).toEqual({
       ...((saveV9 as SaveBlob).carrier as object),
@@ -361,6 +366,7 @@ describe('migrate', () => {
     ['v14', saveV14],
     ['v15', saveV15],
     ['v16', saveV16],
+    ['v17', saveV17],
   ])('a migrated %s fixture keeps running through step()', (_, fixture) => {
     const r = migrate(fixture);
     expect(r.ok).toBe(true);
@@ -378,6 +384,45 @@ describe('migrate', () => {
     expect(r.state.version).toBe(SAVE_VERSION);
     expect(r.state.routes).toEqual([]);
     expect(r.state.ops).toHaveLength(2);
+  });
+
+  it('moves a v17 rebuild queue onto the carrier that owns the hangar (#174)', () => {
+    expect(saveV17.version).toBe(17);
+    expect(saveV17.automation.rebuildQueue).toEqual([{ cls: 'drone', hangarId: 1 }]);
+    const r = migrate(saveV17);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.state.version).toBe(SAVE_VERSION);
+    expect(r.state.automation).toEqual({ autoBuy: false, autoRebuild: false, creditFloor: 0 });
+    expect(r.state.ops[0].rebuildQueue).toEqual([{ cls: 'drone', hangarId: 1 }]);
+    expect(r.state.ops[0].automationTimer).toBe(0.4);
+
+    const raw = structuredClone(saveV17) as SaveBlob;
+    const ops = raw.ops as SaveBlob[];
+    const second = structuredClone(ops[0]);
+    second.id = 9;
+    ops.push(second);
+    raw.focusId = 9;
+    const automation = raw.automation as SaveBlob;
+    automation.rebuildQueue = [
+      { cls: 'drone', hangarId: 1 },
+      { cls: 'hauler', hangarId: 999 },
+      { cls: 'scout' },
+      { hangarId: 1 },
+      null,
+    ];
+    const again = migrate(raw);
+    expect(again.ok).toBe(true);
+    if (!again.ok) return;
+    const home = again.state.ops.find((o) => o.id === 0)!;
+    const looked = again.state.ops.find((o) => o.id === 9)!;
+    expect(home.rebuildQueue).toEqual([]);
+    expect(looked.rebuildQueue).toEqual([
+      { cls: 'drone', hangarId: 1 },
+      { cls: 'hauler', hangarId: 999 },
+    ]);
+    expect(home.automationTimer).toBe(0.4);
+    expect(looked.automationTimer).toBe(0.4);
   });
 
   it('v16 -> v17 gives a running warp its total from the remaining charge', () => {
