@@ -41,7 +41,7 @@ export interface OtherCarrier {
   ships: Float64Array<ArrayBuffer>;
 }
 
-/** What the carrier bar shows about one carrier. */
+/** What the carrier bar and the carrier lists show about one carrier. */
 export interface CarrierBrief {
   id: number;
   systemId: number;
@@ -49,6 +49,8 @@ export interface CarrierBrief {
   energy: number;
   maxEnergy: number;
   income: number; // credits/s
+  /** Hangar ids, so the rule-card scope can name hangars of carriers that are not in focus (#178). */
+  hangars: number[];
 }
 
 /** Operation fields sent as packed rows, or (fx) with frames instead. */
@@ -228,6 +230,7 @@ export function encodeSnapshot(
         energy: op.carrier.energy,
         maxEnergy: maxEnergy(bind(g, op)),
         income: op.incomeAvg,
+        hangars: op.hangars.map((h) => h.id),
       })),
     },
     transfer: [

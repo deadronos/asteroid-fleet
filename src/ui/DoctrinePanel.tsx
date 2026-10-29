@@ -13,6 +13,7 @@ import type {
 } from '../sim/types';
 import { TOAST_POLICY } from '../game/toasts';
 import { formatEventKind } from './events';
+import { carrierRoster } from './carriers';
 import { carrierChoices } from './inbox';
 import { RuleCards } from './RuleCards';
 
@@ -127,7 +128,7 @@ if (ALERT_OTHER.length) ALERT_GROUPS.push(['Other', ALERT_OTHER]);
 
 function AlertRules() {
   const s = useGame();
-  const choices = carrierChoices(engine.state.ops, s.systems);
+  const choices = carrierChoices(carrierRoster(engine.carriers, engine.state.ops), s.systems);
   const [scope, setScope] = useState<'fleet' | number>('fleet');
   const active = scope === 'fleet' || choices.some((c) => c.id === scope) ? scope : 'fleet';
   const set = (kind: SimEventKind, raw: string) =>

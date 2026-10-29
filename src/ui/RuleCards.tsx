@@ -9,6 +9,7 @@ import {
   SHIP_STATS,
   STANCE_SWITCHES,
 } from '../sim/config';
+import { carrierRoster } from './carriers';
 import { ACTION_LABEL, CONDITION_LABEL, fmtValue, STANCE_LABEL } from './cardText';
 import type {
   ActionKind,
@@ -96,8 +97,10 @@ function Editor({
 }) {
   const s = useGame();
   const [d, setD] = useState<Draft>(() => structuredClone(initial));
+  // Hangars of every carrier: the mirror holds only the focused operation (#178).
+  const hangarIds = carrierRoster(engine.carriers, engine.state.ops).flatMap((c) => c.hangars);
   // The sim's own check, on a copy, so the editor can say what is wrong before sending.
-  const err = checkCard(s, structuredClone(d));
+  const err = checkCard(s, structuredClone(d), hangarIds);
   const setCond = (i: number, c: Condition) =>
     setD({ ...d, when: d.when.map((x, j) => (j === i ? c : x)) });
   const pickCond = (i: number, kind: ConditionKind) => {
@@ -121,7 +124,7 @@ function Editor({
           {s.unlocked.map((cls) =>
             scopeOption({ kind: 'class', cls }, `${SHIP_STATS[cls].short}s`),
           )}
-          {s.hangars.map((h) => scopeOption({ kind: 'hangar', id: h.id }, `Hangar ${h.id}`))}
+          {hangarIds.map((id) => scopeOption({ kind: 'hangar', id }, `Hangar ${id}`))}
         </select>
       </label>
       {d.when.map((c, i) => (

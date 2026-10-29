@@ -9,6 +9,7 @@ const c = (id: number): CarrierBrief => ({
   energy: 0,
   maxEnergy: 1,
   income: 0,
+  hangars: [],
 });
 
 describe('carrier hotkeys', () => {

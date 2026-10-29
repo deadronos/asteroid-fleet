@@ -63,6 +63,17 @@ describe('UI snapshot', () => {
     );
   });
 
+  it('lists every carrier with its hangar ids (#178)', () => {
+    const g = stateOf(busyGame());
+    const copy = structuredClone(g.ops[0]);
+    copy.id = 91;
+    g.ops.push(copy);
+    const { snap } = encodeSnapshot(g, false);
+    expect(snap.carriers.map((c) => [c.id, c.hangars])).toEqual(
+      g.ops.map((op) => [op.id, op.hangars.map((h) => h.id)]),
+    );
+  });
+
   it('rebuilds the exact sim state', () => {
     const s = busyGame();
     expect(s.ships.some((x) => x.station)).toBe(true);
