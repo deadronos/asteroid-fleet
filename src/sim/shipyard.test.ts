@@ -96,3 +96,35 @@ describe('shipyard refit (#66)', () => {
     expect(drone.targetId).toBe(-1);
   });
 });
+
+const buy = (s: ReturnType<typeof yard>, start: number) =>
+  order(s, { type: 'buyShip', cls: 'drone', hangarId: 1, start });
+
+describe('buyShip with an explicit slot (#186)', () => {
+  it('refuses a start that overlaps an existing ship and charges nothing', () => {
+    const s = yard();
+    expect(buy(s, 2)).toBeNull();
+    const credits = s.credits;
+    expect(buy(s, 2)).toBe('No free hangar slots');
+    expect(s.credits).toBe(credits);
+    expect(s.ships.length).toBe(1);
+    expect(s.hangars[0].items.length).toBe(1);
+  });
+
+  it('refuses an out-of-range start the same way', () => {
+    const s = yard();
+    const credits = s.credits;
+    for (const start of [-1, s.hangars[0].slots, 99]) {
+      expect(buy(s, start)).toBe('No free hangar slots');
+    }
+    expect(s.credits).toBe(credits);
+    expect(s.ships.length).toBe(0);
+  });
+
+  it('places a ship exactly at a free start', () => {
+    const s = yard();
+    expect(buy(s, 3)).toBeNull();
+    expect(s.hangars[0].items).toEqual([{ shipId: s.ships[0].id, start: 3 }]);
+    expect(s.credits).toBeLessThan(100_000);
+  });
+});
