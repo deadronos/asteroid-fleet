@@ -1,6 +1,6 @@
 # Simulation (`src/sim/`)
 
-Source of truth: `tick.ts`, `ctx.ts`, `view.ts`, `state.ts`, `types.ts`, `config.ts`, `actions.ts`, `background.ts`.
+Source of truth: `tick.ts`, `ctx.ts`, `view.ts`, `state.ts`, `types.ts`, `config.ts`, `actions.ts`, `background.ts`, `worldgen.ts`.
 
 ## State model
 
@@ -9,6 +9,10 @@ Source of truth: `tick.ts`, `ctx.ts`, `view.ts`, `state.ts`, `types.ts`, `config
 - A `Sim` is a `GameState` and one `Operation` bound together by `bind(g, op)` (`view.ts`). Most sim functions take a `Sim` and read both halves through one flat object. `stateOf(s)` gets the `GameState` back. `focused(g)` binds the operation the player is looking at.
 - `SimView` (`viewAccessors.ts`) is **generated** by `pnpm run gen:view` from `OP_KEYS` and `GAME_KEYS` in `view.ts`. When you add a field to `Operation` or `GameState`, add it to the matching list (a `satisfies` check fails to compile otherwise), then run `gen:view`. `view.test.ts` fails until you do. Never edit `viewAccessors.ts` by hand.
 - `state.ts` re-exports the public surface of `view.ts`, `worldgen.ts`, `economy.ts` and `events.ts` so imports stay stable. Import from `./state` unless you are inside one of those modules.
+
+## Asteroid fields (#176)
+
+There is one field per system for the whole run. While any carrier is on the map (Tier A) in a system, its `asteroids` array is the field, and every carrier there holds the **same array object**, so mining by any of them depletes it and `field()` ticks it once (the first holder does). `enterSystem` joins the array another carrier already holds, or else seeds the field and applies the system's `fields` record. A carrier leaving the array behind (`leaveField`: a warp, or `dematerialise` in the runner's `retier`) writes the record only if no other carrier still holds it, and drops its own reference. Tier B carriers hold an empty `asteroids`; `joinField` loads it again when they come back to Tier A. `fields[id]` therefore exists only for systems nobody is on the map in, and is consumed when the next carrier enters. Background mining does not touch the field (it pays credits from `miningIncomeAvg`). Saves keep one copy per carrier; `linkFields` merges them on load (`SimRunner.adopt`), keeping the least ore per rock.
 
 ## The tick
 

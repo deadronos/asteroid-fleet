@@ -10,7 +10,17 @@ import { challengeBonus } from './modifiers';
 import { onSphere, seeded, v3 } from './math';
 import { lvl } from './research';
 import { unlockHulls } from './economy';
-import type { Asteroid, FieldRecord, Hazard, RuleId, Sim, StarSystem, Vec3 } from './types';
+import { stateOf } from './view';
+import type {
+  Asteroid,
+  FieldRecord,
+  GameState,
+  Hazard,
+  RuleId,
+  Sim,
+  StarSystem,
+  Vec3,
+} from './types';
 
 const NAMES = [
   'Kestrel',
@@ -135,10 +145,10 @@ export function recordField(s: Sim): FieldRecord {
 }
 
 /** Apply a depletion record to a freshly seeded field, refilling for the time away. */
-export function applyField(s: Sim, rec: FieldRecord) {
+export function applyField(s: Sim, rec: FieldRecord, rocks: Asteroid[] = s.asteroids) {
   const away = Math.max(0, s.time - rec.left);
   for (const [i, frac, respawn] of rec.rocks) {
-    const a = s.asteroids[i];
+    const a = rocks[i];
     if (!a) continue;
     if (frac > 0) {
       a.ore = a.maxOre * Math.min(1, frac + away / FIELD_REFILL_SECS);
@@ -149,8 +159,88 @@ export function applyField(s: Sim, rec: FieldRecord) {
   }
 }
 
+/** Whether another carrier holds the same live field array as `s`. */
+function sharesField(s: Sim): boolean {
+  for (const op of stateOf(s).ops) if (op.id !== s.id && op.asteroids === s.asteroids) return true;
+  return false;
+}
+
+/**
+ * Stop holding the loaded field. Only the last carrier to let go writes the system's
+ * depletion record; while another still holds the array, that array is the state (#176).
+ */
+export function leaveField(s: Sim) {
+  if (s.asteroids.length === 0) return;
+  if (!sharesField(s)) stateOf(s).fields[s.systemId] = recordField(s);
+  s.asteroids = [];
+}
+
+/** The field of the system `s` is in, seeded from the system. Draws from `r` like a visit does. */
+function seedField(s: Sim, sys: StarSystem, r: () => number): Asteroid[] {
+  const fresh: Asteroid[] = [];
+  const own = s.asteroids;
+  s.asteroids = fresh;
+  for (const c of clusterCenters(sys)) {
+    const n = 8 + Math.floor(r() * 6);
+    for (let i = 0; i < n; i++) fresh.push(spawnAsteroid(s, r, c, sys));
+  }
+  s.asteroids = own;
+  return fresh;
+}
+
+/**
+ * Take the live field of the system `s` is in: the array another carrier there already holds,
+ * or `fresh` with the stored record applied (and consumed). Carriers in one system mine one field.
+ */
+function holdField(s: Sim, fresh: Asteroid[]) {
+  const g = stateOf(s);
+  const id = s.systemId;
+  const held = g.ops.find((op) => op.id !== s.id && op.systemId === id && op.asteroids.length > 0);
+  if (held) {
+    s.asteroids = held.asteroids;
+    return;
+  }
+  const rec = g.fields[id];
+  if (rec) {
+    applyField(s, rec, fresh);
+    delete g.fields[id];
+  }
+  s.asteroids = fresh;
+}
+
+/** Load the field of the carrier's own system if it holds none: it is back on the map. */
+export function joinField(s: Sim) {
+  if (s.asteroids.length > 0) return;
+  holdField(s, seedField(s, s.systems[s.systemId], seeded(s.systems[s.systemId].seed)));
+}
+
+/**
+ * Make carriers that sit in one system hold one array. A save keeps one copy per carrier,
+ * so on load the copies are merged, rock by rock, to the one with the least ore (#176).
+ */
+export function linkFields(g: GameState) {
+  const first = new Map<number, Asteroid[]>();
+  for (const op of g.ops) {
+    if (op.asteroids.length === 0) continue;
+    const lead = first.get(op.systemId);
+    if (!lead) first.set(op.systemId, op.asteroids);
+    else if (lead !== op.asteroids) {
+      if (lead.length === op.asteroids.length)
+        lead.forEach((a, i) => {
+          const o = op.asteroids[i];
+          if (o.ore < a.ore) {
+            a.ore = o.ore;
+            a.respawn = o.respawn;
+          }
+        });
+      op.asteroids = lead;
+    }
+  }
+}
+
 export function enterSystem(s: Sim, id: number) {
-  if (s.asteroids.length > 0 && s.systemId !== id) s.fields[s.systemId] = recordField(s);
+  const keep = s.systemId === id && s.asteroids.length > 0;
+  if (!keep) leaveField(s);
   const sys = s.systems[id];
   s.systemId = id;
   s.pirates = [];
@@ -160,17 +250,10 @@ export function enterSystem(s: Sim, id: number) {
   for (const sh of s.ships) delete sh.idleUntil;
   s.carrier.pos = v3();
   s.carrier.target = null;
-  s.asteroids = [];
+  // Always draw the field, so the hazards below read the same rng whether or not it is kept.
   const r = seeded(sys.seed);
-  for (const c of clusterCenters(sys)) {
-    const n = 8 + Math.floor(r() * 6);
-    for (let i = 0; i < n; i++) s.asteroids.push(spawnAsteroid(s, r, c, sys));
-  }
-  const rec = s.fields[id];
-  if (rec) {
-    applyField(s, rec);
-    delete s.fields[id];
-  }
+  const fresh = seedField(s, sys, r);
+  if (!keep) holdField(s, fresh);
   s.hazards = [];
   s.recon = { clusters: [], veins: [], hazards: [] };
   const hz = sys.tier === 1 ? 0 : sys.tier === 2 ? 2 : 3;

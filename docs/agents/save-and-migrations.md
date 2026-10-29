@@ -22,6 +22,7 @@ A new `Operation` or `GameState` field also needs the `OP_KEYS` / `GAME_KEYS` en
 
 - **v2**: Automation settings and a per-hangar auto-buy target (#11).
 - **v3**: `fields`: per-system depletion records (#14). Leaving a system keeps `[index, oreFraction, respawn]` for each rock that is not full. On return the field is regenerated from the seed, the record applied, and refill added for the time away (`FIELD_REFILL_SECS`). All records stay under 16 KB, tested in `src/sim/fields.test.ts`.
+  Since #176 the record is only read when no carrier is on the map in that system, and a carrier in the background holds no `asteroids`; no schema change, `linkFields` merges separate per-carrier copies on load.
 - **v4**: `containers` (cargo dropped by destroyed barges, salvaged by haulers until it decays) and `Ship.bargeId` (`-1` for the carrier) (#13).
 - **v5**: `Ship.modules` (at most `MODULE_SLOTS[cls]`) and `recon` (surveyed clusters, rich veins, charted hazards; cleared on every jump) (#9).
 - **v6**: `miningIncomeAvg` is guaranteed finite. Older saves lacked it, so offline settlement paid nothing (#38).

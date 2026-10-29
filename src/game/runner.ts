@@ -8,7 +8,7 @@ import {
 } from '../sim/actions';
 import { DT } from '../sim/config';
 import { BG_DT, dematerialise, materialise, stepBackground } from '../sim/background';
-import { bind, focusOp } from '../sim/state';
+import { bind, focusOp, joinField, leaveField, linkFields } from '../sim/state';
 import { step, stepOp } from '../sim/tick';
 import type { GameState } from '../sim/types';
 import { EventAggregator } from './events';
@@ -184,6 +184,7 @@ export class SimRunner {
    */
   private adopt(state: GameState) {
     this.state = state;
+    linkFields(state);
     this.resetClock();
     this.resync();
     this.fieldsAt = null;
@@ -210,10 +211,14 @@ export class SimRunner {
       const isLive = this.live.has(op.id);
       if (wantLive === isLive) continue;
       if (wantLive) {
-        materialise(bind(g, op));
+        const s = bind(g, op);
+        materialise(s);
+        joinField(s);
         this.live.add(op.id);
       } else {
-        dematerialise(bind(g, op));
+        const s = bind(g, op);
+        dematerialise(s);
+        leaveField(s);
         this.live.delete(op.id);
       }
     }
