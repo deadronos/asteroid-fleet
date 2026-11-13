@@ -5,19 +5,10 @@ import { updateSettings, useSettings } from '../game/settings';
 import { setActiveSlot } from '../game/slots';
 import { SHIP_STATS } from '../sim/config';
 import { SHIP_CLASSES } from '../sim/types';
-import { carrierRoster } from './carriers';
 import { downloadFile } from './download';
-import { resolveAlert } from '../game/toasts';
-import { formatEvent, toneClass } from './events';
-import {
-  activeCarrier,
-  carrierChoices,
-  filterEvents,
-  inboxKey,
-  mergeForInbox,
-  type CarrierFilter,
-  type SeverityFilter,
-} from './inbox';
+import { formatEvent } from './events';
+import { type CarrierFilter, type SeverityFilter } from './inbox';
+import { LogPanel } from './LogPanel';
 import { SceneBoundary } from './ErrorBoundary';
 import { FleetPanel } from './FleetPanel';
 import { CarrierBar } from './CarrierBar';
@@ -25,7 +16,7 @@ import { useHotkeys } from './hotkeys';
 import { HotkeyHelp } from './HotkeyHelp';
 import { Hud } from './Hud';
 import { useStackLayout } from './layout';
-import { fmt, formatSimTime } from './format';
+import { fmt } from './format';
 import { GearButton } from './GearButton';
 import { tierHint } from '../sim/config';
 import { leaveTactical } from '../render/focus';
@@ -36,14 +27,12 @@ import { ICON_SHAPE, PALETTE } from './palette';
 // Not needed for the first frame: the scene (three.js + r3f), the research tree
 // and the settings menu load as separate chunks right after first paint.
 const Scene = lazy(() => import('../render/Scene').then((m) => ({ default: m.Scene })));
+const loadCarrier = () => import('./CarrierPanel').then((m) => ({ default: m.CarrierPanel }));
+const loadDoctrine = () => import('./DoctrinePanel').then((m) => ({ default: m.DoctrinePanel }));
 const loadResearch = () => import('./ResearchPanel').then((m) => ({ default: m.ResearchPanel }));
 const loadSettings = () => import('./Settings').then((m) => ({ default: m.SettingsMenu }));
-const CarrierPanel = lazy(() =>
-  import('./CarrierPanel').then((m) => ({ default: m.CarrierPanel })),
-);
-const DoctrinePanel = lazy(() =>
-  import('./DoctrinePanel').then((m) => ({ default: m.DoctrinePanel })),
-);
+const CarrierPanel = lazy(loadCarrier);
+const DoctrinePanel = lazy(loadDoctrine);
 const ResearchPanel = lazy(loadResearch);
 const SettingsMenu = lazy(loadSettings);
 const loadStarMap = () => import('./StarMap').then((m) => ({ default: m.StarMap }));
@@ -55,6 +44,8 @@ const whenIdle = (fn: () => void) =>
     ? requestIdleCallback(fn, { timeout: 2000 })
     : setTimeout(fn, 2000);
 whenIdle(() => {
+  void loadCarrier();
+  void loadDoctrine();
   void loadResearch();
   void loadSettings();
   void loadStarMap();
@@ -82,81 +73,6 @@ function write(key: string, v: string) {
   } catch {
     /* ignore */
   }
-}
-
-export function LogPanel({
-  carrier,
-  onCarrier,
-  severity,
-  onSeverity,
-}: {
-  carrier: CarrierFilter;
-  onCarrier: (carrier: CarrierFilter) => void;
-  severity: SeverityFilter;
-  onSeverity: (severity: SeverityFilter) => void;
-}) {
-  const s = useGame();
-  const st = s.stats;
-  const choices = carrierChoices(carrierRoster(engine.carriers, engine.state.ops), s.systems);
-  const selected = activeCarrier(
-    carrier,
-    choices.map((c) => c.id),
-  );
-  const rows = filterEvents(mergeForInbox(s.log), selected, severity).filter(
-    (ev) => resolveAlert(s.alerts, ev.kind, ev.carrierId) !== 'off',
-  );
-  return (
-    <>
-      <h3>This run</h3>
-      <p className="hint">
-        {fmt(st.oreValueDelivered)} ore value delivered · {fmt(st.creditsEarned)} credits earned ·{' '}
-        {st.piratesKilled} pirates destroyed · {st.shipsLost} ships lost · prestige ×
-        {s.lifetime.prestiges}
-      </p>
-      <h3>Event inbox</h3>
-      <div className="row">
-        <label>
-          Carrier{' '}
-          <select
-            aria-label="Carrier"
-            value={selected === 'all' ? 'all' : String(selected)}
-            onChange={(e) => {
-              const v = e.target.value;
-              onCarrier(v === 'all' ? 'all' : Number(v));
-            }}
-          >
-            <option value="all">All</option>
-            {choices.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Severity{' '}
-          <select
-            aria-label="Severity"
-            value={severity}
-            onChange={(e) => onSeverity(e.target.value as SeverityFilter)}
-          >
-            <option value="all">All</option>
-            <option value="warn+">Warn+</option>
-            <option value="critical">Critical</option>
-          </select>
-        </label>
-      </div>
-      <div className="log">
-        {rows.map((l) => (
-          <div key={inboxKey(l)} className={toneClass(l.severity)}>
-            <span className="t">{formatSimTime(l.t)}</span>
-            {formatEvent(l)}
-            {l.count > 1 && <span className="t">x{l.count}</span>}
-          </div>
-        ))}
-      </div>
-    </>
-  );
 }
 
 /** Next preset speed up or down from `v`, clamped to 1×–4×. */

@@ -1,7 +1,7 @@
-import { useGLTF } from '@react-three/drei';
-import { useFrame, type ThreeEvent } from '@react-three/fiber';
+import { useFrame, useLoader, type ThreeEvent } from '@react-three/fiber';
 import { Suspense, useMemo, useRef } from 'react';
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { SHIP_STATS } from '../sim/config';
 import { shipGeometry } from './geometry';
 import { focus } from './focus';
@@ -224,7 +224,7 @@ function Layers({
 }
 
 function ModelLayers({ lodDistance }: { lodDistance: number }) {
-  const gltfs = useGLTF(URLS, false, false);
+  const gltfs = useLoader(GLTFLoader, URLS);
   const models = useMemo(
     () => gltfs.map((g, i) => bakeModel(g.scene, classColor(CLASSES[i]), SHIP_LENGTH[CLASSES[i]])),
     [gltfs],

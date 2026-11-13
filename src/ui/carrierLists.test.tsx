@@ -6,7 +6,7 @@ import { encodeSnapshot } from '../game/snapshot';
 import { apply } from '../sim/actions';
 import { newGame } from '../sim/state';
 import type { GameState } from '../sim/types';
-import { LogPanel } from './App';
+import { LogPanel } from './LogPanel';
 import { DoctrinePanel } from './DoctrinePanel';
 import type { CarrierFilter, SeverityFilter } from './inbox';
 import { RuleCards } from './RuleCards';
