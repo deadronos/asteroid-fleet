@@ -1,7 +1,7 @@
-import { useGLTF } from '@react-three/drei';
-import { useFrame } from '@react-three/fiber';
+import { useFrame, useLoader } from '@react-three/fiber';
 import { Suspense, useMemo, useRef } from 'react';
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { engine } from '../game/engine';
 import { asteroidGeometry } from './geometry';
 import { ASTEROID_MODEL, bakeModel, modelUrl } from './models';
@@ -89,7 +89,7 @@ function Field({
 }
 
 function ModelField({ lodDistance }: { lodDistance: number }) {
-  const gltf = useGLTF(modelUrl(ASTEROID_MODEL), false, false);
+  const gltf = useLoader(GLTFLoader, modelUrl(ASTEROID_MODEL));
   const model = useMemo(() => {
     const g = bakeModel(gltf.scene);
     // Instance colours carry the ore tier; drop the kit's baked rock colour.

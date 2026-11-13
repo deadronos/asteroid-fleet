@@ -1,8 +1,7 @@
-import { OrbitControls } from '@react-three/drei';
 import { useFrame, useThree } from '@react-three/fiber';
-import { useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
-import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { engine } from '../game/engine';
 import { CAMERA_OFFSET } from './constants';
 import { fleetFrame } from './frameState';
@@ -25,8 +24,21 @@ export function CameraRig({
   tactical: boolean;
   onAutoTactical: (on: boolean) => void;
 }) {
-  const controls = useRef<OrbitControlsImpl>(null);
-  const { camera } = useThree();
+  const { camera, gl, set } = useThree();
+  const controls = useMemo(() => {
+    const c = new OrbitControls(camera, gl.domElement);
+    c.enableDamping = true;
+    c.dampingFactor = 0.08;
+    c.minDistance = 8;
+    c.maxDistance = 360;
+    return c;
+  }, [camera, gl.domElement]);
+  useEffect(() => {
+    set({ controls });
+    return () => {
+      controls.dispose();
+    };
+  }, [controls, set]);
   const anchor = useRef(new THREE.Vector3());
   const started = useRef(false);
   const system = useRef(-1);
@@ -46,8 +58,7 @@ export function CameraRig({
   ]);
 
   useFrame((_, dt) => {
-    const c = controls.current;
-    if (!c) return;
+    const c = controls;
     const s = engine.view;
     const a = engine.alpha();
 
@@ -112,16 +123,7 @@ export function CameraRig({
     }
     c.update();
   });
-  return (
-    <OrbitControls
-      ref={controls}
-      makeDefault
-      enableDamping
-      dampingFactor={0.08}
-      minDistance={8}
-      maxDistance={360}
-    />
-  );
+  return null;
 }
 
 /** Carrier position uses its own previous-tick snapshot rather than the per-id map. */

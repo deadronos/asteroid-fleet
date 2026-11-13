@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { describe, expect, it, vi } from 'vitest';
 import { engine } from '../game/engine';
 import { newGame } from '../sim/state';
-import { LogPanel } from './App';
+import { LogPanel } from './LogPanel';
 import type { CarrierFilter, SeverityFilter } from './inbox';
 
 function Host({

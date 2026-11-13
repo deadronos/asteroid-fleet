@@ -11,7 +11,7 @@ Source of truth: `App.tsx`, `../game/engine.ts` (`useGame`), `hotkeys.ts`, `Moda
 ## Structure
 
 - `App.tsx` is the shell: HUD, side panels in `Tabs`, the log/inbox, modals and the lazily loaded scene. Heavy panels (`Scene`, `ResearchPanel`, `SettingsMenu`, `CarrierPanel`, `DoctrinePanel`...) are `lazy()` imports, which keeps the initial bundle inside budget ([../workflow.md](../workflow.md)). New large panels should be lazy too.
-- One component per panel file (`FleetPanel`, `CarrierPanel`, `DoctrinePanel`, `RuleCards`, `ResearchPanel`, `StarMap`, `Shipyard`, `Goals`...). Pure helpers sit beside them as `.ts` files (`format.ts`, `inbox.ts`, `cardText.ts`, `mapLayout.ts`, `carriers.ts`) and are unit-tested on their own.
+- One component per panel file (`FleetPanel`, `CarrierPanel`, `DoctrinePanel`, `RuleCards`, `ResearchPanel`, `StarMap`, `Shipyard`, `Goals`, `LogPanel`...). Pure helpers sit beside them as `.ts` files (`format.ts`, `inbox.ts`, `cardText.ts`, `mapLayout.ts`, `carriers.ts`) and are unit-tested on their own.
 - Text for sim data lives in the UI: event text in `events.ts`, card labels in `cardText.ts`, numbers via `fmt` / `formatSimTime` in `format.ts`.
 - Disabled buttons explain why. Refusal reasons come from shared sim helpers such as `warpBlocked` (`sim/warpReason.ts`) or the cost checks in `sim/costs.ts`, so the UI and the command interpreter agree.
 

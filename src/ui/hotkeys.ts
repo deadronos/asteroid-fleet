@@ -121,14 +121,14 @@ export function useHotkeys(list: Hotkey[]): void {
   });
   useEffect(
     () =>
+      // Bindings are static in shape; only their closures change, which `ref` covers.
       registerHotkeys(
-        list.map((h, i) => ({
-          ...h,
-          run: (e: KeyboardEvent) => ref.current[i].run(e),
-        })),
+        ref.current.map((h, i) =>
+          Object.assign({}, h, {
+            run: (e: KeyboardEvent) => ref.current[i].run(e),
+          }),
+        ),
       ),
-    // Bindings are static in shape; only their closures change, which `ref` covers.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
 }

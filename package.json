@@ -20,7 +20,6 @@
     "gen:view": "node scripts/gen-sim-view.mjs"
   },
   "dependencies": {
-    "@react-three/drei": "^10.7.9",
     "@react-three/fiber": "^9.8.2",
     "@react-three/postprocessing": "^3.2.2",
     "idb-keyval": "^6.3.0",
@@ -40,7 +39,6 @@
     "oxfmt": "^0.74.0",
     "oxlint": "^1.89.0",
     "oxlint-tsgolint": "^7.0.2005",
-    "three-stdlib": "2.36.1",
     "typescript": "^7.0.2",
     "vite": "^8.3.5",
     "vitest": "^5.0.5"

@@ -1,6 +1,6 @@
 # Rendering (`src/render/`)
 
-Source of truth: `Scene.tsx`, `frameState.ts`, `Fleet.tsx`, `AsteroidField.tsx`, `models.ts`, `constants.ts`, `public/models/README.md`.
+Source of truth: `Scene.tsx`, `Environment.tsx`, `Tactical.tsx`, `frameState.ts`, `Fleet.tsx`, `AsteroidField.tsx`, `models.ts`, `constants.ts`, `public/models/README.md`.
 
 ## Shape of the scene
 

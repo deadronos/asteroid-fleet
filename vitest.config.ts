@@ -5,7 +5,7 @@ export default mergeConfig(
   viteConfig,
   defineConfig({
     test: {
-      exclude: ['**/node_modules/**', '**/dist/**', 'e2e/**'],
+      exclude: ['**/node_modules/**', '**/dist/**', 'e2e/**', '**/.worktrees/**'],
       coverage: {
         provider: 'v8',
         include: ['src/**'],
