@@ -37,14 +37,15 @@ interface Activity {
 function cardActivity(s: Sim): Record<number, Activity> {
   const out: Record<number, Activity> = {};
   for (const card of s.cards) {
-    const carrier = ACTION_DEFS[card.then.kind].classes === null;
-    if (!card.enabled || !cardActive(s, card)) {
+    const classes = ACTION_DEFS[card.then.kind].classes;
+    if (!cardActive(s, card)) {
       out[card.id] = { active: false, count: 0 };
-    } else if (carrier) {
+    } else if (classes === null) {
       out[card.id] = { active: card.when.every((c) => conditionHolds(s, c, null)), count: 0 };
     } else {
       let count = 0;
       for (const sh of s.ships) {
+        if (!classes.includes(sh.cls)) continue;
         if (card.scope.kind === 'hangar' && sh.hangarId !== card.scope.id) continue;
         if (card.scope.kind === 'class' && sh.cls !== card.scope.cls) continue;
         if (card.when.every((c) => conditionHolds(s, c, sh))) count++;
@@ -317,7 +318,11 @@ export function RuleCards() {
               {live?.active && (
                 <span
                   className="card-live"
-                  aria-label={live.count ? `${live.count} ships firing` : 'Card firing'}
+                  aria-label={
+                    live.count
+                      ? `${live.count} ${live.count === 1 ? 'ship' : 'ships'} firing`
+                      : 'Card firing'
+                  }
                 >
                   {' '}
                   ● active

@@ -174,10 +174,11 @@ function HangarBoard({
   if (!board) return null;
   const byStart = new Map(board.ships.map((sh) => [sh.start, sh]));
   // Tap/keyboard movement: a ship stays selected until it is moved or Escape cancels it.
+  // Allow overlapping the ship's own slots (matches sim/hangar.ts `fits`), so multi-slot ships can shift left.
   const free = (start: number) =>
     board.selSize > 0 &&
     start + board.selSize <= board.slots &&
-    board.occ.slice(start, start + board.selSize).every((id) => id === null);
+    board.occ.slice(start, start + board.selSize).every((id) => id === null || id === selShip);
   const move = (start: number) => {
     if (!free(start)) return;
     engine.dispatch({ type: 'moveShip', shipId: selShip, hangarId: board.id, start });
@@ -185,6 +186,7 @@ function HangarBoard({
   };
   const cancel = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape' && selShip >= 0) {
+      e.preventDefault();
       e.stopPropagation();
       onShip(-1);
     }
@@ -667,8 +669,9 @@ export function FleetPanel() {
             onSelect={() => setPicked(id)}
             selShip={selShip}
             onShip={(id) => {
-              setSelShip(id === selShip ? -1 : id);
-              focus.set(id === selShip ? null : id);
+              const next = id < 0 || id === selShip ? -1 : id;
+              setSelShip(next);
+              focus.set(next < 0 ? null : next);
             }}
           />
           {selShip >= 0 && f.hasSel[i] && <ShipDetail id={selShip} />}

@@ -222,17 +222,54 @@ describe('touch and keyboard ship movement (#248)', () => {
     expect(board.querySelectorAll('.slot.valid').length).toBe(0);
     expect(dispatch.mock.calls.some(([c]) => c.type === 'moveShip')).toBe(false);
   });
+  it('allows a multi-slot ship to shift into an adjacent slot overlapping itself', async () => {
+    const s = game(3);
+    const v = focused(s);
+    v.credits = 50_000;
+    v.hangars[0].slots = 6;
+    v.hangars[0].items = [];
+    v.ships = [];
+    expect(order(v, { type: 'buyShip', cls: 'barge', hangarId: v.hangars[0].id })).toBeNull();
+    const bargeId = v.ships[0].id;
+    // Place the 4-slot barge at slots 1..4 so slot 0 is the only empty slot to its left.
+    v.hangars[0].items[0].start = 1;
+    const dispatch = vi.spyOn(engine, 'dispatch').mockImplementation(() => {});
+    const m = await mount(<FleetPanel />, s);
+    cleanup = m.cleanup;
+    const tile = m.el.querySelector<HTMLElement>('.ship-tile')!;
+    await click(tile);
+    const slot = m.el.querySelector<HTMLElement>('.slot.valid')!;
+    expect(slot).not.toBeNull();
+    expect(slot.getAttribute('aria-label')).toContain('slot 1');
+    await click(slot);
+    expect(dispatch).toHaveBeenCalledWith({
+      type: 'moveShip',
+      shipId: bargeId,
+      hangarId: v.hangars[0].id,
+      start: 0,
+    });
+  });
 });
 
 describe('live rule card status (#246)', () => {
-  it('shows a ship count on a firing ship-scoped card', async () => {
+  it('shows a ship count on a firing ship-scoped card and filters by action classes', async () => {
     const s = game(3);
-    focused(s).credits = 10_000;
-    expect(order(focused(s), { type: 'buyShip', cls: 'hauler', hangarId: 1 })).toBeNull();
+    const v = focused(s);
+    v.credits = 10_000;
+    expect(order(v, { type: 'buyShip', cls: 'hauler', hangarId: 1 })).toBeNull();
+    // Fleet-scoped barge-only action (`callHauler`) must not count drones or haulers when no barge exists.
+    v.cards.push({
+      id: 99,
+      enabled: true,
+      scope: { kind: 'fleet' },
+      when: [{ kind: 'always' }],
+      then: { kind: 'callHauler' },
+    });
     const m = await mount(<RuleCards />, s);
     cleanup = m.cleanup;
     const live = [...m.el.querySelectorAll('.card-live')].map((e) => e.textContent ?? '');
     expect(live.some((text) => /1 ship\b/.test(text))).toBe(true);
+    expect(m.el.querySelector('[data-card="99"] .card-live')).toBeNull();
   });
 
   it('shows a plain active badge on a firing carrier-scoped card', async () => {
