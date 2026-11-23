@@ -278,7 +278,7 @@ export interface Carrier {
   hull: number;
   maxHull: number;
   energy: number;
-  shield: number; // 0..1 shield strength, drains energy when absorbing hits
+  shield: number; // 0..1 shield strength; regenerating drains energy (#229)
   ore: number;
   oreValue: number;
   h2: number;

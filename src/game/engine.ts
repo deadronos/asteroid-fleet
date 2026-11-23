@@ -21,6 +21,21 @@ import { alertActions, offerToasts, ToastQueue } from './toasts';
 
 const AUTOSAVE_MS = 15000;
 
+/** High-value orders that trigger an immediate save so multi-carrier closes don't lose them (#249). */
+const SAVE_ORDERS = new Set<Order['type']>([
+  'buyCarrier',
+  'warp',
+  'cancelWarp',
+  'jumpNow',
+  'buyResearch',
+  'buyAdmiralty',
+  'refit',
+  'buyHangar',
+  'upgradeRefinery',
+  'addRoute',
+  'removeRoute',
+]);
+
 /**
  * Main-thread side of the game. The sim runs in a worker (see `runner.ts`); this class
  * keeps a mirror of its state for React and the renderer. A packed snapshot of the whole state
@@ -79,8 +94,15 @@ class Engine {
 
   private host: SimHost | null = null;
   /** Pending while `init` loads the save; the sim host does not exist yet. */
-  private started!: () => void;
-  private starting: Promise<void> = new Promise((r) => (this.started = r));
+  private resolveStarting!: () => void;
+  private starting: Promise<void> = new Promise((r) => (this.resolveStarting = r));
+  private hasStarted = false;
+  private started = () => {
+    this.hasStarted = true;
+    this.resolveStarting();
+  };
+  private saving: Promise<boolean> | null = null;
+  private saveQueued = false;
   private version = 0;
   private listeners = new Set<() => void>();
   private ships = new Map<number, Ship>();
@@ -347,12 +369,17 @@ class Engine {
    * Stamps `focusedCarrierId`, which updates on a switch before the mirror does (#175).
    */
   dispatch(order: Order) {
-    this.host?.post({ t: 'cmd', cmd: { ...order, carrierId: this.focusedCarrierId } });
+    this.postCmd(this.focusedCarrierId, order);
   }
 
   /** An order for a named carrier, e.g. a supply route that starts at another one. */
   dispatchFor(carrierId: number, order: Order) {
+    this.postCmd(carrierId, order);
+  }
+
+  private postCmd(carrierId: number, order: Order) {
     this.host?.post({ t: 'cmd', cmd: { ...order, carrierId } });
+    if (this.hasStarted && SAVE_ORDERS.has(order.type)) void this.save();
   }
 
   /** The sim's current state, exact (unlike the mirror, which is up to one UI tick behind). */
@@ -385,6 +412,7 @@ class Engine {
 
   replace(state: GameState) {
     this.epoch += 1;
+    this.saveQueued = false;
     this.pendingFocus = null;
     this.unseen.clear();
     this.toasts.clear();
@@ -422,24 +450,39 @@ class Engine {
     this.emit();
   }
 
-  /** Saves the sim's exact state. False when autosave is blocked by an unreadable save. */
   /**
    * Saves the sim's exact state. Resolves once the write has landed, true if storage kept it;
-   * false when it did not, or when autosave is blocked by an unreadable save.
+   * false when it did not, or when autosave is blocked by an unreadable save. Concurrent calls
+   * coalesce into at most one trailing save so overlapping snapshots cannot finish out of order (#249).
    */
   async save(): Promise<boolean> {
+    if (saveOverwriteBlocked()) return false;
+    if (this.saving) {
+      this.saveQueued = true;
+      return this.saving;
+    }
+    this.saving = this.runSave();
+    try {
+      return await this.saving;
+    } finally {
+      this.saving = null;
+    }
+  }
+
+  private async runSave(): Promise<boolean> {
+    this.saveQueued = false;
     if (saveOverwriteBlocked()) return false;
     const epoch = this.epoch;
     const state = await this.fullState();
     // A reset or import while the snapshot was in flight: the reply is the old run (#170).
-    if (epoch !== this.epoch) return false;
-    return this.write(state);
+    const ok = epoch === this.epoch ? await this.write(state) : false;
+    return this.saveQueued ? this.runSave() : ok;
   }
 
   private saveMirror() {
     // The mirror holds only the focused carrier, so writing it would drop the others from the
-    // save. Trade-off: closing the tab with several carriers loses up to one autosave interval.
-    if (this.carriers.length > 1) return;
+    // save; milestone commands call `save()` directly to narrow that window (#249).
+    if (this.carriers.length > 1 || this.state.ops.length > 1) return;
     // The mirror lags the worker by up to one UI tick, so it must not replace a newer write.
     if (this.state.time < this.lastWrittenTime) return;
     if (!saveOverwriteBlocked()) void this.write(this.state);

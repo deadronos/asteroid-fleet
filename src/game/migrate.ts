@@ -1,14 +1,32 @@
 import { presetCard } from '../sim/cards';
-import { HULLS, PRESETS, warpCost } from '../sim/config';
+import {
+  ACTION_DEFS,
+  CONDITION_DEFS,
+  HANGAR_TYPES,
+  HULLS,
+  MAX_CONDITIONS,
+  MODULES,
+  PRESETS,
+  STANCE_SWITCHES,
+  warpCost,
+} from '../sim/config';
+import { CHALLENGES, MODIFIERS } from '../sim/modifiers';
 import { OP_KEYS, SAVE_VERSION, makeSystems } from '../sim/state';
 import {
   ROUTE_RESOURCES,
+  SHIP_CLASSES,
   type GameState,
   type HullId,
   type RuleCard,
   type RuleId,
   type Severity,
+  type ShipClass,
+  type ShipMode,
+  type StanceSwitch,
 } from '../sim/types';
+import { MODES } from './protocol';
+
+const MAX_HANGAR_SLOTS = 512;
 
 export type SaveFailure = 'corrupt' | 'newer' | 'unknown';
 
@@ -264,8 +282,16 @@ export function migrate(raw: unknown): MigrateResult {
 
   const migrated = applyMigrationSteps(save, version, SAVE_VERSION);
   if (!migrated) return { ok: false, reason: 'unknown' };
-  return validateSave(migrated);
+  return validateSave(migrated, version);
 }
+
+const isNum = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isFinite(value);
+
+const isInt = (value: unknown): value is number => isNum(value) && Number.isInteger(value);
+
+const isVec3 = (value: unknown): boolean =>
+  isRecord(value) && isNum(value.x) && isNum(value.y) && isNum(value.z);
 
 function isRecord(value: unknown): value is SaveBlob {
   return !!value && typeof value === 'object' && !Array.isArray(value);
@@ -276,7 +302,118 @@ function isTimer(value: unknown): boolean {
   return value === null || typeof value === 'number';
 }
 
-function validateSave(save: SaveBlob): MigrateResult {
+function validCard(card: unknown): boolean {
+  if (!isRecord(card) || !isNum(card.id) || typeof card.enabled !== 'boolean') return false;
+  if (
+    card.preset !== undefined &&
+    (typeof card.preset !== 'string' || !Object.hasOwn(PRESETS, card.preset))
+  )
+    return false;
+  if (!isRecord(card.scope)) return false;
+  const scopeOk =
+    card.scope.kind === 'fleet' ||
+    (card.scope.kind === 'class' &&
+      typeof card.scope.cls === 'string' &&
+      SHIP_CLASSES.includes(card.scope.cls as ShipClass)) ||
+    (card.scope.kind === 'hangar' && isNum(card.scope.id));
+  if (!scopeOk) return false;
+  if (!Array.isArray(card.when) || card.when.length === 0 || card.when.length > MAX_CONDITIONS)
+    return false;
+  for (const cond of card.when) {
+    if (
+      !isRecord(cond) ||
+      typeof cond.kind !== 'string' ||
+      !Object.hasOwn(CONDITION_DEFS, cond.kind)
+    )
+      return false;
+    if (cond.value !== undefined && !isNum(cond.value)) return false;
+  }
+  if (
+    !isRecord(card.then) ||
+    typeof card.then.kind !== 'string' ||
+    !Object.hasOwn(ACTION_DEFS, card.then.kind)
+  )
+    return false;
+  if (card.then.kind === 'stance') {
+    if (typeof card.then.to !== 'string' || !STANCE_SWITCHES.includes(card.then.to as StanceSwitch))
+      return false;
+    if (card.then.seconds !== undefined && (!isNum(card.then.seconds) || card.then.seconds < 0))
+      return false;
+  }
+  return true;
+}
+
+function validCarrier(c: unknown): boolean {
+  if (!isRecord(c) || !isVec3(c.pos)) return false;
+  if (c.target !== null && !isVec3(c.target)) return false;
+  if (typeof c.hullClass !== 'string' || !Object.hasOwn(HULLS, c.hullClass)) return false;
+  if (c.stance !== 'hold' && c.stance !== 'followRich') return false;
+  if (!isNum(c.hull) || !isNum(c.maxHull) || c.maxHull <= 0) return false;
+  if (!isNum(c.energy) || !isNum(c.shield) || !isNum(c.ore) || !isNum(c.oreValue) || !isNum(c.h2))
+    return false;
+  return isNum(c.refinery) && c.refinery >= 0;
+}
+
+function validShip(sh: unknown): boolean {
+  if (!isRecord(sh)) return false;
+  if (!isNum(sh.id) || !isNum(sh.hangarId)) return false;
+  if (typeof sh.cls !== 'string' || !SHIP_CLASSES.includes(sh.cls as ShipClass)) return false;
+  if (typeof sh.mode !== 'string' || !MODES.includes(sh.mode as ShipMode)) return false;
+  if (!isVec3(sh.pos)) return false;
+  if (!isNum(sh.hull) || !isNum(sh.cargo) || !isNum(sh.cargoValue) || !isNum(sh.h2)) return false;
+  return (
+    Array.isArray(sh.modules) &&
+    sh.modules.every((m) => typeof m === 'string' && Object.hasOwn(MODULES, m))
+  );
+}
+
+function validHangar(h: unknown): boolean {
+  if (!isRecord(h) || !isNum(h.id)) return false;
+  if (typeof h.type !== 'string' || !Object.hasOwn(HANGAR_TYPES, h.type)) return false;
+  if (!isInt(h.slots) || h.slots < 1 || h.slots > MAX_HANGAR_SLOTS) return false;
+  return (
+    Array.isArray(h.items) &&
+    h.items.every((it) => isRecord(it) && isNum(it.shipId) && isNum(it.start))
+  );
+}
+
+function validAsteroid(a: unknown): boolean {
+  return (
+    isRecord(a) &&
+    isNum(a.id) &&
+    isVec3(a.pos) &&
+    isNum(a.ore) &&
+    isNum(a.maxOre) &&
+    isNum(a.value) &&
+    isNum(a.radius) &&
+    isNum(a.respawn)
+  );
+}
+
+function validPirate(p: unknown): boolean {
+  return (
+    isRecord(p) &&
+    isNum(p.id) &&
+    isVec3(p.pos) &&
+    isNum(p.hull) &&
+    isNum(p.maxHull) &&
+    isNum(p.damage) &&
+    isNum(p.speed)
+  );
+}
+
+function validContainer(c: unknown): boolean {
+  return (
+    isRecord(c) &&
+    isNum(c.id) &&
+    isVec3(c.pos) &&
+    isNum(c.cargo) &&
+    isNum(c.cargoValue) &&
+    isNum(c.ttl)
+  );
+}
+
+function validateSave(save: SaveBlob, fromVersion: number): MigrateResult {
   if (save.version !== SAVE_VERSION) return { ok: false, reason: 'corrupt' };
   if (!Array.isArray(save.ops) || save.ops.length === 0) return { ok: false, reason: 'corrupt' };
   if (!Array.isArray(save.systems)) return { ok: false, reason: 'corrupt' };
@@ -288,27 +425,42 @@ function validateSave(save: SaveBlob): MigrateResult {
   if (!isRecord(save.alerts) || !isRecord(save.alerts.fleet) || !isRecord(save.alerts.byCarrier))
     save.alerts = { fleet: {}, byCarrier: {} };
   if (!Array.isArray(save.log)) save.log = [];
-  if (!Array.isArray(save.cards)) save.cards = [];
+  if (!Array.isArray(save.cards) || !save.cards.every(validCard))
+    return { ok: false, reason: 'corrupt' };
   if (!Array.isArray(save.unlockedRules)) save.unlockedRules = [];
   if (!Array.isArray(save.events)) save.events = [];
-  if (!Array.isArray(save.modifiers)) save.modifiers = [];
+  if (
+    !Array.isArray(save.modifiers) ||
+    !save.modifiers.every((m) => typeof m === 'string' && Object.hasOwn(MODIFIERS, m))
+  )
+    return { ok: false, reason: 'corrupt' };
   if (!Array.isArray(save.routes)) save.routes = [];
   if (!Array.isArray(save.challengesDone)) save.challengesDone = [];
-  if (typeof save.challenge !== 'string') save.challenge = null;
-  if (!Array.isArray(save.hulls) || !save.hulls.includes('standard')) save.hulls = ['standard'];
-
-  if (typeof save.credits !== 'number' || !Number.isFinite(save.credits))
+  if (
+    save.challenge !== null &&
+    (typeof save.challenge !== 'string' || !Object.hasOwn(CHALLENGES, save.challenge))
+  )
+    return { ok: false, reason: 'corrupt' };
+  if (
+    !Array.isArray(save.hulls) ||
+    !save.hulls.includes('standard') ||
+    !save.hulls.every((h) => typeof h === 'string' && Object.hasOwn(HULLS, h))
+  )
+    return { ok: false, reason: 'corrupt' };
+  if (save.powerMode !== 'balanced' && save.powerMode !== 'income' && save.powerMode !== 'defense')
     return { ok: false, reason: 'corrupt' };
 
+  if (!isNum(save.credits)) return { ok: false, reason: 'corrupt' };
+
   const ids = new Set<unknown>();
+  const allowEmptyHangars = fromVersion < 9;
   for (const op of save.ops) {
-    if (!isRecord(op) || typeof op.id !== 'number' || ids.has(op.id))
-      return { ok: false, reason: 'corrupt' };
+    if (!isRecord(op) || !isNum(op.id) || ids.has(op.id)) return { ok: false, reason: 'corrupt' };
     ids.add(op.id);
-    if (!validOp(op)) return { ok: false, reason: 'corrupt' };
+    if (!validOp(op, allowEmptyHangars)) return { ok: false, reason: 'corrupt' };
     // Early saves were written with `systems: []`; rebuild the map from the seed (#40).
     if (!isRecord((save.systems as unknown[])[op.systemId as number])) {
-      if (typeof save.seed !== 'number') return { ok: false, reason: 'corrupt' };
+      if (!isNum(save.seed)) return { ok: false, reason: 'corrupt' };
       const systems = makeSystems(save.seed);
       if (!systems[op.systemId as number]) return { ok: false, reason: 'corrupt' };
       save.systems = systems;
@@ -340,14 +492,17 @@ function validateSave(save: SaveBlob): MigrateResult {
 }
 
 /** Checks one operation, filling fields that may safely default. */
-function validOp(op: SaveBlob): boolean {
-  if (!Array.isArray(op.ships)) return false;
-  if (!Array.isArray(op.asteroids)) return false;
-  if (!Array.isArray(op.hangars)) return false;
-  if (!Array.isArray(op.containers)) return false;
+function validOp(op: SaveBlob, allowEmptyHangars: boolean): boolean {
+  if (!Array.isArray(op.ships) || !op.ships.every(validShip)) return false;
+  if (!Array.isArray(op.asteroids) || !op.asteroids.every(validAsteroid)) return false;
+  if (!Array.isArray(op.hangars) || (!allowEmptyHangars && op.hangars.length === 0)) return false;
+  if (!op.hangars.every(validHangar)) return false;
+  if (op.pirates === undefined) op.pirates = [];
+  else if (!Array.isArray(op.pirates) || !op.pirates.every(validPirate)) return false;
+  if (!Array.isArray(op.containers) || !op.containers.every(validContainer)) return false;
   if (!isRecord(op.recon)) return false;
-  if (!isRecord(op.carrier)) return false;
-  if (typeof op.rng !== 'number') return false;
+  if (!validCarrier(op.carrier)) return false;
+  if (!isNum(op.rng)) return false;
   if (!isRecord(op.wave) || !isTimer(op.wave.timer)) return false;
   if (!isRecord(op.storm) || !isTimer(op.storm.timer)) return false;
   // NaN is stored as null; a non-finite income would poison the rolling average.
@@ -356,7 +511,6 @@ function validOp(op: SaveBlob): boolean {
   if (!Array.isArray(op.rebuildQueue)) op.rebuildQueue = [];
   if (typeof op.automationTimer !== 'number' || !Number.isFinite(op.automationTimer))
     op.automationTimer = 0;
-  if (typeof op.systemId !== 'number' || !Number.isInteger(op.systemId) || op.systemId < 0)
-    return false;
+  if (!isInt(op.systemId) || op.systemId < 0) return false;
   return true;
 }

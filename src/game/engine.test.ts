@@ -266,3 +266,178 @@ describe('jump of the focused carrier (#182)', () => {
     expect(engine.cuts).toBe(cuts + 1);
   });
 });
+
+const flush = () => new Promise<void>((r) => setTimeout(r, 0));
+
+describe('multi-carrier save durability (#249)', () => {
+  type EngineInternals = {
+    host: { kind: string; post: (m: { t: string; id?: number }) => void } | null;
+    started: () => void;
+    hasStarted: boolean;
+    saving: Promise<boolean> | null;
+    saveQueued: boolean;
+    write: (s: unknown) => Promise<boolean>;
+    saveMirror: () => void;
+    lastWrittenTime: number;
+  };
+
+  it('triggers save() on high-value commands in dispatch and dispatchFor', () => {
+    const e = engine as unknown as EngineInternals;
+    const host = e.host;
+    const hasStarted = e.hasStarted;
+    const posted: { t: string; id?: number }[] = [];
+    e.host = { kind: 'local', post: (m) => posted.push(m) };
+    e.started();
+    const save = vi.spyOn(engine, 'save').mockResolvedValue(true);
+    try {
+      const milestoneOrders = [
+        { type: 'buyCarrier' },
+        { type: 'warp', systemId: 1 },
+        { type: 'cancelWarp' },
+        { type: 'jumpNow' },
+        { type: 'buyResearch', id: 'yield' },
+        { type: 'buyAdmiralty', id: 'admYield' },
+        { type: 'refit', hull: 'light' },
+        { type: 'buyHangar', hangarType: 'launch' },
+        { type: 'upgradeRefinery' },
+        { type: 'addRoute', to: 1, resource: 'ore', rate: 10 },
+        { type: 'removeRoute', routeId: 1 },
+      ] as const;
+      for (const order of milestoneOrders) {
+        save.mockClear();
+        engine.dispatch(order);
+        expect(save).toHaveBeenCalledTimes(1);
+      }
+      save.mockClear();
+      engine.dispatchFor(2, { type: 'addRoute', to: 0, resource: 'h2', rate: 5 });
+      expect(save).toHaveBeenCalledTimes(1);
+
+      save.mockClear();
+      engine.dispatch({ type: 'buyShip', cls: 'drone' });
+      engine.dispatch({ type: 'setPower', mode: 'income' });
+      expect(save).not.toHaveBeenCalled();
+    } finally {
+      save.mockRestore();
+      e.host = host;
+      e.hasStarted = hasStarted;
+    }
+  });
+
+  it('coalesces concurrent save() calls to at most one trailing write', async () => {
+    const e = engine as unknown as EngineInternals;
+    const host = e.host;
+    const hasStarted = e.hasStarted;
+    const posted: { t: string; id?: number }[] = [];
+    e.host = { kind: 'local', post: (m) => posted.push(m) };
+    e.started();
+    let resolveWrite!: (v: boolean) => void;
+    let inFlightWrites = 0;
+    let maxInFlightWrites = 0;
+    const write = vi.spyOn(e, 'write').mockImplementation(
+      () =>
+        new Promise<boolean>((resolve) => {
+          inFlightWrites++;
+          maxInFlightWrites = Math.max(maxInFlightWrites, inFlightWrites);
+          resolveWrite = (v) => {
+            inFlightWrites--;
+            resolve(v);
+          };
+        }),
+    );
+    try {
+      const p1 = engine.save();
+      const p2 = engine.save();
+      const p3 = engine.save();
+      await flush();
+      const snapshots = () => posted.filter((m) => m.t === 'snapshot');
+      expect(snapshots()).toHaveLength(1);
+
+      engine.onSimMessage({ t: 'snapshot', id: snapshots()[0].id!, state: newGame(1) });
+      await flush();
+      expect(write).toHaveBeenCalledTimes(1);
+      // Second snapshot must not start until the first write completes.
+      expect(snapshots()).toHaveLength(1);
+
+      resolveWrite(true);
+      await flush();
+      expect(snapshots()).toHaveLength(2);
+
+      engine.onSimMessage({ t: 'snapshot', id: snapshots()[1].id!, state: newGame(2) });
+      await flush();
+      expect(write).toHaveBeenCalledTimes(2);
+      resolveWrite(true);
+
+      expect(await Promise.all([p1, p2, p3])).toEqual([true, true, true]);
+      expect(maxInFlightWrites).toBe(1);
+    } finally {
+      write.mockRestore();
+      e.host = host;
+      e.hasStarted = hasStarted;
+      e.saving = null;
+      e.saveQueued = false;
+    }
+  });
+
+  it('discards stale queued saves across replace and runs post-replace saves at the new epoch', async () => {
+    const e = engine as unknown as EngineInternals;
+    const host = e.host;
+    const hasStarted = e.hasStarted;
+    const posted: { t: string; id?: number }[] = [];
+    e.host = { kind: 'local', post: (m) => posted.push(m) };
+    e.started();
+    const write = vi.spyOn(e, 'write').mockResolvedValue(true);
+    try {
+      const p1 = engine.save();
+      const p2 = engine.save();
+      await flush();
+      const req1 = posted.find((m) => m.t === 'snapshot')!;
+      const fresh = newGame(99);
+      engine.replace(fresh);
+      // Save requested after replace queues a trailing snapshot for the new epoch.
+      const p3 = engine.save();
+      engine.onSimMessage({ t: 'snapshot', id: req1.id!, state: newGame(1) });
+      await flush();
+      const snapshots = posted.filter((m) => m.t === 'snapshot');
+      expect(snapshots).toHaveLength(2);
+      const newer = newGame(100);
+      engine.onSimMessage({ t: 'snapshot', id: snapshots[1].id!, state: newer });
+      expect(await Promise.all([p1, p2, p3])).toEqual([true, true, true]);
+      expect(write).toHaveBeenCalledTimes(2);
+      expect(write).toHaveBeenNthCalledWith(1, fresh);
+      expect(write).toHaveBeenNthCalledWith(2, newer);
+    } finally {
+      write.mockRestore();
+      e.host = host;
+      e.hasStarted = hasStarted;
+      e.saving = null;
+      e.saveQueued = false;
+    }
+  });
+
+  it('skips saveMirror when multiple carriers are active', () => {
+    const e = engine as unknown as EngineInternals;
+    const state = engine.state;
+    const carriers = engine.carriers;
+    const write = vi.spyOn(e, 'write').mockResolvedValue(true);
+    try {
+      const multi = newGame(4);
+      multi.ops.push({ ...structuredClone(multi.ops[0]), id: 2 });
+      engine.state = multi;
+      engine.carriers = [];
+      e.saveMirror();
+      expect(write).not.toHaveBeenCalled();
+
+      engine.state = newGame(4);
+      engine.carriers = [
+        { id: 0, systemId: 0, hull: 1, energy: 600, maxEnergy: 1000, income: 0, hangars: [1, 2] },
+        { id: 2, systemId: 0, hull: 1, energy: 600, maxEnergy: 1000, income: 0, hangars: [3, 4] },
+      ];
+      e.saveMirror();
+      expect(write).not.toHaveBeenCalled();
+    } finally {
+      write.mockRestore();
+      engine.state = state;
+      engine.carriers = carriers;
+    }
+  });
+});

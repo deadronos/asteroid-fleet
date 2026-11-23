@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PRESETS } from '../sim/config';
 import { order } from '../sim/actions';
-import { OP_KEYS, SAVE_VERSION, focused, newGame } from '../sim/state';
+import { OP_KEYS, SAVE_VERSION, focused, newGame, stateOf } from '../sim/state';
+import { stressGame } from '../sim/stress';
 import { step } from '../sim/tick';
 import saveV1 from './fixtures/save-v1.json';
 import saveV2 from './fixtures/save-v2.json';
@@ -892,5 +893,188 @@ describe('v18 -> v19 warp payment (#184)', () => {
     expect(order(s, { type: 'cancelWarp' })).toBeNull();
     expect(s.warp).toBeNull();
     expect(s.carrier.energy).toBeGreaterThan(before);
+  });
+});
+
+function corruptMigrate(mutate: (raw: Record<string, unknown>) => void) {
+  const raw = JSON.parse(JSON.stringify(newGame(19))) as Record<string, unknown>;
+  mutate(raw);
+  return migrate(raw);
+}
+
+describe('deep save validation (#249)', () => {
+  const corrupt = { ok: false, reason: 'corrupt' };
+
+  it('accepts a large stress fleet within hangar slot bounds', () => {
+    const raw = JSON.parse(JSON.stringify(stateOf(stressGame())));
+    const r = migrate(raw);
+    expect(r.ok).toBe(true);
+  });
+
+  it('rejects corrupt ship records', () => {
+    expect(
+      corruptMigrate((r) => {
+        const op = (r.ops as SaveBlob[])[0];
+        const ship = (op.ships as SaveBlob[])[0];
+        op.ships = [{ ...ship, cls: 'dreadnought' }];
+      }),
+    ).toEqual(corrupt);
+    expect(
+      corruptMigrate((r) => {
+        const op = (r.ops as SaveBlob[])[0];
+        const ship = (op.ships as SaveBlob[])[0];
+        op.ships = [{ ...ship, mode: 'flying' }];
+      }),
+    ).toEqual(corrupt);
+    expect(
+      corruptMigrate((r) => {
+        const op = (r.ops as SaveBlob[])[0];
+        const ship = (op.ships as SaveBlob[])[0];
+        op.ships = [{ ...ship, modules: ['quantum'] }];
+      }),
+    ).toEqual(corrupt);
+    expect(
+      corruptMigrate((r) => {
+        const op = (r.ops as SaveBlob[])[0];
+        const ship = (op.ships as SaveBlob[])[0];
+        op.ships = [{ ...ship, pos: { x: null, y: 0, z: 0 } }];
+      }),
+    ).toEqual(corrupt);
+  });
+
+  it('rejects corrupt carrier records', () => {
+    expect(
+      corruptMigrate((r) => {
+        ((r.ops as SaveBlob[])[0].carrier as SaveBlob).hullClass = 'titan';
+      }),
+    ).toEqual(corrupt);
+    expect(
+      corruptMigrate((r) => {
+        ((r.ops as SaveBlob[])[0].carrier as SaveBlob).stance = 'charge';
+      }),
+    ).toEqual(corrupt);
+    expect(
+      corruptMigrate((r) => {
+        ((r.ops as SaveBlob[])[0].carrier as SaveBlob).pos = { x: null, y: 0, z: 0 };
+      }),
+    ).toEqual(corrupt);
+    expect(
+      corruptMigrate((r) => {
+        ((r.ops as SaveBlob[])[0].carrier as SaveBlob).energy = null;
+      }),
+    ).toEqual(corrupt);
+    expect(
+      corruptMigrate((r) => {
+        ((r.ops as SaveBlob[])[0].carrier as SaveBlob).maxHull = 0;
+      }),
+    ).toEqual(corrupt);
+    expect(
+      corruptMigrate((r) => {
+        ((r.ops as SaveBlob[])[0].carrier as SaveBlob).refinery = -1;
+      }),
+    ).toEqual(corrupt);
+  });
+
+  it('rejects empty hangars on modern saves and out-of-range hangar slots', () => {
+    expect(
+      corruptMigrate((r) => {
+        (r.ops as SaveBlob[])[0].hangars = [];
+      }),
+    ).toEqual(corrupt);
+    expect(
+      corruptMigrate((r) => {
+        ((r.ops as SaveBlob[])[0].hangars as SaveBlob[])[0].slots = 0;
+      }),
+    ).toEqual(corrupt);
+    expect(
+      corruptMigrate((r) => {
+        ((r.ops as SaveBlob[])[0].hangars as SaveBlob[])[0].slots = 513;
+      }),
+    ).toEqual(corrupt);
+    expect(
+      corruptMigrate((r) => {
+        ((r.ops as SaveBlob[])[0].hangars as SaveBlob[])[0].slots = 6.5;
+      }),
+    ).toEqual(corrupt);
+    expect(
+      corruptMigrate((r) => {
+        ((r.ops as SaveBlob[])[0].hangars as SaveBlob[])[0].type = 'mega';
+      }),
+    ).toEqual(corrupt);
+    expect(
+      corruptMigrate((r) => {
+        ((r.ops as SaveBlob[])[0].hangars as SaveBlob[])[0].items = [{ shipId: null, start: 0 }];
+      }),
+    ).toEqual(corrupt);
+  });
+
+  it('rejects malformed asteroids, containers, pirates and rule cards', () => {
+    expect(
+      corruptMigrate((r) => {
+        ((r.ops as SaveBlob[])[0].asteroids as SaveBlob[])[0].ore = null;
+      }),
+    ).toEqual(corrupt);
+    expect(
+      corruptMigrate((r) => {
+        (r.ops as SaveBlob[])[0].containers = [
+          { id: 1, pos: { x: 0, y: 0, z: 0 }, cargo: 10, cargoValue: 20, ttl: null },
+        ];
+      }),
+    ).toEqual(corrupt);
+    expect(
+      corruptMigrate((r) => {
+        (r.ops as SaveBlob[])[0].pirates = [
+          { id: 1, pos: { x: 0, y: 0, z: 0 }, hull: null, maxHull: 40, damage: 5, speed: 9 },
+        ];
+      }),
+    ).toEqual(corrupt);
+    expect(
+      corruptMigrate((r) => {
+        r.cards = [
+          { id: 1, enabled: true, scope: { kind: 'bogus' }, when: [], then: { kind: 'park' } },
+        ];
+      }),
+    ).toEqual(corrupt);
+    expect(
+      corruptMigrate((r) => {
+        r.cards = [
+          {
+            id: 1,
+            enabled: true,
+            scope: { kind: 'fleet' },
+            when: [{ kind: 'always' }],
+            then: { kind: 'stance', to: 'engagement:bogus' },
+          },
+        ];
+      }),
+    ).toEqual(corrupt);
+  });
+
+  it('rejects invalid top-level hulls, powerMode, challenge and modifiers', () => {
+    expect(
+      corruptMigrate((r) => {
+        r.hulls = ['light'];
+      }),
+    ).toEqual(corrupt);
+    expect(
+      corruptMigrate((r) => {
+        r.hulls = ['standard', 'dreadnought'];
+      }),
+    ).toEqual(corrupt);
+    expect(
+      corruptMigrate((r) => {
+        r.powerMode = 'overdrive';
+      }),
+    ).toEqual(corrupt);
+    expect(
+      corruptMigrate((r) => {
+        r.challenge = 'impossible';
+      }),
+    ).toEqual(corrupt);
+    expect(
+      corruptMigrate((r) => {
+        r.modifiers = ['doublePirates'];
+      }),
+    ).toEqual(corrupt);
   });
 });
