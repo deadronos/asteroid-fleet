@@ -5,7 +5,7 @@ The v0.0.14 review is grouped under five umbrellas:
 - **#219** — Bugs and spec drift (#224–#230) — _done_
 - **#220** — Visuals, FX and game feel (#231–#237) — _done_
 - **#221** — Performance and render hygiene (#238–#241) — _done_
-- **#222** — Gameplay, balance and progression (#242–#245)
+- **#222** — Gameplay, balance and progression (#242–#245) — _done_
 - **#223** — UX, accessibility, saves and maintainability (#246–#250) — _done_
 
 Also open from earlier: **#161** (Combat fidelity: firing arcs, hit chance, evasion and pirate types).
@@ -21,11 +21,7 @@ Also open from earlier: **#161** (Combat fidelity: firing arcs, hit chance, evas
 - #235, #236, #237: Batch 4b procedural Web Audio synth, UI/camera feel, and diegetic 3D cues (#255) — completes umbrella #220
 - #242, #243, #246, #247, #248: Batch 5 pre-Fusion pacing & hazard-safe respawn, safe drone stance, live rule-card badges, progressive disclosure, touch/keyboard hangar moves (#256)
 - #250: Batch 6a code health pass (#257) — completes umbrella #223
-
-## Batch 6b — Progression & hangar depth (#222)
-
-- #244: deepen hangar board synergies and add per-class/per-hangar module loadout templates
-- #245 _(Option A decided)_: rework Research/Admiralty unlocks, add RP/hr & run stats, and extend mid/late goals
+- #244, #245: Batch 6b hangar synergies, module loadout templates, Admiralty/Research rework, RP stats & 6-phase goals (#258) — completes umbrella #222
 
 ## Batch 6c — Combat fidelity (#161)
 
