@@ -123,8 +123,18 @@ export interface Ship {
   idleUntil?: number;
 }
 
+/** Pirate hull types; each has its own speed, evasion and target priorities (#161). */
+export type PirateKind = 'interceptor' | 'gunship' | 'bomber';
+export const PIRATE_KINDS = [
+  'interceptor',
+  'gunship',
+  'bomber',
+] as const satisfies readonly PirateKind[];
+
 export interface Pirate {
   id: number;
+  /** Hull type; drives evasion, accuracy and which ships this pirate hunts (#161). */
+  kind: PirateKind;
   pos: Vec3;
   hull: number;
   maxHull: number;
@@ -275,6 +285,8 @@ export type CarrierStance = 'hold' | 'followRich';
 export interface Carrier {
   pos: Vec3;
   target: Vec3 | null;
+  /** Facing in the XZ plane, radians: `atan2(dx, dz)`, so 0 points along +Z (#161). */
+  heading: number;
   hull: number;
   maxHull: number;
   energy: number;

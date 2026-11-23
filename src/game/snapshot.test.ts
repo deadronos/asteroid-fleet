@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { stressGame } from '../sim/stress';
 import { stateOf } from '../sim/state';
 import { stepSim } from '../sim/tick';
-import type { GameState, Ship, Sim } from '../sim/types';
+import type { GameState, Pirate, Ship, Sim } from '../sim/types';
 import { OTHER_ROW, applySnapshot, encodeSnapshot } from './snapshot';
 
 function busyGame(): Sim {
@@ -125,6 +125,28 @@ describe('UI snapshot', () => {
       expect({ [k]: got[k] }).toEqual({ [k]: full[k] });
     // Absent optional keys stay absent, not undefined or NaN.
     expect('idleUntil' in out.find((x) => x.id === bare.id)!).toBe(false);
+  });
+
+  it('round-trips every Pirate key, the kind included (#161)', () => {
+    const s = busyGame();
+    // `Required<Pirate>` makes a new Pirate field a type error here until it is set below.
+    const full: Required<Pirate> = {
+      id: 987654,
+      kind: 'bomber',
+      pos: { x: 1.5, y: -2.5, z: 3.5 },
+      hull: 12.25,
+      maxHull: 80,
+      damage: 8,
+      speed: 6.5,
+      targetId: -2,
+      fireCooldown: 0.625,
+    };
+    s.pirates.push(full);
+    const out = roundTrip(s, null).ops[0].pirates;
+    const got = out.find((x) => x.id === full.id)!;
+    expect(Object.keys(got).sort()).toEqual(Object.keys(full).sort());
+    for (const k of Object.keys(full) as (keyof Pirate)[])
+      expect({ [k]: got[k] }).toEqual({ [k]: full[k] });
   });
 
   it('keeps the drone cover backoff (#187)', () => {

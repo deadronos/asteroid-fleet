@@ -74,3 +74,14 @@ export function onSphere(r: () => number, radius: number, flat = 0.25): Vec3 {
 }
 
 export const clamp = (v: number, a: number, b: number) => (v < a ? a : v > b ? b : v);
+
+/** `to - from` wrapped into [-π, π], so a turn takes the short way round (#161). */
+export function shortestArc(from: number, to: number): number {
+  const tau = Math.PI * 2;
+  return ((((to - from) % tau) + tau + Math.PI) % tau) - Math.PI;
+}
+
+/** Rotate `from` toward `to` by at most `maxStep` radians along the shorter arc (#161). */
+export function turnToward(from: number, to: number, maxStep: number): number {
+  return from + clamp(shortestArc(from, to), -maxStep, maxStep);
+}

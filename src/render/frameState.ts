@@ -1,6 +1,6 @@
 import { useFrame } from '@react-three/fiber';
 import { engine } from '../game/engine';
-import type { Asteroid, Pirate, Ship, Vec3 } from '../sim/types';
+import type { Asteroid, Pirate, PirateKind, Ship, Vec3 } from '../sim/types';
 import { SHIP_CLASSES } from '../sim/types';
 import { advanceHeading, pruneHeadings } from './heading';
 import type { ModelClass } from './models';
@@ -10,12 +10,20 @@ export const CLASSES: ModelClass[] = [...SHIP_CLASSES, 'pirate'];
 const CLASS_INDEX: Record<string, number> = Object.fromEntries(CLASSES.map((c, i) => [c, i]));
 export const PIRATE_CLASS = CLASSES.length - 1;
 
+/** Subtle per-kind size cue, applied in the existing instanced layers (no extra draws) (#161). */
+export const PIRATE_SCALE: Record<PirateKind, number> = {
+  interceptor: 0.8,
+  gunship: 1,
+  bomber: 1.35,
+};
+
 /** Room for the 1000-ship sim cap plus pirates. */
 export const MAX_ENTITIES = 2048;
 
 /**
  * Every live (not docked) ship and pirate, interpolated once per frame. Entity `i` is
- * `ids[i]`, at `pos[3i..3i+2]`, facing `hdg[3i..]`, having moved `step[i]` last tick.
+ * `ids[i]`, at `pos[3i..3i+2]`, facing `hdg[3i..]`, moved `step[i]` last tick and drawn at
+ * `scale[i]`.
  * `bucket[c]` lists the entity indices of class `c` in `[0, bucketLen[c])`.
  */
 export const fleetFrame = {
@@ -25,6 +33,8 @@ export const fleetFrame = {
   pos: new Float32Array(MAX_ENTITIES * 3),
   hdg: new Float32Array(MAX_ENTITIES * 3),
   step: new Float32Array(MAX_ENTITIES),
+  /** Per-instance scale; pirate hull kinds differ slightly in size (#161). */
+  scale: new Float32Array(MAX_ENTITIES),
   bucket: CLASSES.map(() => new Int32Array(MAX_ENTITIES)),
   bucketLen: new Int32Array(CLASSES.length),
   /** Entity index of `view.ships[i]`, or -1 when docked or over the cap. */
@@ -49,11 +59,12 @@ export function fillFleetFrame(
 ): FleetFrame {
   out.bucketLen.fill(0);
   let n = 0;
-  const put = (e: Ship | Pirate, c: number): number => {
+  const put = (e: Ship | Pirate, c: number, scale = 1): number => {
     if (n >= MAX_ENTITIES) return -1;
     const p = prev.get(e.id) ?? e.pos;
     const i = n++;
     const o = i * 3;
+    out.scale[i] = scale;
     out.pos[o] = p.x + (e.pos.x - p.x) * a;
     out.pos[o + 1] = p.y + (e.pos.y - p.y) * a;
     out.pos[o + 2] = p.z + (e.pos.z - p.z) * a;
@@ -70,7 +81,7 @@ export function fillFleetFrame(
     out.shipEntity[k] =
       sh.mode === 'docked' || sh.mode === 'carried' ? -1 : put(sh, CLASS_INDEX[sh.cls]);
   }
-  for (const p of pirates) put(p, PIRATE_CLASS);
+  for (const p of pirates) put(p, PIRATE_CLASS, PIRATE_SCALE[p.kind]);
   out.count = n;
   return out;
 }

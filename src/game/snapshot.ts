@@ -1,6 +1,7 @@
 import { MODULE_IDS, MODULE_SLOTS } from '../sim/config';
 import { bind, focusOp, maxEnergy } from '../sim/state';
 import {
+  PIRATE_KINDS,
   SHIP_CLASSES,
   type Asteroid,
   type GameState,
@@ -99,6 +100,7 @@ const SHIP_MODES: ShipMode[] = [
 ];
 const modeIndex = new Map(SHIP_MODES.map((m, i) => [m, i]));
 const clsIndex = new Map(SHIP_CLASSES.map((c, i) => [c, i]));
+const pirateKindIndex = new Map(PIRATE_KINDS.map((k, i) => [k, i]));
 const moduleIndex = new Map(MODULE_IDS.map((m, i) => [m, i]));
 
 const MAX_MODULES = Math.max(...Object.values(MODULE_SLOTS));
@@ -106,8 +108,8 @@ const MAX_MODULES = Math.max(...Object.values(MODULE_SLOTS));
 // bargeId fireCooldown hasHold holdCard holdUntil nModules idleUntil (NaN for none)
 // modules×MAX_MODULES
 const SHIP_ROW = 24 + MAX_MODULES;
-// id pos×3 hull maxHull damage speed targetId fireCooldown
-const PIRATE_ROW = 10;
+// id kind pos×3 hull maxHull damage speed targetId fireCooldown
+const PIRATE_ROW = 11;
 // id pos×3 ore maxOre value radius respawn
 const ASTEROID_ROW = 9;
 // id cls pos×3
@@ -163,15 +165,16 @@ export function encodeSnapshot(
   o = 0;
   for (const p of s.pirates) {
     pirates[o] = p.id;
-    pirates[o + 1] = p.pos.x;
-    pirates[o + 2] = p.pos.y;
-    pirates[o + 3] = p.pos.z;
-    pirates[o + 4] = p.hull;
-    pirates[o + 5] = p.maxHull;
-    pirates[o + 6] = p.damage;
-    pirates[o + 7] = p.speed;
-    pirates[o + 8] = p.targetId;
-    pirates[o + 9] = p.fireCooldown;
+    pirates[o + 1] = pirateKindIndex.get(p.kind)!;
+    pirates[o + 2] = p.pos.x;
+    pirates[o + 3] = p.pos.y;
+    pirates[o + 4] = p.pos.z;
+    pirates[o + 5] = p.hull;
+    pirates[o + 6] = p.maxHull;
+    pirates[o + 7] = p.damage;
+    pirates[o + 8] = p.speed;
+    pirates[o + 9] = p.targetId;
+    pirates[o + 10] = p.fireCooldown;
     o += PIRATE_ROW;
   }
 
@@ -299,15 +302,16 @@ export function applySnapshot(prevState: GameState | null, snap: UiSnapshot): Ga
   for (let o = 0; o < pirateRows.length; o += PIRATE_ROW) {
     const id = pirateRows[o];
     const p = oldPirates.get(id) ?? ({ id, pos: { x: 0, y: 0, z: 0 } } as Pirate);
-    p.pos.x = pirateRows[o + 1];
-    p.pos.y = pirateRows[o + 2];
-    p.pos.z = pirateRows[o + 3];
-    p.hull = pirateRows[o + 4];
-    p.maxHull = pirateRows[o + 5];
-    p.damage = pirateRows[o + 6];
-    p.speed = pirateRows[o + 7];
-    p.targetId = pirateRows[o + 8];
-    p.fireCooldown = pirateRows[o + 9];
+    p.kind = PIRATE_KINDS[pirateRows[o + 1]];
+    p.pos.x = pirateRows[o + 2];
+    p.pos.y = pirateRows[o + 3];
+    p.pos.z = pirateRows[o + 4];
+    p.hull = pirateRows[o + 5];
+    p.maxHull = pirateRows[o + 6];
+    p.damage = pirateRows[o + 7];
+    p.speed = pirateRows[o + 8];
+    p.targetId = pirateRows[o + 9];
+    p.fireCooldown = pirateRows[o + 10];
     pirates.push(p);
   }
 

@@ -45,6 +45,7 @@ function rollRng(rng: number, n: number): number {
 /** One pirate. `hull` 0 is already dead and must not be part of a handover roll. */
 function pushPirate(s: Sim, hull = 40) {
   s.pirates.push({
+    kind: 'gunship',
     id: s.nextId++,
     pos: { x: 80, y: 0, z: 0 },
     hull,

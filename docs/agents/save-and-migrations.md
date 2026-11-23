@@ -40,6 +40,7 @@ A new `Operation` or `GameState` field also needs the `OP_KEYS` / `GAME_KEYS` en
 - **v18**: Each carrier keeps its own rebuild queue and automation timer. The toggles and credit floor stay on the run (#174).
 - **v19**: A jump in progress stores `warp.paid` (`{ energy, h2 }`), so a cancel refunds 75% of each part actually paid (#184). Older saves with a charging warp get all-energy, the base jump cost with the hull and sensors discount, which is what the old refund assumed.
 - **v20**: `loadouts`, per-class module templates shared across carriers and surviving both resets (#244). Old saves get an empty `{}`; `validateSave` deeply validates the map (ship-class keys, arrays no longer than `MODULE_SLOTS[cls]`, `ModuleId | null` entries) and repairs malformed templates to `{}`. The finite Admiralty unlocks (#245) live in the existing `admiralty` record and need no new field.
+- **v21**: `carrier.heading` and `pirate.kind` (#161). Old saves faced +Z (`heading = 0`) and every pirate was a gunship. `validateSave` requires a finite heading and a kind from `PIRATE_KINDS`; neither is repairable, so a save that claims v21 without them is corrupt.
 
 ## Storage
 

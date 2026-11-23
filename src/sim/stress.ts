@@ -11,7 +11,14 @@ import {
   spawnAsteroid,
   unlockRule,
 } from './state';
-import { SHIP_CLASSES, type Sim, type HangarType, type RuleId, type ShipClass } from './types';
+import {
+  PIRATE_KINDS,
+  SHIP_CLASSES,
+  type Sim,
+  type HangarType,
+  type RuleId,
+  type ShipClass,
+} from './types';
 
 const MIX: [ShipClass, number][] = [
   ['drone', 0.5],
@@ -78,6 +85,7 @@ export function stressGame(ships = 1000, asteroids = 600, pirates = 40, seed = 9
     const pos = onSphere(r, 100, 0.2);
     s.pirates.push({
       id: s.nextId++,
+      kind: PIRATE_KINDS[i % PIRATE_KINDS.length],
       pos,
       hull: 400,
       maxHull: 400,

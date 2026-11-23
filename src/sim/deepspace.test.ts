@@ -79,6 +79,7 @@ describe('gas giants', () => {
     const hv = launch(s, 'harvester', 40);
     launch(s, 'hauler', -40);
     s.pirates.push({
+      kind: 'gunship',
       id: s.nextId++,
       pos: { x: 0, y: 0, z: 60 },
       hull: 50,

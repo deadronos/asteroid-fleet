@@ -33,6 +33,7 @@ function raidedAwayFromOre() {
   s.carrier.pos = { x: 0, y: 0, z: 0 };
   s.asteroids = s.asteroids.filter((a) => Math.hypot(a.pos.x, a.pos.z) > 60);
   s.pirates.push({
+    kind: 'gunship',
     id: s.nextId++,
     pos: { x: 400, y: 0, z: 400 },
     hull: 1e9,
@@ -91,6 +92,7 @@ it('Tier 1 safe drones mine uncovered ore while a pirate is present', () => {
   s.carrier.pos = { x: 0, y: 0, z: 0 };
   s.asteroids = s.asteroids.filter((a) => Math.hypot(a.pos.x, a.pos.z) > 60);
   s.pirates.push({
+    kind: 'gunship',
     id: s.nextId++,
     pos: { x: 400, y: 0, z: 400 },
     hull: 1e9,

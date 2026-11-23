@@ -23,6 +23,7 @@ import saveV16 from './fixtures/save-v16.json';
 import saveV17 from './fixtures/save-v17.json';
 import saveV18 from './fixtures/save-v18.json';
 import saveV19 from './fixtures/save-v19.json';
+import saveV20 from './fixtures/save-v20.json';
 import { set } from 'idb-keyval';
 import { applyMigrationSteps, migrate, type SaveBlob } from './migrate';
 import {
@@ -297,10 +298,11 @@ describe('migrate', () => {
     }
     expect(op.rebuildQueue).toEqual([]);
     expect(op.automationTimer).toBe(saveV9.automation.timer);
-    // v11 adds the hull class.
+    // v11 adds the hull class, v21 the facing (#161).
     expect(op.carrier).toEqual({
       ...((saveV9 as SaveBlob).carrier as object),
       hullClass: 'standard',
+      heading: 0,
     });
     expect(op.ships).toHaveLength(4);
     expect(op.wave.timer).toBe(Infinity);
@@ -373,6 +375,7 @@ describe('migrate', () => {
     ['v17', saveV17],
     ['v18', saveV18],
     ['v19', saveV19],
+    ['v20', saveV20],
   ])('a migrated %s fixture keeps running through step()', (_, fixture) => {
     const r = migrate(fixture);
     expect(r.ok).toBe(true);
@@ -921,6 +924,81 @@ describe('v19 -> v20 module loadout templates (#244)', () => {
     const copy = importSave(exportSaveFile(state));
     expect(copy).not.toBeNull();
     expect(copy!.loadouts).toEqual(state.loadouts);
+  });
+});
+
+describe('v20 -> v21 carrier heading and pirate kinds (#161)', () => {
+  it('backfills a level heading and gunship kind on a v20 save', () => {
+    expect(saveV20.version).toBe(20);
+    expect(saveV20.ops[0].carrier).not.toHaveProperty('heading');
+    expect(saveV20.ops[0].pirates[0]).not.toHaveProperty('kind');
+    const r = migrate(saveV20);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.state.version).toBe(SAVE_VERSION);
+    for (const op of r.state.ops) {
+      expect(op.carrier.heading).toBe(0);
+      for (const p of op.pirates) expect(p.kind).toBe('gunship');
+    }
+    expect(saveV20.ops[0].carrier).not.toHaveProperty('heading');
+    expect(saveV20.ops[0].pirates[0]).not.toHaveProperty('kind');
+  });
+
+  it('rejects a non-finite carrier heading', () => {
+    for (const heading of [null, NaN, undefined]) {
+      expect(
+        corruptMigrate((r) => {
+          ((r.ops as SaveBlob[])[0].carrier as SaveBlob).heading = heading;
+        }),
+      ).toEqual({ ok: false, reason: 'corrupt' });
+    }
+    // Stamping a pre-v21 save as current skips the step that adds the heading.
+    const unmigrated = migrate({
+      ...structuredClone(saveV20),
+      version: SAVE_VERSION,
+      loadouts: {},
+    });
+    expect(unmigrated.ok).toBe(false);
+  });
+
+  it('rejects an unknown pirate kind', () => {
+    expect(
+      corruptMigrate((r) => {
+        (r.ops as SaveBlob[])[0].pirates = [
+          {
+            id: 99,
+            kind: 'scout',
+            pos: { x: 60, y: 0, z: 0 },
+            hull: 45,
+            maxHull: 45,
+            damage: 5,
+            speed: 9,
+            targetId: -1,
+            fireCooldown: 0,
+          },
+        ];
+      }),
+    ).toEqual({ ok: false, reason: 'corrupt' });
+  });
+
+  it('round-trips a heading and pirate kinds through export and import', () => {
+    const state = newGame(42);
+    state.ops[0].carrier.heading = 1.25;
+    state.ops[0].pirates.push({
+      id: 999,
+      kind: 'bomber',
+      pos: { x: 80, y: 0, z: 0 },
+      hull: 80,
+      maxHull: 80,
+      damage: 8,
+      speed: 6,
+      targetId: -2,
+      fireCooldown: 0,
+    });
+    const copy = importSave(exportSaveFile(state));
+    expect(copy).not.toBeNull();
+    expect(copy!.ops[0].carrier.heading).toBeCloseTo(1.25);
+    expect(copy!.ops[0].pirates.map((p) => p.kind)).toEqual(['bomber']);
   });
 });
 

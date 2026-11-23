@@ -27,7 +27,7 @@ Source of truth: `host.ts`, `localHost.ts`, `sim.worker.ts`, `runner.ts`, `proto
   - `error`: a refused command's message.
   - `snapshot`: the full `GameState`, used by the save path.
 - `epoch`: a `replace` bumps the run generation. Event batches carry it, and the engine drops stale ones so an in-flight message cannot toast the previous run. `save()` checks it too: a `snapshot` requested before the `replace` holds the old run and is not written (#170).
-- Adding a ship mode means appending to `MODES` and to the snapshot's mode list. `carried` is in both; a frame that omits it draws a barge drone as docked until the next state (#181). Adding snapshot data means extending `encodeSnapshot` and `applySnapshot` together; `snapshot.test.ts` round-trips them.
+- Adding a ship mode means appending to `MODES` and to the snapshot's mode list. `carried` is in both; a frame that omits it draws a barge drone as docked until the next state (#181). Adding snapshot data means extending `encodeSnapshot` and `applySnapshot` together; `snapshot.test.ts` round-trips them. `PIRATE_ROW` carries the pirate kind index next to the id (#161), so the mirror can apply the same per-kind firing and rendering rules as the worker.
 
 ## Events and toasts
 

@@ -25,7 +25,7 @@ export * from './economy';
 export { SEVERITY, emit } from './events';
 
 /** Bump together with a `migrations[n]` step and a fixture. See docs/agents/save-and-migrations.md. */
-export const SAVE_VERSION = 20;
+export const SAVE_VERSION = 21;
 
 interface Carry {
   research: number;
@@ -67,6 +67,7 @@ function buildOp(
     carrier: {
       pos: v3(),
       target: null,
+      heading: 0,
       hull: hd.hull * (1 + SCALE_HULL_FRAME * (levels.frame ?? 0)),
       maxHull: hd.hull * (1 + SCALE_HULL_FRAME * (levels.frame ?? 0)),
       energy: ENERGY_MAX * 0.6,
