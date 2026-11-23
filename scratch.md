@@ -3,7 +3,7 @@
 The v0.0.14 review is grouped under five umbrellas:
 
 - **#219** — Bugs and spec drift (#224–#230) — _done_
-- **#220** — Visuals, FX and game feel (#231–#237)
+- **#220** — Visuals, FX and game feel (#231–#237) — _done_
 - **#221** — Performance and render hygiene (#238–#241) — _done_
 - **#222** — Gameplay, balance and progression (#242–#245)
 - **#223** — UX, accessibility, saves and maintainability (#246–#250)
@@ -18,12 +18,7 @@ Also open from earlier: **#161** (Combat fidelity: firing arcs, hit chance, evas
 - #229, #230, #249: Batch 2 shield constants, Tier B RP/Fusion, save durability & deep validation (#252) — completes umbrella #219
 - #238, #239, #240, #241: Batch 3 GPU, React UI, and sim hot-path performance (#253) — completes umbrella #221
 - #231, #232, #233, #234: Batch 4a volumetric beams, particle explosions, ship glow, Fresnel shields & hazards (#254)
-
-## Batch 4b — Audio, UI feel & diegetic cues (#220)
-
-- #236: procedural Web Audio synthesizer for combat, warp, alerts and UI (with Settings volume/mute)
-- #237: UI micro-transitions, hull-hit/warp camera feedback, and eased tactical camera transitions
-- #235: diegetic 3D cues (focused-ship reticle, mining sparks, scout survey pings, antialiased tactical icons, wave direction)
+- #235, #236, #237: Batch 4b procedural Web Audio synth, UI/camera feel, and diegetic 3D cues (#255) — completes umbrella #220
 
 ## Batch 5 — Gameplay balance & UX polish (#222, #223)
 
