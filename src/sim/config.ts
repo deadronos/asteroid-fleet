@@ -5,6 +5,7 @@ import {
   type HangarType,
   type HullId,
   type ModuleId,
+  type PirateKind,
   type RuleCard,
   type RuleId,
   type ShipClass,
@@ -30,6 +31,8 @@ export interface ShipStats {
   damage: number; // dps while in range
   range: number;
   sensor: number;
+  /** Incoming-fire avoidance from class agility and speed; subtracted from the attacker's tracking (#161). */
+  evasion: number;
   color: string;
 }
 
@@ -46,6 +49,7 @@ export const SHIP_STATS: Record<ShipClass, ShipStats> = {
     damage: 0,
     range: 0,
     sensor: 0,
+    evasion: 0,
     color: '#56b4e9',
   },
   barge: {
@@ -60,6 +64,7 @@ export const SHIP_STATS: Record<ShipClass, ShipStats> = {
     damage: 0,
     range: 0,
     sensor: 0,
+    evasion: 0,
     color: '#e69f00',
   },
   hauler: {
@@ -74,6 +79,7 @@ export const SHIP_STATS: Record<ShipClass, ShipStats> = {
     damage: 0,
     range: 0,
     sensor: 0,
+    evasion: 0,
     color: '#f0e442',
   },
   fighter: {
@@ -88,6 +94,7 @@ export const SHIP_STATS: Record<ShipClass, ShipStats> = {
     damage: 9,
     range: 9,
     sensor: 55,
+    evasion: 0.35,
     color: '#d55e00',
   },
   scout: {
@@ -102,6 +109,7 @@ export const SHIP_STATS: Record<ShipClass, ShipStats> = {
     damage: 0,
     range: 0,
     sensor: 80,
+    evasion: 0.2,
     color: '#cc79a7',
   },
   repair: {
@@ -116,6 +124,7 @@ export const SHIP_STATS: Record<ShipClass, ShipStats> = {
     damage: 0,
     range: 6,
     sensor: 60,
+    evasion: 0,
     color: '#2fd6a0',
   },
   harvester: {
@@ -130,6 +139,7 @@ export const SHIP_STATS: Record<ShipClass, ShipStats> = {
     damage: 0,
     range: 0,
     sensor: 0,
+    evasion: 0,
     color: '#b8a6ff',
   },
 };
@@ -137,6 +147,8 @@ export const SHIP_STATS: Record<ShipClass, ShipStats> = {
 export const MINING_RATE = 2.4; // ore units per second for a drone
 export const DOCK_RADIUS = 4;
 export const CARRIER_SENSOR = 45;
+/** Radians per second the carrier hull can turn toward its target or a threat (#161). */
+export const CARRIER_TURN_RATE = 0.9;
 export const COVER_RADIUS = 28; // "safe" mining radius around carrier / escorted barges
 
 export interface HangarTypeDef {
@@ -460,14 +472,32 @@ export const warpPayment = (cost: number, energy: number, h2: number) => {
 // ---------- Carrier turrets (#160) ----------
 
 export type TurretKind = 'pd' | 'heavy';
+
+/** One hull-mounted weapon: its cone is centred on `bearing` from the carrier's heading (#161). */
+export interface TurretMount {
+  kind: TurretKind;
+  /** Offset from the carrier's forward (+Z) heading, radians. */
+  bearing: number;
+  /** Half-angle of the firing cone, radians; π covers every bearing. */
+  arc: number;
+}
+
 /** Point-defense: short, quick, nearest pirate. Heavy battery: long, hard-hitting, toughest pirate. */
-export const TURRETS: Record<TurretKind, { range: number; damage: number; period: number }> = {
-  pd: { range: 26, damage: 6, period: 0.25 },
-  heavy: { range: 55, damage: 16, period: 0.9 },
+export const TURRETS: Record<
+  TurretKind,
+  { range: number; damage: number; period: number; tracking: number }
+> = {
+  pd: { range: 26, damage: 6, period: 0.25, tracking: 1 },
+  heavy: { range: 55, damage: 16, period: 0.9, tracking: 0.3 },
 };
 /** Per research level: turretDamage and turretRange, matching the fighter nodes. */
 export const TURRET_DAMAGE_PER_LEVEL = 0.15;
 export const TURRET_RANGE_PER_LEVEL = 0.2;
+/** PD mount coverage and the heavy battery's cone half-angle (a 120° wedge) (#161). */
+export const PD_ARC = Math.PI;
+export const HEAVY_ARC = Math.PI / 3;
+/** Fighter guns track agile interceptors better than a heavy battery (#161). */
+export const FIGHTER_TRACKING = 0.75;
 
 // ---------- Hull classes (#65) ----------
 
@@ -485,8 +515,8 @@ export interface HullDef {
   warpCharge: number; // multiplier on charge time
   warpCost: number; // multiplier on jump energy
   shield: number; // multiplier on shield regeneration
-  /** Weapon mounts; every hull has at least one. */
-  turrets: TurretKind[];
+  /** Weapon mounts with their firing cones; every hull has at least one. */
+  turrets: TurretMount[];
   /** Unlocks once this zone tier has been reached on a run after the first prestige. */
   tier: 1 | 2 | 3;
 }
@@ -504,7 +534,7 @@ export const HULLS: Record<HullId, HullDef> = {
     warpCharge: 1,
     warpCost: 1,
     shield: 1,
-    turrets: ['pd'],
+    turrets: [{ kind: 'pd', bearing: 0, arc: PD_ARC }],
     tier: 1,
   },
   light: {
@@ -519,7 +549,7 @@ export const HULLS: Record<HullId, HullDef> = {
     warpCharge: 0.5,
     warpCost: 0.6,
     shield: 1,
-    turrets: ['pd'],
+    turrets: [{ kind: 'pd', bearing: 0, arc: PD_ARC }],
     tier: 2,
   },
   fleet: {
@@ -534,7 +564,10 @@ export const HULLS: Record<HullId, HullDef> = {
     warpCharge: 1.3,
     warpCost: 1.3,
     shield: 1,
-    turrets: ['pd', 'pd'],
+    turrets: [
+      { kind: 'pd', bearing: 0, arc: PD_ARC },
+      { kind: 'pd', bearing: Math.PI, arc: PD_ARC },
+    ],
     tier: 2,
   },
   mining: {
@@ -549,7 +582,7 @@ export const HULLS: Record<HullId, HullDef> = {
     warpCharge: 1.2,
     warpCost: 1.2,
     shield: 1,
-    turrets: ['pd'],
+    turrets: [{ kind: 'pd', bearing: 0, arc: PD_ARC }],
     tier: 3,
   },
   bastion: {
@@ -564,7 +597,11 @@ export const HULLS: Record<HullId, HullDef> = {
     warpCharge: 1.5,
     warpCost: 1.4,
     shield: 2,
-    turrets: ['pd', 'pd', 'heavy'],
+    turrets: [
+      { kind: 'pd', bearing: 0, arc: PD_ARC },
+      { kind: 'pd', bearing: Math.PI, arc: PD_ARC },
+      { kind: 'heavy', bearing: 0, arc: HEAVY_ARC },
+    ],
     tier: 3,
   },
 };
@@ -579,6 +616,57 @@ export const REFIT_COST = 5000;
 export const WAVE_INTERVAL = (tier: number) => (tier >= 3 ? 70 : 110);
 export const WAVE_WARNING = 15;
 export const PIRATE_BASE = { hull: 45, damage: 5, speed: 9 };
+
+/** Pirate hull type (#161). Hull, damage and speed multiply PIRATE_BASE; the rest are combat odds. */
+export interface PirateTypeDef {
+  name: string;
+  hull: number;
+  damage: number;
+  speed: number;
+  /** Evasion presented to incoming fire. */
+  evasion: number;
+  /** Accuracy of this pirate's own guns. */
+  tracking: number;
+  /** Weight on the carrier when choosing a target. */
+  carrierBias: number;
+}
+
+export const PIRATE_TYPES: Record<PirateKind, PirateTypeDef> = {
+  interceptor: {
+    name: 'Interceptor',
+    hull: 0.7,
+    damage: 0.8,
+    speed: 1.5,
+    evasion: 0.45,
+    tracking: 0.8,
+    carrierBias: 0.8,
+  },
+  gunship: {
+    name: 'Gunship',
+    hull: 1,
+    damage: 1,
+    speed: 1,
+    evasion: 0.15,
+    tracking: 0.6,
+    carrierBias: 1,
+  },
+  bomber: {
+    name: 'Bomber',
+    hull: 1.8,
+    damage: 1.6,
+    speed: 0.7,
+    evasion: 0,
+    tracking: 0.4,
+    carrierBias: 2.2,
+  },
+};
+
+/** Wave composition: bombers appear at distance 4+ and in Deep space, interceptors fill the rest (#161). */
+export const WAVE_INTERCEPTOR_CHANCE = 0.35;
+export const WAVE_BOMBER_DISTANCE = 4;
+export const WAVE_BOMBER_CHANCE_FAR = 0.15;
+export const WAVE_BOMBER_CHANCE_DEEP = 0.3;
+
 /** Wave size = (base + distance * per-distance + (tier - 2) * per-tier) * heat factor, min 1. */
 export const WAVE_SIZE_BASE = 1;
 export const WAVE_SIZE_PER_DISTANCE = 0.7;

@@ -1,6 +1,6 @@
 # Simulation (`src/sim/`)
 
-Source of truth: `tick.ts`, `ctx.ts`, `hangar.ts`, `view.ts`, `state.ts`, `types.ts`, `config.ts`, `research.ts`, `admiralty.ts`, `cards.ts`, `loadouts.ts`, `goals.ts`, `actions.ts` (barrel over `orders.ts`, `reset.ts`, `offline.ts`), `background.ts`, `worldgen.ts`.
+Source of truth: `tick.ts`, `ctx.ts`, `hangar.ts`, `view.ts`, `state.ts`, `types.ts`, `config.ts`, `math.ts`, `combat.ts`, `world.ts`, `research.ts`, `admiralty.ts`, `cards.ts`, `loadouts.ts`, `goals.ts`, `actions.ts` (barrel over `orders.ts`, `reset.ts`, `offline.ts`), `background.ts`, `worldgen.ts`.
 
 ## State model
 
@@ -21,6 +21,13 @@ There is one field per system for the whole run. While any carrier is on the map
 - `stepSim(s)` does the same for one bound operation and is the test and benchmark entry point.
 - `stepOp` runs in a fixed order: fx decay → power → threats → launch → each ship's behaviour → turrets → pirates → hazards → refine → field → containers → reserves → automation → drift → cleanup → challenge check → income averages → warp. Order matters for determinism and for golden tests, so don't reorder it casually.
 - Behaviour per ship class lives in `mining.ts` (drone, barge, hauler, harvester) and `combat.ts` (fighter, scout, repair, pirates). Environment is in `world.ts`, jumps in `warp.ts`, supply routes in `routes.ts`.
+
+## Combat fidelity (#161)
+
+- `Carrier.heading` is a saved facing in the XZ plane (`atan2(dx, dz)`, 0 is +Z). `turnCarrier` (`world.ts`) moves it toward `carrier.target` while travelling and toward the toughest nearby pirate while holding, capped at `CARRIER_TURN_RATE` per second. `shortestArc` and `turnToward` live in `math.ts`; the renderer imports the same wrap helper so the drawn hull and the firing cones agree.
+- `HULLS[hull].turrets` is now a list of `TurretMount` (`kind`, `bearing`, `arc`), not bare kinds. `inFiringArc` (`combat.ts`) gates acquisition on a cone around `heading + bearing`; PD has a π arc, heavy batteries a π/3 half-angle. Hull choice therefore changes what a carrier can shoot.
+- `hitChance(tracking, evasion)` is pure and deterministic: `clamp(0.5 + tracking - evasion, 0.15, 1)`. Weapons scale their continuous damage by the expected fraction instead of rolling per tick, so no extra `rand(s)` calls enter the hot path. Tracking lives on `TURRETS`, `FIGHTER_TRACKING` and `PIRATE_TYPES`; evasion on `SHIP_STATS`, `PIRATE_TYPES`.
+- `PirateKind` and `PIRATE_KINDS` are in `types.ts`, `PIRATE_TYPES` in `config.ts`. `spawnWave` composes waves from `rand(s)`; interceptors appear everywhere, bombers only at distance 4+ or tier 3. `pirateTargetScore` applies per-kind biases, and bombers also weight the carrier more heavily.
 
 ## Per-tick context (`ctx.ts`)
 

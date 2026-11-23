@@ -18,8 +18,8 @@ const BUDGET = {
   // Measured 448.0 kB at v0.0.9 (~0.9% headroom at 452). Lazy panels move
   // bytes out of `initial` but not out of the total; reclaiming it needs less shipped code,
   // e.g. dropping drei's unused DRACO/Meshopt loaders from the r3f chunk.
-  // was 454: #244, #245 (module loadouts, board synergies, finite Admiralty, research nodes, six goal phases); was 452: #242-#248 (hazard-aware respawn, solar/RP tuning, live rule-card badges, progressive research, tap/keyboard moves, lazy guide); was 448: v0.0.9 fixes (turrets #162, #156-#159) tipped it over; was 447: glTF carrier, panel view offset, far-ship min size (#124); was 446: v0.0.5 review fixes (modal stack, eval-free SimView, #151); was 445: colour tokens (#136) + shape-coded tactical icons (#125); was 440; shared accessible Modal and side-panel tabs (#119)
-  total: 459 * KB,
+  // was 459: #161 (carrier heading, turret arcs, tracking/evasion, pirate kinds and their v21 migration); was 454: #244, #245 (module loadouts, board synergies, finite Admiralty, research nodes, six goal phases); was 452: #242-#248 (hazard-aware respawn, solar/RP tuning, live rule-card badges, progressive research, tap/keyboard moves, lazy guide); was 448: v0.0.9 fixes (turrets #162, #156-#159) tipped it over; was 447: glTF carrier, panel view offset, far-ship min size (#124); was 446: v0.0.5 review fixes (modal stack, eval-free SimView, #151); was 445: colour tokens (#136) + shape-coded tactical icons (#125); was 440; shared accessible Modal and side-panel tabs (#119)
+  total: 461 * KB,
 };
 
 const dist = 'dist';

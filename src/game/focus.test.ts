@@ -96,6 +96,7 @@ describe('carrier focus', () => {
     // Three living pirates: this seed's roll destroys one fighter and repels the wave.
     for (let i = 0; i < 3; i++) {
       op.pirates.push({
+        kind: 'gunship',
         id: state.nextId++,
         pos: { x: 40, y: 0, z: 0 },
         hull: 30,

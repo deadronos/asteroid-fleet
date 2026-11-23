@@ -203,6 +203,7 @@ describe('rule cards (#82)', () => {
     s.pirates = [];
     expect(holds('pirateWithin')).toBe(false);
     s.pirates.push({
+      kind: 'gunship',
       id: 999,
       pos: { x: 40, y: 0, z: 0 },
       hull: 1,

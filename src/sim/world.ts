@@ -2,6 +2,8 @@
 // field, reserve rebuilds and carrier drift.
 
 import {
+  CARRIER_SENSOR,
+  CARRIER_TURN_RATE,
   COVER_RADIUS,
   H2_STORM_DPS,
   H2_STORM_RADIUS,
@@ -14,7 +16,7 @@ import {
 } from './config';
 import { card, damageShip, inHazard, shieldHp, type Ctx } from './ctx';
 import { oreNear } from './mining';
-import { dist, dist2, moveToward, rand } from './math';
+import { dist, dist2, moveToward, rand, shortestArc, turnToward } from './math';
 import {
   lvl,
   reserveDefsView,
@@ -39,7 +41,7 @@ import {
   stateOf,
   upkeepRate,
 } from './state';
-import type { Sim, Vec3 } from './types';
+import type { Pirate, Sim, Vec3 } from './types';
 
 export function power(s: Sim, dt: number, ctx: Ctx) {
   const c = s.carrier;
@@ -181,6 +183,37 @@ export function reserves(s: Sim, dt: number, ctx: Ctx) {
   }
 }
 
+/**
+ * Bring the hull to bear (#161): toward a travel target when moving, or the toughest nearby
+ * pirate when holding position under attack. The step is capped at CARRIER_TURN_RATE so facing
+ * cannot snap around between ticks.
+ */
+export function turnCarrier(s: Sim, dt: number) {
+  const c = s.carrier;
+  let dest: Vec3 | null = null;
+  if (c.target && c.energy > maxEnergy(s) * 0.1 && dist(c.target, c.pos) > 0.5) {
+    dest = c.target;
+  } else if (s.pirates.length > 0) {
+    let threat: Pirate | null = null;
+    let best = -Infinity;
+    for (const p of s.pirates) {
+      if (p.hull <= 0) continue;
+      const d = dist(p.pos, c.pos);
+      if (d > CARRIER_SENSOR * 2) continue;
+      // Toughest first, nearest breaks ties so the arc settles on one target.
+      const score = p.hull - d * 0.01;
+      if (score > best) {
+        best = score;
+        threat = p;
+      }
+    }
+    if (threat) dest = threat.pos;
+  }
+  if (!dest) return;
+  const desired = Math.atan2(dest.x - c.pos.x, dest.z - c.pos.z);
+  c.heading = shortestArc(0, turnToward(c.heading, desired, CARRIER_TURN_RATE * dt));
+}
+
 export function drift(s: Sim, dt: number, ctx?: Ctx) {
   // Hold still while the warp charges, so recalled ships aren't chasing the carrier.
   if (s.warp) return;
@@ -209,4 +242,5 @@ export function drift(s: Sim, dt: number, ctx?: Ctx) {
     if (!moveToward(c.pos, c.target, 1.2 * (1 + SCALE_SPEED_DRIFT * lvl(s, 'sublight')) * dt))
       c.energy -= 1 * dt;
   }
+  turnCarrier(s, dt);
 }

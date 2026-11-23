@@ -14,6 +14,7 @@ import {
 import { CHALLENGES, MODIFIERS } from '../sim/modifiers';
 import { OP_KEYS, SAVE_VERSION, makeSystems } from '../sim/state';
 import {
+  PIRATE_KINDS,
   ROUTE_RESOURCES,
   SHIP_CLASSES,
   type GameState,
@@ -240,6 +241,18 @@ export const migrations: Record<number, Migration> = {
     save.loadouts = {};
     return save;
   },
+  // v21: carrier heading and pirate hull kinds (#161). Old saves faced +Z and every
+  // pirate was a gunship, which is what those fields meant before firing arcs existed.
+  20: (save) => {
+    if (Array.isArray(save.ops))
+      for (const op of save.ops) {
+        if (!isRecord(op)) continue;
+        if (isRecord(op.carrier)) op.carrier.heading ??= 0;
+        if (Array.isArray(op.pirates))
+          for (const p of op.pirates) if (isRecord(p)) p.kind ??= 'gunship';
+      }
+    return save;
+  },
 };
 
 const LEGACY_TONE: Record<string, Severity> = {
@@ -372,6 +385,7 @@ export function validLoadouts(value: unknown): boolean {
 function validCarrier(c: unknown): boolean {
   if (!isRecord(c) || !isVec3(c.pos)) return false;
   if (c.target !== null && !isVec3(c.target)) return false;
+  if (!isNum(c.heading)) return false;
   if (typeof c.hullClass !== 'string' || !Object.hasOwn(HULLS, c.hullClass)) return false;
   if (c.stance !== 'hold' && c.stance !== 'followRich') return false;
   if (!isNum(c.hull) || !isNum(c.maxHull) || c.maxHull <= 0) return false;
@@ -420,6 +434,8 @@ function validPirate(p: unknown): boolean {
   return (
     isRecord(p) &&
     isNum(p.id) &&
+    typeof p.kind === 'string' &&
+    PIRATE_KINDS.includes(p.kind as (typeof PIRATE_KINDS)[number]) &&
     isVec3(p.pos) &&
     isNum(p.hull) &&
     isNum(p.maxHull) &&

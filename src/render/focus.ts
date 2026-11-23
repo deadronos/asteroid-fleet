@@ -87,8 +87,5 @@ export function stepTactical(s: {
   return { resetCamera: false, auto };
 }
 
-/** `to - from` wrapped into [-π, π], so a turn takes the short way round. */
-export function shortestArc(from: number, to: number): number {
-  const tau = Math.PI * 2;
-  return ((((to - from) % tau) + tau + Math.PI) % tau) - Math.PI;
-}
+/** Shared with the sim so the drawn heading and the firing cones use the same wrap (#161). */
+export { shortestArc } from '../sim/math';

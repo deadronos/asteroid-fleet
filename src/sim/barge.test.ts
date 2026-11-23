@@ -145,6 +145,7 @@ describe('pirate targeting', () => {
     full.cargo = cargoCap(s, 'barge');
     full.cargoValue = full.cargo * 3;
     s.pirates.push({
+      kind: 'gunship',
       id: s.nextId++,
       pos: { x: 0, y: 0, z: 25 },
       hull: 100,
@@ -179,6 +180,7 @@ describe('carried drone protection (#225)', () => {
     // Pirates score carried drones as 0 and drop them if they board mid-chase.
     expect(pirateTargetScore(s, drone)).toBe(0);
     s.pirates.push({
+      kind: 'gunship',
       id: s.nextId++,
       pos: { x: 81, y: 0, z: 0 },
       hull: 100,

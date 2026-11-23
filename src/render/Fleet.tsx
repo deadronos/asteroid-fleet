@@ -80,18 +80,19 @@ function ShipLayer({
       const x = f.pos[o];
       const y = f.pos[o + 1];
       const z = f.pos[o + 2];
+      const scale = f.scale[i];
       dummy.position.set(x, y, z);
       dummy.lookAt(x + f.hdg[o], y + f.hdg[o + 1], z + f.hdg[o + 2]);
       const d2 = camPos.distanceToSquared(dummy.position);
       if (nm && d2 < lod2) {
-        dummy.scale.setScalar(1);
+        dummy.scale.setScalar(scale);
         dummy.updateMatrix();
         nearIds[nn] = f.ids[i];
         nm.setMatrixAt(nn, dummy.matrix);
         if (gm) gm.setMatrixAt(nn, dummy.matrix);
         nn++;
       } else {
-        dummy.scale.setScalar(Math.max(1, Math.sqrt(d2) * minScalePerDist));
+        dummy.scale.setScalar(Math.max(1, Math.sqrt(d2) * minScalePerDist) * scale);
         dummy.updateMatrix();
         farIds[nf] = f.ids[i];
         fm.setMatrixAt(nf++, dummy.matrix);
@@ -204,7 +205,7 @@ function Trails() {
     for (let i = 0; i < n; i++) {
       const o = i * 3;
       const cls = CLASSES[f.cls[i]];
-      const half = SHIP_LENGTH[cls] * 0.5;
+      const half = SHIP_LENGTH[cls] * 0.5 * f.scale[i];
       const hx = f.hdg[o];
       const hy = f.hdg[o + 1];
       const hz = f.hdg[o + 2];

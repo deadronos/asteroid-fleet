@@ -9,6 +9,7 @@ import {
   ESCORT_ATTACKER_RANGE,
   ESCORT_NEAR,
   ESCORT_ORBIT_RADIUS,
+  FIGHTER_TRACKING,
   GAS_PIRATE_HARVESTER_BIAS,
   HEAT_CARGO_PER_TIER,
   HEAT_FACTOR_CAP,
@@ -19,17 +20,23 @@ import {
   PIRATE_SPAWN_HEIGHT,
   PIRATE_SPAWN_JITTER,
   PIRATE_SPAWN_RADIUS,
+  PIRATE_TYPES,
   SCOUT_ORBIT_RADIUS,
   STORM_DURATION,
   STORM_GAP,
   TURRET_DAMAGE_PER_LEVEL,
   TURRET_RANGE_PER_LEVEL,
   TURRETS,
+  WAVE_BOMBER_CHANCE_DEEP,
+  WAVE_BOMBER_CHANCE_FAR,
+  WAVE_BOMBER_DISTANCE,
+  WAVE_INTERCEPTOR_CHANCE,
   WAVE_INTERVAL_JITTER,
   WAVE_SIZE_BASE,
   WAVE_SIZE_PER_DISTANCE,
   WAVE_SIZE_PER_TIER,
   SHIP_STATS,
+  type TurretMount,
   SURVEY_RADIUS,
   VEIN_SCAN_RADIUS,
   VEIN_VALUE_SHARE,
@@ -47,7 +54,7 @@ import {
   speed,
   type Ctx,
 } from './ctx';
-import { copy, dist, dist2, moveToward, rand, randRange, seeded } from './math';
+import { clamp, copy, dist, dist2, moveToward, rand, randRange, seeded, shortestArc } from './math';
 import {
   lvl,
   SCALE_COMBAT_FIGHTERRANGE,
@@ -58,7 +65,7 @@ import {
   SCALE_REPAIR_FIELD,
 } from './research';
 import { clusterCenters, emit, isStowed, maxHull } from './state';
-import type { Sim, Pirate, Ship, Vec3 } from './types';
+import type { Sim, Pirate, PirateKind, Ship, Vec3 } from './types';
 
 /** Scout survey reach, widened by Deep scan research (#245). */
 export const surveyRadius = (s: Sim) => SURVEY_RADIUS * (1 + SCALE_DEEP_SCAN * lvl(s, 'deepScan'));
@@ -76,6 +83,29 @@ export function cargoHeat(s: Sim): number {
 export function heatFactor(s: Sim): number {
   const tier = s.systems[s.systemId].tier;
   return 1 + Math.min(HEAT_FACTOR_CAP, cargoHeat(s) / (HEAT_CARGO_PER_TIER * tier));
+}
+
+/**
+ * Whether a mount can bring its cone to bear on `to`. A cone of π covers every bearing;
+ * otherwise the bearing to the target must fall within `arc` of `heading + mount.bearing` (#161).
+ */
+export function inFiringArc(
+  heading: number,
+  mount: Pick<TurretMount, 'bearing' | 'arc'>,
+  from: Vec3,
+  to: Vec3,
+): boolean {
+  if (mount.arc >= Math.PI) return true;
+  const bearing = Math.atan2(to.x - from.x, to.z - from.z);
+  return Math.abs(shortestArc(heading + mount.bearing, bearing)) <= mount.arc;
+}
+
+/** Floor below which even the best evasion cannot push a weapon's hit chance (#161). */
+export const HIT_CHANCE_MIN = 0.15;
+
+/** Expected fraction of a weapon's damage that lands: tracking minus target evasion (#161). */
+export function hitChance(tracking: number, evasion: number): number {
+  return clamp(0.5 + tracking - evasion, HIT_CHANCE_MIN, 1);
 }
 
 /** Pirates in the next wave: grows with system distance and tier, scaled by cargo heat. */
@@ -187,7 +217,8 @@ export function fighter(s: Sim, ship: Ship, dt: number, ctx: Ctx, engagement: st
       SHIP_STATS.fighter.range * (1 + SCALE_COMBAT_FIGHTERRANGE * lvl(s, 'fighterRange'));
     moveToward(ship.pos, target.pos, v, range * 0.7);
     if (dist(ship.pos, target.pos) <= range) {
-      target.hull -= fighterDamage(s, ctx, ship) * dt;
+      const hc = hitChance(FIGHTER_TRACKING, PIRATE_TYPES[target.kind].evasion);
+      target.hull -= fighterDamage(s, ctx, ship) * hc * dt;
       if (ship.fireCooldown <= 0) {
         s.fx.push({
           kind: 'laser',
@@ -339,6 +370,56 @@ export function repairDrone(s: Sim, ship: Ship, dt: number, ctx: Ctx) {
   }
 }
 
+/** One pirate's hull type, drawn from the run's rng; bombers need depth or distance (#161). */
+function waveKind(s: Sim): PirateKind {
+  const sys = s.systems[s.systemId];
+  const bomber =
+    sys.tier >= 3
+      ? WAVE_BOMBER_CHANCE_DEEP
+      : sys.distance >= WAVE_BOMBER_DISTANCE
+        ? WAVE_BOMBER_CHANCE_FAR
+        : 0;
+  const r = rand(s);
+  if (r < bomber) return 'bomber';
+  if (r < bomber + WAVE_INTERCEPTOR_CHANCE) return 'interceptor';
+  return 'gunship';
+}
+
+/** Spawn a mixed wave of `count` pirates around the carrier, drawing only from `rand(s)` (#161). */
+export function spawnWave(s: Sim, count: number) {
+  const sys = s.systems[s.systemId];
+  const r = seeded(s.rng ^ 0x77);
+  const a = r() * Math.PI * 2;
+  const hullScale = 1 + sys.distance * PIRATE_HULL_PER_DISTANCE;
+  const damageScale = 1 + sys.distance * PIRATE_DAMAGE_PER_DISTANCE;
+  for (let i = 0; i < count; i++) {
+    const kind = waveKind(s);
+    const def = PIRATE_TYPES[kind];
+    const hull = PIRATE_BASE.hull * def.hull * hullScale;
+    s.pirates.push({
+      id: s.nextId++,
+      kind,
+      pos: {
+        x:
+          s.carrier.pos.x +
+          Math.cos(a) * PIRATE_SPAWN_RADIUS +
+          randRange(s, -PIRATE_SPAWN_JITTER, PIRATE_SPAWN_JITTER),
+        y: randRange(s, -PIRATE_SPAWN_HEIGHT, PIRATE_SPAWN_HEIGHT),
+        z:
+          s.carrier.pos.z +
+          Math.sin(a) * PIRATE_SPAWN_RADIUS +
+          randRange(s, -PIRATE_SPAWN_JITTER, PIRATE_SPAWN_JITTER),
+      },
+      hull,
+      maxHull: hull,
+      damage: PIRATE_BASE.damage * def.damage * damageScale,
+      speed: PIRATE_BASE.speed * def.speed,
+      targetId: -1,
+      fireCooldown: 0,
+    });
+  }
+}
+
 export function threats(s: Sim, dt: number) {
   const sys = s.systems[s.systemId];
   if (sys.tier === 1) return;
@@ -353,32 +434,7 @@ export function threats(s: Sim, dt: number) {
   if (w.timer <= 0) {
     w.warning = false;
     w.active = true;
-    const r = seeded(s.rng ^ 0x77);
-    const a = r() * Math.PI * 2;
-    const scale = 1 + sys.distance * PIRATE_HULL_PER_DISTANCE;
-    for (let i = 0; i < w.size; i++) {
-      const pos = {
-        x:
-          s.carrier.pos.x +
-          Math.cos(a) * PIRATE_SPAWN_RADIUS +
-          randRange(s, -PIRATE_SPAWN_JITTER, PIRATE_SPAWN_JITTER),
-        y: randRange(s, -PIRATE_SPAWN_HEIGHT, PIRATE_SPAWN_HEIGHT),
-        z:
-          s.carrier.pos.z +
-          Math.sin(a) * PIRATE_SPAWN_RADIUS +
-          randRange(s, -PIRATE_SPAWN_JITTER, PIRATE_SPAWN_JITTER),
-      };
-      s.pirates.push({
-        id: s.nextId++,
-        pos,
-        hull: PIRATE_BASE.hull * scale,
-        maxHull: PIRATE_BASE.hull * scale,
-        damage: PIRATE_BASE.damage * (1 + sys.distance * PIRATE_DAMAGE_PER_DISTANCE),
-        speed: PIRATE_BASE.speed,
-        targetId: -1,
-        fireCooldown: 0,
-      });
-    }
+    spawnWave(s, w.size);
     emit(s, 'PiratesArrived', { size: w.size });
     w.timer = WAVE_INTERVAL(sys.tier) * randRange(s, ...WAVE_INTERVAL_JITTER);
   }
@@ -403,9 +459,27 @@ function gasGiantTargetBias(s: Sim, sh: Ship): number {
   return GAS_PIRATE_HARVESTER_BIAS;
 }
 
-export function pirateTargetScore(s: Sim, sh: Ship): number {
+/** Kind-specific priority: interceptors hunt miners and fighters, bombers prefer cargo and the carrier. */
+function kindTargetBias(kind: PirateKind, sh: Ship): number {
+  if (kind === 'interceptor') {
+    if (sh.cls === 'drone' || sh.cls === 'harvester' || sh.cls === 'fighter') return 2.5;
+    if (sh.cls === 'barge' || sh.cls === 'hauler') return 0.5;
+    return 1;
+  }
+  if (kind === 'bomber') {
+    if (sh.cls === 'barge') return 1.8;
+    if (sh.cls === 'hauler' || sh.cls === 'harvester') return 1.2;
+    if (sh.cls === 'fighter' || sh.cls === 'drone' || sh.cls === 'scout' || sh.cls === 'repair')
+      return 0.6;
+    return 1;
+  }
+  return 1;
+}
+
+/** Attractiveness of `sh` to `kind`, before distance; stowed ships are never targeted. */
+export function pirateTargetScore(s: Sim, sh: Ship, kind: PirateKind = 'gunship'): number {
   if (isStowed(sh)) return 0;
-  return baseTargetScore(s, sh) * gasGiantTargetBias(s, sh);
+  return baseTargetScore(s, sh) * kindTargetBias(kind, sh) * gasGiantTargetBias(s, sh);
 }
 
 function baseTargetScore(s: Sim, sh: Ship): number {
@@ -417,14 +491,15 @@ function baseTargetScore(s: Sim, sh: Ship): number {
 
 export function pirateStep(s: Sim, dt: number, ctx: Ctx) {
   for (const p of s.pirates) {
+    const def = PIRATE_TYPES[p.kind];
     let tgtPos: Vec3 | null =
       p.targetId === CARRIER ? s.carrier.pos : (ctx.ships.get(p.targetId)?.pos ?? null);
     const t = ctx.ships.get(p.targetId);
     if (!tgtPos || (t && isStowed(t)) || rand(s) < dt / 3) {
       let best = CARRIER;
-      let bs = 0.6 / (dist(p.pos, s.carrier.pos) + 30);
+      let bs = (0.6 * def.carrierBias) / (dist(p.pos, s.carrier.pos) + 30);
       for (const sh of ctx.ships.values()) {
-        const sc = pirateTargetScore(s, sh);
+        const sc = pirateTargetScore(s, sh, p.kind);
         if (sc <= 0) continue;
         const v = sc / (dist(p.pos, sh.pos) + 30);
         if (v > bs) {
@@ -439,12 +514,11 @@ export function pirateStep(s: Sim, dt: number, ctx: Ctx) {
     moveToward(p.pos, tgtPos, p.speed * dt, range * 0.8);
     p.fireCooldown -= dt;
     if (dist(p.pos, tgtPos) <= range) {
-      const dmg = p.damage * dt;
+      const victim = p.targetId === CARRIER ? null : (ctx.ships.get(p.targetId) ?? null);
+      const evasion = victim ? SHIP_STATS[victim.cls].evasion : 0;
+      const dmg = p.damage * hitChance(def.tracking, evasion) * dt;
       if (p.targetId === CARRIER) damageCarrier(s, dmg);
-      else {
-        const victim = ctx.ships.get(p.targetId);
-        if (victim) damageShip(s, victim, dmg);
-      }
+      else if (victim) damageShip(s, victim, dmg);
       if (p.fireCooldown <= 0) {
         s.fx.push({
           kind: 'pirateLaser',
@@ -459,31 +533,33 @@ export function pirateStep(s: Sim, dt: number, ctx: Ctx) {
 }
 
 /**
- * Carrier turrets (#160): every hull fires on pirates in range, so a run without fighters
- * can still clear a wave. Point-defense takes the nearest pirate, heavy batteries the toughest.
+ * Carrier turrets (#160, #161): every hull fires on pirates in range, so a run without fighters
+ * can still clear a wave. Point-defense takes the nearest pirate, heavy batteries the toughest,
+ * and a mount only acquires targets inside its cone around the carrier's heading.
  */
 export function carrierTurrets(s: Sim, dt: number) {
   if (s.pirates.length === 0) return;
   const c = s.carrier.pos;
   const dmgMul = 1 + TURRET_DAMAGE_PER_LEVEL * lvl(s, 'turretDamage');
   const rangeMul = 1 + TURRET_RANGE_PER_LEVEL * lvl(s, 'turretRange');
-  for (const kind of HULLS[s.carrier.hullClass].turrets) {
-    const t = TURRETS[kind];
+  for (const mount of HULLS[s.carrier.hullClass].turrets) {
+    const t = TURRETS[mount.kind];
     const r2 = (t.range * rangeMul) ** 2;
     let target: Pirate | null = null;
     let best = Infinity;
     for (const p of s.pirates) {
       if (p.hull <= 0) continue;
       const d2 = dist2(p.pos, c);
-      if (d2 > r2) continue;
-      const score = kind === 'pd' ? d2 : -p.hull;
+      if (d2 > r2 || !inFiringArc(s.carrier.heading, mount, c, p.pos)) continue;
+      const score = mount.kind === 'pd' ? d2 : -p.hull;
       if (score < best) {
         best = score;
         target = p;
       }
     }
     if (!target) continue;
-    target.hull -= t.damage * dmgMul * dt;
+    const hc = hitChance(t.tracking, PIRATE_TYPES[target.kind].evasion);
+    target.hull -= t.damage * dmgMul * hc * dt;
     // Beams on a fixed beat from sim time, so firing draws no randomness.
     if (Math.floor(s.time / t.period) !== Math.floor((s.time - dt) / t.period))
       s.fx.push({
