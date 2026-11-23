@@ -19,24 +19,21 @@ Also open from earlier: **#161** (Combat fidelity: firing arcs, hit chance, evas
 - #238, #239, #240, #241: Batch 3 GPU, React UI, and sim hot-path performance (#253) — completes umbrella #221
 - #231, #232, #233, #234: Batch 4a volumetric beams, particle explosions, ship glow, Fresnel shields & hazards (#254)
 - #235, #236, #237: Batch 4b procedural Web Audio synth, UI/camera feel, and diegetic 3D cues (#255) — completes umbrella #220
+- #242, #243, #246, #247, #248: Batch 5 pre-Fusion pacing & hazard-safe respawn, safe drone stance, live rule-card badges, progressive disclosure, touch/keyboard hangar moves (#256)
 
-## Batch 5 — Gameplay balance & UX polish (#222, #223)
+## Batch 6a — Code health (#223)
 
-Fix the pre-Fusion plateau and onboarding friction so the improved visuals back a smooth 1st-hour and mid-game curve.
+Clean up structural debt before the larger gameplay additions (completes umbrella #223).
 
-- #242: diagnose the 4h income collapse (`301/s -> 1.6/s` at 1000 E), smooth T1/T2 rush, and ease the pre-Fusion solar wall against `pnpm run balance`
-- #243: fix default `safe` drone stance stalling when the carrier parks away from covered rocks
-- #246: live active/firing status badges on Rule Cards
-- #247: progressive disclosure for `ResearchPanel` and lighter first-run onboarding
-- #248: click/tap and keyboard ship movement on Hangar boards (fixes mobile/touch and keyboard access)
+- #250: code health pass (deduplicate hangar board helpers, lint-enforce `sim/` purity, dispose GPU resources, co-locate research scalars, split monoliths)
 
-## Batch 6 — Deeper systems & code health (#222, #223, #161)
-
-Larger feature/refactor bets once the core loop feels crisp.
+## Batch 6b — Progression & hangar depth (#222)
 
 - #244: deepen hangar board synergies and add per-class/per-hangar module loadout templates
 - #245 _(Option A decided)_: rework Research/Admiralty unlocks, add RP/hr & run stats, and extend mid/late goals
-- #250: code health pass (deduplicate hangar board helpers, lint-enforce `sim/` purity, dispose GPU resources, co-locate research scalars, split monoliths)
+
+## Batch 6c — Combat fidelity (#161)
+
 - #161: combat fidelity (carrier heading, firing arcs, tracking/evasion, pirate types)
 
 ---
