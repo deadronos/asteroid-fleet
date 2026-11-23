@@ -156,16 +156,20 @@ function Carrier() {
   useFrame((st, dt) => {
     const s = engine.view;
     const g = group.current;
+    const shState = shieldState.current;
+    const cut = shState.opId !== s.id || shState.systemId !== s.systemId;
     if (g) {
       lerpCarrier(engine.alpha(), carrierAt);
       g.position.set(carrierAt.x, carrierAt.y, carrierAt.z);
-      // The sim owns the facing (#161); ease only to hide the 10 Hz steps.
-      g.rotation.y += shortestArc(g.rotation.y, s.carrier.heading) * easeFactor(dt, TURN_RATE);
-      g.rotation.y = shortestArc(0, g.rotation.y);
+      // The sim owns the facing (#161); snap on carrier/system cut and ease fast enough to track the firing cone.
+      if (cut) g.rotation.y = s.carrier.heading;
+      else {
+        g.rotation.y += shortestArc(g.rotation.y, s.carrier.heading) * easeFactor(dt, 10);
+        g.rotation.y = shortestArc(0, g.rotation.y);
+      }
     }
     if (shield.current) {
-      const shState = shieldState.current;
-      if (shState.opId !== s.id || shState.systemId !== s.systemId) {
+      if (cut) {
         shState.opId = s.id;
         shState.systemId = s.systemId;
         shState.prev = s.carrier.shield;
