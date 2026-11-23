@@ -184,6 +184,7 @@ export function Hud({
         </div>
       </div>
       <Alerts />
+      {h.hullPct < 100 && <div key={h.hullPct} className="hull-vignette" aria-hidden="true" />}
     </>
   );
 }

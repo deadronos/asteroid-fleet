@@ -7,10 +7,20 @@ import { CAMERA_OFFSET } from './constants';
 import { fleetFrame } from './frameState';
 import type { Vec3 } from '../sim/types';
 import { useHotkeys } from '../ui/hotkeys';
-import { easeFactor, focus, resolveFocus, stepTactical, takeTacticalExit } from './focus';
+import {
+  easeFactor,
+  focus,
+  resolveFocus,
+  shakeDecay,
+  stepTactical,
+  takeTacticalExit,
+  tacticalEase,
+  warpFov,
+} from './focus';
 
 const FOCUS_DISTANCE = 45;
 const FOLLOW_RATE = 7;
+const TRANS_SECONDS = 0.45;
 const tmp: Vec3 = { x: 0, y: 0, z: 0 };
 const goal = new THREE.Vector3();
 const delta = new THREE.Vector3();
@@ -39,6 +49,11 @@ export function CameraRig({
       controls.dispose();
     };
   }, [controls, set]);
+  const reduceMotion = useMemo(
+    () =>
+      typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches,
+    [],
+  );
   const anchor = useRef(new THREE.Vector3());
   const started = useRef(false);
   const system = useRef(-1);
@@ -46,6 +61,22 @@ export function CameraRig({
   const lastFocus = useRef<number | null>(null);
   const autoOn = useRef(false);
   const wasTactical = useRef(tactical);
+  const trans = useRef({ active: false, t: 0, from: new THREE.Vector3(), to: new THREE.Vector3() });
+  const shake = useRef(0);
+  const shakeOff = useRef(new THREE.Vector3());
+  const fov = useRef(55);
+  const hull = useRef(-1);
+  const warping = useRef(false);
+  const lastBoom = useRef(-Infinity);
+
+  // Taking over the orbit cancels an in-flight tactical move, so the user is never fought.
+  useEffect(() => {
+    const cancel = () => {
+      trans.current.active = false;
+    };
+    controls.addEventListener('start', cancel);
+    return () => controls.removeEventListener('start', cancel);
+  }, [controls]);
 
   useHotkeys([
     {
@@ -57,10 +88,22 @@ export function CameraRig({
     },
   ]);
 
-  useFrame((_, dt) => {
+  const startTrans = (x: number, y: number, z: number) => {
+    const t = trans.current;
+    t.from.copy(camera.position);
+    t.to.set(x, y, z);
+    t.t = 0;
+    t.active = true;
+  };
+
+  useFrame((st, dt) => {
     const c = controls;
     const s = engine.view;
     const a = engine.alpha();
+    const now = st.clock.elapsedTime;
+
+    // Undo last frame's shake before following, or the offset accumulates into the orbit (#237).
+    camera.position.sub(shakeOff.current);
 
     const id = resolveFocus(s, focus.get());
     if (id !== focus.get()) focus.set(id); // docked or destroyed: back to the carrier
@@ -74,6 +117,7 @@ export function CameraRig({
 
     const jumped = !started.current || system.current !== s.systemId || carrierId.current !== s.id;
     if (jumped) {
+      trans.current.active = false;
       delta.copy(goal).sub(anchor.current);
       anchor.current.copy(goal);
       c.target.add(delta);
@@ -99,9 +143,7 @@ export function CameraRig({
       lastFocus.current = id;
     }
 
-    if (tactical && !wasTactical.current) {
-      camera.position.set(c.target.x, c.target.y + 230, c.target.z + 1);
-    }
+    if (tactical && !wasTactical.current) startTrans(c.target.x, c.target.y + 230, c.target.z + 1);
     // Leaving from auto-tactical: pretend manual tactical was on and is now off.
     const exit = takeTacticalExit();
     const step = stepTactical({
@@ -111,7 +153,7 @@ export function CameraRig({
       dist: camera.position.distanceTo(c.target),
     });
     if (step.resetCamera)
-      camera.position.set(
+      startTrans(
         c.target.x + CAMERA_OFFSET[0],
         c.target.y + CAMERA_OFFSET[1],
         c.target.z + CAMERA_OFFSET[2],
@@ -121,7 +163,54 @@ export function CameraRig({
       autoOn.current = step.auto;
       onAutoTactical(step.auto);
     }
+
+    const tr = trans.current;
+    if (tr.active) {
+      tr.t = Math.min(1, tr.t + Math.min(dt, 0.1) / TRANS_SECONDS);
+      camera.position.lerpVectors(tr.from, tr.to, tacticalEase(tr.t));
+      if (tr.t >= 1) tr.active = false;
+    }
     c.update();
+
+    // Warp charge widens the lens slightly; it eases back to 55 on jump or cancel.
+    const targetFov = !reduceMotion && s.warp ? warpFov(s.warp.charge, s.warp.total) : 55;
+    const nextFov = fov.current + (targetFov - fov.current) * easeFactor(dt, 5);
+    if (Math.abs(nextFov - fov.current) > 1e-4) {
+      fov.current = nextFov;
+      (camera as THREE.PerspectiveCamera).fov = nextFov;
+      (camera as THREE.PerspectiveCamera).updateProjectionMatrix();
+    }
+
+    if (!reduceMotion) {
+      if (hull.current >= 0 && s.carrier.hull < hull.current - 1e-4)
+        shake.current = Math.min(1, shake.current + 0.55);
+      hull.current = s.carrier.hull;
+      if (s.warp && !warping.current) shake.current = Math.min(1, shake.current + 0.35);
+      warping.current = !!s.warp;
+      if (now - lastBoom.current > 0.12) {
+        for (const f of s.fx) {
+          if (f.kind !== 'explosion') continue;
+          const dx = f.a.x - c.target.x;
+          const dy = f.a.y - c.target.y;
+          const dz = f.a.z - c.target.z;
+          if (dx * dx + dy * dy + dz * dz < 3600) {
+            shake.current = Math.min(1, shake.current + 0.12);
+            lastBoom.current = now;
+            break;
+          }
+        }
+      }
+      shake.current = shakeDecay(shake.current, dt);
+      if (shake.current > 0.002) {
+        const amp = shake.current * 0.9;
+        shakeOff.current.set(
+          Math.sin(now * 47.3) * amp,
+          Math.sin(now * 61.7) * amp * 0.7,
+          Math.sin(now * 53.1) * amp,
+        );
+      } else shakeOff.current.set(0, 0, 0);
+      camera.position.add(shakeOff.current);
+    }
   });
   return null;
 }

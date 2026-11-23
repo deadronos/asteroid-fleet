@@ -1,4 +1,4 @@
-import { Canvas, useFrame, useLoader } from '@react-three/fiber';
+import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber';
 import {
   Suspense,
   lazy,
@@ -15,6 +15,7 @@ import { engine, lerpCarrier } from '../game/engine';
 import { OTHER_ROW } from '../game/snapshot';
 import { SHIP_CLASSES, type Vec3 } from '../sim/types';
 import { AsteroidField } from './AsteroidField';
+import { AudioBridge } from './AudioBridge';
 import { CameraRig } from './CameraRig';
 import { ASTEROID_LOD, CAMERA_OFFSET, FLEET_LOD } from './constants';
 import { Containers } from './Containers';
@@ -22,7 +23,7 @@ import { GasGiant, Hazards, Sky } from './Environment';
 import { Fleet } from './Fleet';
 import { easeFactor, focus, isDoubleMiss, shortestArc } from './focus';
 import { FleetPass } from './frameState';
-import { Beams, Explosions } from './Fx';
+import { Beams, Explosions, FocusReticle, MiningSparks, SurveyPings } from './Fx';
 import { FRESNEL_VERT, SHIELD_FRAG } from './geometry';
 import { CARRIER_MODEL, carrierModel, disposeCarrierModel, modelUrl } from './models';
 import { FrameCap, RenderStats } from './RenderLoop';
@@ -43,6 +44,26 @@ export interface ViewOptions {
 const BAY_COLOR = new THREE.Color('#ffd27a').multiplyScalar(3);
 const ENGINE_COLOR = new THREE.Color('#58b8ff').multiplyScalar(5);
 const WARP_RING_COLOR = new THREE.Color('#9b7bff').multiplyScalar(4);
+
+/** Soft round sprites for distant ships of other carriers, replacing square 4px dots (#235). */
+const DOT_VERT = /* glsl */ `
+uniform float uPx;
+attribute vec3 color;
+varying vec3 vColor;
+void main() {
+  vColor = color;
+  gl_PointSize = 6.0 * uPx;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}`;
+const DOT_FRAG = /* glsl */ `
+varying vec3 vColor;
+void main() {
+  float d = length(gl_PointCoord - 0.5) * 2.0;
+  float a = 1.0 - smoothstep(0.55, 1.0, d);
+  if (a <= 0.0) discard;
+  gl_FragColor = vec4(vColor, a);
+  #include <colorspace_fragment>
+}`;
 /** How fast the hull turns toward its heading, per second (see `easeFactor`). */
 const TURN_RATE = 0.8;
 const SHIELD_FLASH_DECAY = 0.35;
@@ -192,6 +213,7 @@ const otherAt: Vec3 = { x: 0, y: 0, z: 0 };
 
 /** Carriers sharing the viewed system: a tinted hull each, and their ships as far-LOD points. */
 function OtherCarriers() {
+  const dpr = useThree((st) => st.viewport.dpr);
   const key = useSyncExternalStore(engine.subscribe, () => engine.others.map((o) => o.id).join());
   const ids = key ? key.split(',').map(Number) : [];
   const groups = useRef(new Map<number, THREE.Group>());
@@ -252,8 +274,15 @@ function OtherCarriers() {
           <CarrierHull other />
         </group>
       ))}
-      <points geometry={geo} frustumCulled={false}>
-        <pointsMaterial size={4} sizeAttenuation={false} vertexColors toneMapped={false} />
+      <points geometry={geo} frustumCulled={false} raycast={() => null}>
+        <shaderMaterial
+          vertexShader={DOT_VERT}
+          fragmentShader={DOT_FRAG}
+          uniforms={{ uPx: { value: dpr } }}
+          transparent
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+        />
       </points>
     </>
   );
@@ -294,10 +323,14 @@ export const Scene = memo(function Scene({
       <Fleet lodDistance={FLEET_LOD[quality]} />
       <Beams />
       <Explosions />
+      <MiningSparks />
+      <SurveyPings />
+      <FocusReticle />
       <Tactical on={tactical || auto} />
       <RenderStats />
       {(paused || lqFps > 0) && <FrameCap fps={lqFps} paused={paused} />}
       <CameraRig tactical={tactical} onAutoTactical={onAuto} />
+      <AudioBridge />
       <PanelViewOffset />
       {quality === 'high' && bloom && (
         <Suspense fallback={null}>

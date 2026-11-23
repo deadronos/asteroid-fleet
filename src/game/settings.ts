@@ -11,9 +11,10 @@ export type Settings = {
   bloom: boolean;
   /** Frame-rate cap in low quality; 0 is uncapped. */
   fpsCap: number;
-  masterVolume: number;
-  musicVolume: number;
-  sfxVolume: number;
+  /** Master mute for all procedural sound cues (#236). */
+  sound: boolean;
+  /** Master volume, 0..1 (#236). */
+  volume: number;
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -21,9 +22,8 @@ export const DEFAULT_SETTINGS: Settings = {
   quality: 'high',
   bloom: true,
   fpsCap: 30,
-  masterVolume: 0.8,
-  musicVolume: 0.6,
-  sfxVolume: 0.8,
+  sound: true,
+  volume: 0.5,
 };
 
 export const UI_SCALES = [0.85, 1, 1.15, 1.3];
@@ -43,9 +43,8 @@ export function parseSettings(raw: unknown): Settings {
     quality: r.quality === 'low' || r.quality === 'high' ? r.quality : d.quality,
     bloom: typeof r.bloom === 'boolean' ? r.bloom : d.bloom,
     fpsCap: typeof r.fpsCap === 'number' && FPS_CAPS.includes(r.fpsCap) ? r.fpsCap : d.fpsCap,
-    masterVolume: clamp01(r.masterVolume, d.masterVolume),
-    musicVolume: clamp01(r.musicVolume, d.musicVolume),
-    sfxVolume: clamp01(r.sfxVolume, d.sfxVolume),
+    sound: typeof r.sound === 'boolean' ? r.sound : d.sound,
+    volume: clamp01(r.volume, d.volume),
   };
 }
 

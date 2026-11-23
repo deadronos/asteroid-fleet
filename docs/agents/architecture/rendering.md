@@ -1,6 +1,6 @@
 # Rendering (`src/render/`)
 
-Source of truth: `Scene.tsx`, `Environment.tsx`, `Effects.tsx`, `Fx.tsx`, `RenderLoop.tsx`, `Tactical.tsx`, `frameState.ts`, `Fleet.tsx`, `AsteroidField.tsx`, `models.ts`, `geometry.ts`, `constants.ts`, `public/models/README.md`.
+Source of truth: `Scene.tsx`, `Environment.tsx`, `Effects.tsx`, `Fx.tsx`, `AudioBridge.tsx`, `RenderLoop.tsx`, `Tactical.tsx`, `CameraRig.tsx`, `frameState.ts`, `focus.ts`, `Fleet.tsx`, `AsteroidField.tsx`, `models.ts`, `geometry.ts`, `constants.ts`, `public/models/README.md`.
 
 ## Shape of the scene
 
@@ -11,7 +11,10 @@ Source of truth: `Scene.tsx`, `Environment.tsx`, `Effects.tsx`, `Fx.tsx`, `Rende
 - `Beams` and `Explosions` live in `Fx.tsx`: beams draw as additive instanced open cylinders scaled and oriented per kind (#231), while explosions and warp arrivals share layered instanced core flashes, shockwave rings, and deterministically seeded radial sparks/streaks (#232), hiding empty meshes when idle.
 - `Carrier` (`Scene.tsx`) draws its shield as an additive Fresnel rim `ShaderMaterial` with an impact flash when `carrier.shield` drops and a low-shield flicker below `0.25` (#234).
 - `Hazards` and `GasGiant` (`Environment.tsx`) replace wireframe primitives with Fresnel/wave shells (`DEBRIS_SHELL_FRAG`, `RADIATION_FRAG`, `STORM_FRAG` in `geometry.ts`) plus one shared `InstancedMesh` of tumbling debris chunks across all debris hazards (#234).
-- Tactical view draws shape-coded icons (`ICON_SHAPE`, `SHAPES` from `ui/palette.ts`) and turns on automatically when you zoom far out.
+- Tactical view draws anti-aliased shape-coded icons (`ICON_SHAPE`, `SHAPES` from `ui/palette.ts`), a pulsing warning ring while `wave.warning` is set, and turns on automatically when you zoom far out (#235).
+- `FocusReticle`, `MiningSparks` and `SurveyPings` (`Fx.tsx`) draw diegetic cues straight from `fleetFrame` and the view in `useFrame`: a bracket on the focused ship, glints where mining beams meet rock, and expanding radar rings when scouts survey a cluster or chart a hazard. Other carriers' far-LOD ships use soft round point sprites instead of square dots (#235).
+- `AudioBridge.tsx` is the only link from the render layer to the lazy `game/audio.ts` synth. It unlocks Web Audio on the first gesture, forwards new events and per-frame FX, and turns button presses into UI clicks; the synth itself holds no React state (#236).
+- `CameraRig` eases tactical moves instead of snapping them (cancelling on manual orbit), applies damped shake on hull hits, near explosions and warp jumps, and adds a small FOV kick in the last two seconds of warp charge. Shake and FOV cues respect `prefers-reduced-motion` (#237).
 
 ## Per-frame data
 

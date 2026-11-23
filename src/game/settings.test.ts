@@ -10,22 +10,26 @@ describe('parseSettings', () => {
     );
   });
 
-  it('keeps valid values and clamps volumes', () => {
+  it('keeps valid values and clamps volume', () => {
     const s = parseSettings({
       uiScale: 1.15,
       quality: 'low',
       bloom: false,
       fpsCap: 60,
-      masterVolume: 3,
-      sfxVolume: -1,
+      sound: false,
+      volume: 3,
     });
     expect(s).toMatchObject({
       uiScale: 1.15,
       quality: 'low',
       bloom: false,
       fpsCap: 60,
-      masterVolume: 1,
-      sfxVolume: 0,
+      sound: false,
+      volume: 1,
     });
+  });
+
+  it('defaults sound on and volume to 0.5 for junk values', () => {
+    expect(parseSettings({ volume: 'x', sound: 'yes' })).toEqual(DEFAULT_SETTINGS);
   });
 });

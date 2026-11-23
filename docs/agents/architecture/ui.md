@@ -24,4 +24,6 @@ Source of truth: `App.tsx`, `../game/engine.ts` (`useGame`), `hotkeys.ts`, `Moda
 ## Styling
 
 - One stylesheet, `styles.css`, with color and surface tokens as CSS custom properties on `:root` (#136). Use the tokens, not new literals.
+- HUD bars, buttons, toasts, alerts and the hull-damage vignette use short CSS transitions and keyframes; every motion rule is disabled under `prefers-reduced-motion` (#237). The vignette remounts on a changed hull percentage, so an undamaged HUD never re-renders for it.
+- Settings exposes `sound` (mute) and `volume` (0..1), persisted with the rest of `Settings` and read by the lazy Web Audio synth (#236).
 - Canvas and tactical colors come from `PALETTE` / `ICON_SHAPE` in `palette.ts`.

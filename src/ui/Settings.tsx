@@ -69,6 +69,24 @@ function UiTab({ onHelp }: { onHelp: () => void }) {
           ))}
         </select>
       </Field>
+      <Field label="Sound">
+        <input
+          type="checkbox"
+          checked={s.sound}
+          onChange={(e) => updateSettings({ sound: e.target.checked })}
+        />
+      </Field>
+      <Field label={`Volume · ${Math.round(s.volume * 100)}%`}>
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.05}
+          value={s.volume}
+          disabled={!s.sound}
+          onChange={(e) => updateSettings({ volume: Number(e.target.value) })}
+        />
+      </Field>
       <div className="row">
         <button onClick={onHelp}>How to play</button>
       </div>

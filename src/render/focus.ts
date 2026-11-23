@@ -39,6 +39,23 @@ export function easeFactor(dt: number, rate: number): number {
   return 1 - Math.exp(-Math.max(0, dt) * rate);
 }
 
+/** Smoothstep ease for the eased tactical camera move; clamps 0..1 (#237). */
+export function tacticalEase(t: number): number {
+  const k = Math.min(1, Math.max(0, t));
+  return k * k * (3 - 2 * k);
+}
+
+/** Exponential decay of a camera shake impulse, frame-rate independent (#237). */
+export function shakeDecay(v: number, dt: number, rate = 6): number {
+  return v * Math.exp(-Math.max(0, dt) * rate);
+}
+
+/** FOV target during the last two seconds of warp charge, easing back to base otherwise (#237). */
+export function warpFov(charge: number, total: number, base = 55, kick = 5): number {
+  const left = total - charge;
+  return left > 0 && left < 2 ? base + kick * (1 - left / 2) : base;
+}
+
 let exitRequested = false;
 /** Ask the camera rig to leave tactical view (manual and auto) on its next frame. */
 export function leaveTactical(): void {
