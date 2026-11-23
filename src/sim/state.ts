@@ -197,6 +197,6 @@ export function newGame(seed = 1337, carry?: Carry): GameState {
   const start = startSystem(s);
   if (start !== 0) enterSystem(s, start);
   for (let i = 0; i < 4; i++) createShip(s, 'drone', 1);
-  emit(s, 'CarrierOnline', { system: s.systems[0].name });
+  emit(s, 'CarrierOnline', { system: s.systems[s.systemId].name });
   return g;
 }

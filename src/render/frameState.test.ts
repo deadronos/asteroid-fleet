@@ -12,7 +12,7 @@ describe('fillFleetFrame', () => {
 
   it('interpolates once and buckets by class, skipping docked ships', () => {
     const ships = [ship(1, 'drone', 10), ship(2, 'barge', 5, 'docked'), ship(3, 'drone', 20)];
-    const f = fillFleetFrame(ships, [ship(9, 'x', 4)], prev, 0.5);
+    const f = fillFleetFrame(ships, [ship(9, 'x', 4)], prev, 0.5, 1 / 60);
     expect(f.count).toBe(3);
     expect(Array.from(f.ids.slice(0, 3))).toEqual([1, 3, 9]);
     expect(f.pos[0]).toBe(5);
@@ -33,16 +33,16 @@ describe('fillFleetFrame', () => {
 
   it('skips a carried drone the way it skips a docked ship (#181)', () => {
     const ships = [ship(1, 'drone', 10, 'carried'), ship(2, 'drone', 5, 'idle')];
-    const f = fillFleetFrame(ships, [], prev, 1);
+    const f = fillFleetFrame(ships, [], prev, 1, 1 / 60);
     expect(f.count).toBe(1);
     expect(Array.from(f.ids.slice(0, 1))).toEqual([2]);
     expect(Array.from(f.shipEntity.slice(0, 2))).toEqual([-1, 0]);
   });
 
   it('resets between frames', () => {
-    const f = fillFleetFrame([ship(1, 'drone', 1)], [], prev, 1);
+    const f = fillFleetFrame([ship(1, 'drone', 1)], [], prev, 1, 1 / 60);
     expect(f.count).toBe(1);
-    fillFleetFrame([], [], prev, 1, f);
+    fillFleetFrame([], [], prev, 1, 1 / 60, f);
     expect(f.count).toBe(0);
     expect(f.bucketLen[CLASSES.indexOf('drone')]).toBe(0);
   });

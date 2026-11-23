@@ -41,6 +41,7 @@ export interface ViewOptions {
 }
 
 const MAX_SEG = 1024;
+const MAX_EXPLOSIONS = 128;
 const BEAM_COLORS: Record<string, THREE.Color> = {
   mine: new THREE.Color('#7fe7ff').multiplyScalar(2.2),
   laser: new THREE.Color('#ff8fa0').multiplyScalar(3),
@@ -127,6 +128,7 @@ function Explosions() {
     let n = 0;
     for (const f of engine.view.fx) {
       if (f.kind !== 'explosion' && f.kind !== 'warp') continue;
+      if (n >= MAX_EXPLOSIONS) break;
       const life = f.kind === 'warp' ? 1.5 : 0.8;
       const k = 1 - f.ttl / life;
       dummy.position.set(f.a.x, f.a.y, f.a.z);
@@ -138,7 +140,7 @@ function Explosions() {
     m.instanceMatrix.needsUpdate = true;
   });
   return (
-    <instancedMesh ref={mesh} args={[undefined, undefined, 128]} frustumCulled={false}>
+    <instancedMesh ref={mesh} args={[undefined, undefined, MAX_EXPLOSIONS]} frustumCulled={false}>
       <icosahedronGeometry args={[1, 1]} />
       <meshBasicMaterial color={EXPLOSION_COLOR} toneMapped={false} transparent opacity={0.8} />
     </instancedMesh>

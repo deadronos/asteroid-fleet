@@ -55,9 +55,10 @@ export function executeJump(s: Sim) {
   for (const x of s.ships) if (x.mode === 'carried' && !lost.has(x)) dock(s, x);
   for (const l of outside) destroyShip(s, l, 'leftBehind');
   s.ships = s.ships.filter((x) => x.mode === 'docked');
-  s.fx.push({ kind: 'warp', a: copy(s.carrier.pos), b: copy(s.carrier.pos), ttl: 1.5 });
   s.warp = null;
   enterSystem(s, target);
+  // Push after enterSystem, which clears s.fx and moves the carrier to the origin (#224).
+  s.fx.push({ kind: 'warp', a: copy(s.carrier.pos), b: copy(s.carrier.pos), ttl: 1.5 });
   for (const sh of s.ships) sh.pos = copy(s.carrier.pos);
   emit(s, 'Warped', { system: s.systems[target].name });
 }

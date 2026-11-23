@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { order } from './actions';
-import { cargoCap } from './ctx';
+import { pirateStep, pirateTargetScore, repairDrone } from './combat';
+import { DT } from './config';
+import { buildCtx, cargoCap } from './ctx';
 import { CONTAINER_TTL } from './mining';
+import { gasGiantPos, maxHull } from './state';
 import { stepSim } from './tick';
 import type { Sim, Ship } from './types';
 import { game } from './testing';
+import { hazards } from './world';
 
 const run = (s: Sim, seconds: number) => {
   for (let i = 0; i < seconds * 10; i++) stepSim(s);
@@ -149,5 +153,76 @@ describe('pirate targeting', () => {
     });
     stepSim(s);
     expect(s.pirates[0].targetId).toBe(full.id);
+  });
+});
+
+describe('carried drone protection (#225)', () => {
+  it('shields carried drones from pirate targeting, hazards/storms, and repair drones', () => {
+    const s = bargeGame(41, true);
+    s.unlocked.push('repair');
+    expect(order(s, { type: 'buyShip', cls: 'repair', hangarId: 2 })).toBeNull();
+    const barge = s.ships.find((x) => x.cls === 'barge')!;
+    const drone = s.ships.find((x) => x.cls === 'drone')!;
+    const repair = s.ships.find((x) => x.cls === 'repair')!;
+    for (const x of s.ships) x.mode = 'docked';
+
+    barge.mode = 'station';
+    barge.pos = { x: 80, y: 0, z: 0 };
+    drone.mode = 'carried';
+    drone.bargeId = barge.id;
+    drone.pos = { ...barge.pos };
+    drone.hull = maxHull(s, 'drone') * 0.25;
+
+    // Pirates score carried drones as 0 and drop them if they board mid-chase.
+    expect(pirateTargetScore(s, drone)).toBe(0);
+    s.pirates.push({
+      id: s.nextId++,
+      pos: { x: 81, y: 0, z: 0 },
+      hull: 100,
+      maxHull: 100,
+      damage: 10,
+      speed: 5,
+      targetId: drone.id,
+      fireCooldown: 0,
+    });
+    const hullBeforePirate = drone.hull;
+    pirateStep(s, DT, buildCtx(s));
+    expect(s.pirates[0].targetId).not.toBe(drone.id);
+    expect(drone.hull).toBe(hullBeforePirate);
+
+    // Hazards, solar storms, and H2 storms skip carried drones.
+    s.hazards = [{ pos: { ...drone.pos }, radius: 20, dps: 50, kind: 'debris' }];
+    s.storm = { timer: 100, active: 10 };
+    const t2Plain = s.systems.find((sys) => sys.tier === 2 && !sys.gasGiant);
+    if (t2Plain) s.systemId = t2Plain.id;
+    const hullBeforeHazard = drone.hull;
+    hazards(s, DT);
+    expect(drone.hull).toBe(hullBeforeHazard);
+
+    const t3Gas = s.systems.find((sys) => sys.gasGiant)!;
+    expect(t3Gas).toBeDefined();
+    s.systemId = t3Gas.id;
+    drone.pos = { ...gasGiantPos(t3Gas) };
+    hazards(s, DT);
+    expect(drone.hull).toBe(hullBeforeHazard);
+
+    // Repair drones neither target nor nano-heal carried drones.
+    repair.mode = 'repairing';
+    repair.pos = { ...barge.pos };
+    repair.targetId = drone.id;
+    drone.pos = { ...barge.pos };
+    s.researchLevels.repairNano = 1;
+    const hullBeforeRepair = drone.hull;
+    repairDrone(s, repair, DT, buildCtx(s));
+    expect(repair.targetId).toBe(-1);
+    expect(drone.hull).toBe(hullBeforeRepair);
+
+    // Even when nano-healing an adjacent damaged barge, the carried drone is untouched.
+    barge.hull = maxHull(s, 'barge') * 0.5;
+    const bargeBefore = barge.hull;
+    repairDrone(s, repair, DT, buildCtx(s));
+    expect(repair.targetId).toBe(barge.id);
+    expect(barge.hull).toBeGreaterThan(bargeBefore);
+    expect(drone.hull).toBe(hullBeforeRepair);
   });
 });
