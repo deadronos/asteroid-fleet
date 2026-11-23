@@ -15,7 +15,6 @@ export interface ResearchNode {
   id: string;
   branch: Branch;
   name: string;
-  desc: string;
   maxLevel: number;
   cost: (level: number) => number; // cost of buying the next level
   requires?: string;
@@ -37,6 +36,53 @@ export interface Repeat {
 /** Each level closes this share of the remaining gap to the cap. */
 export const SOFTCAP_STEP = 0.08;
 
+/** Per-level research scalars (#250). */
+export const SCALE_HULL_ARMOR = 0.15;
+export const SCALE_HULL_DRONE = 0.3;
+export const SCALE_HULL_HAULER = 0.4;
+export const SCALE_HULL_FIGHTER = 0.25;
+export const SCALE_HULL_HARVESTER = 0.3;
+export const SCALE_HULL_FRAME = 0.12;
+export const SCALE_HULL_BARGEBAYFLAT = 1.5;
+export const SCALE_HULL_HAULERARMORFLAT = 0.6;
+export const SCALE_ENERGY_CAPACITY = 0.25;
+export const SCALE_ENERGY_REACTOR = 0.1;
+export const SCALE_ENERGY_VOIDREFINING = 0.25;
+export const SCALE_ENERGY_SOLAR = 0.2;
+export const SCALE_ENERGY_LAUNCHINTERVAL = 0.08;
+export const SCALE_ENERGY_WARPCHARGE = 0.15;
+export const SCALE_ENERGY_JUMPCOST = 0.05;
+export const SCALE_CARGO_BARGE = 0.2;
+export const SCALE_CARGO_DRONE = 0.2;
+export const SCALE_CARGO_HAULER = 0.25;
+export const SCALE_CARGO_HARVESTER = 0.25;
+export const SCALE_SPEED_HAULER = 0.12;
+export const SCALE_SPEED_DRONE = 0.15;
+export const SCALE_SPEED_BARGE = 0.25;
+export const SCALE_SPEED_SCOUT = 0.25;
+export const SCALE_SPEED_REPAIR = 0.25;
+export const SCALE_SPEED_HARVESTER = 0.2;
+export const SCALE_SPEED_DRIFT = 0.2;
+export const SCALE_COMBAT_DAMAGE = 0.15;
+export const SCALE_COMBAT_FIGHTERACEFLAT = 1.25;
+export const SCALE_COMBAT_FIGHTERRANGE = 0.2;
+export const SCALE_COMBAT_BARGESHELL = 0.25;
+export const SCALE_COMBAT_STORMSHIELDING = 0.3;
+export const SCALE_COMBAT_WARNINGPERSENSORS = 5;
+export const SCALE_COMBAT_WARNINGPERRELAY = 10;
+export const SCALE_MINING_YIELD = 0.15;
+export const SCALE_MINING_SWARMPERDRONE = 0.1;
+export const SCALE_MINING_SWARMCAP = 0.5;
+export const SCALE_REPAIR_FIELD = 0.3;
+export const SCALE_REPAIR_BEAM = 0.25;
+export const SCALE_WORLD_RARECHANCE = 0.04;
+export const SCALE_WORLD_RAREVALUEFLAT = 2.5;
+export const SCALE_WORLD_RICHVALUE = 0.1;
+export const SCALE_WORLD_SCOUTSURVEY = 0.5;
+export const SCALE_WORLD_STARTCREDITS = 250;
+export const SCALE_WORLD_RESERVECD = 0.2;
+export const SCALE_WORLD_DEEPFABRICATION = 0.15;
+
 /** Soft-capped effect of a repeatable node: cap × (1 − (1 − step)^level). */
 export function softcap(level: number, cap: number): number {
   return cap * (1 - Math.pow(1 - SOFTCAP_STEP, level));
@@ -53,7 +99,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'bargeCap',
     branch: 'Logistics',
     name: 'Compression',
-    desc: '+20 % barge capacity',
     maxLevel: 5,
     cost: lin(1, 1),
   },
@@ -61,7 +106,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'haulSpeed',
     branch: 'Logistics',
     name: 'Hauler thrusters',
-    desc: '+12 % hauler speed',
     maxLevel: 5,
     cost: lin(1, 1),
   },
@@ -69,7 +113,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'yield',
     branch: 'Mining',
     name: 'Drill heads',
-    desc: '+15 % mining yield',
     maxLevel: 8,
     cost: lin(1, 1),
   },
@@ -77,7 +120,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'droneCargo',
     branch: 'Mining',
     name: 'Drone holds',
-    desc: '+20 % drone cargo',
     maxLevel: 5,
     cost: lin(1, 1),
   },
@@ -85,7 +127,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'rich',
     branch: 'Mining',
     name: 'Vein mapping',
-    desc: '+10 % ore value',
     maxLevel: 5,
     cost: lin(2, 2),
     requires: 'yield',
@@ -94,7 +135,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'damage',
     branch: 'Combat',
     name: 'Pulse lasers',
-    desc: '+15 % fighter damage',
     maxLevel: 5,
     cost: lin(1, 1),
   },
@@ -102,7 +142,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'turretDamage',
     branch: 'Combat',
     name: 'Turret capacitors',
-    desc: '+15 % carrier turret damage',
     maxLevel: 5,
     cost: lin(1, 1),
   },
@@ -110,7 +149,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'turretRange',
     branch: 'Combat',
     name: 'Fire control',
-    desc: '+20 % carrier turret range',
     maxLevel: 3,
     cost: lin(1, 1),
     requires: 'turretDamage',
@@ -119,7 +157,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'armor',
     branch: 'Combat',
     name: 'Composite armor',
-    desc: '+15 % hull for all ships',
     maxLevel: 5,
     cost: lin(1, 1),
   },
@@ -127,7 +164,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'repair',
     branch: 'Combat',
     name: 'Field repair',
-    desc: '+30 % repair speed',
     maxLevel: 3,
     cost: lin(1, 2),
   },
@@ -135,7 +171,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'energyCap',
     branch: 'Carrier',
     name: 'Capacitors',
-    desc: '+25 % energy capacity; solar grows with capacity',
     maxLevel: 5,
     cost: lin(1, 1),
   },
@@ -143,7 +178,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'solar',
     branch: 'Carrier',
     name: 'Solar sails',
-    desc: '+20 % solar recharge',
     maxLevel: 5,
     cost: lin(1, 1),
   },
@@ -151,7 +185,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'warpCharge',
     branch: 'Carrier',
     name: 'Jump spool',
-    desc: '-15 % warp charge time',
     maxLevel: 3,
     cost: lin(2, 1),
   },
@@ -159,7 +192,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'fusion',
     branch: 'Carrier',
     name: 'Fusion reactor',
-    desc: 'Burns H2 from gas giants for energy; unlocks the gas harvester',
     maxLevel: 1,
     cost: () => 4,
   },
@@ -167,7 +199,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'slots',
     branch: 'Carrier',
     name: 'Hangar frames',
-    desc: 'Every run starts with +1 slot per hangar',
     maxLevel: 3,
     cost: lin(2, 2),
   },
@@ -175,7 +206,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'startCredits',
     branch: 'Carrier',
     name: 'Venture capital',
-    desc: '+250 starting credits',
     maxLevel: 5,
     cost: lin(1, 1),
   },
@@ -183,7 +213,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'reserveDrone',
     branch: 'Reserves',
     name: 'Drone reserve',
-    desc: 'Keep at least 2 drones per level; one rebuilt every 2 min',
     maxLevel: 3,
     cost: lin(1, 1),
   },
@@ -191,7 +220,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'reserveFighter',
     branch: 'Reserves',
     name: 'Fighter reserve',
-    desc: 'Keep at least 1 fighter per level; one rebuilt every 5 min',
     maxLevel: 3,
     cost: lin(2, 2),
   },
@@ -199,7 +227,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'reserveCd',
     branch: 'Reserves',
     name: 'Fabricator',
-    desc: '-20 % rebuild cooldown',
     maxLevel: 3,
     cost: lin(2, 1),
     requires: 'reserveDrone',
@@ -208,7 +235,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'rare',
     branch: 'Mining',
     name: 'Rare strikes',
-    desc: '+4 % chance per level that a new asteroid is rare ore (x2.5 value)',
     maxLevel: 5,
     cost: lin(2, 1),
     requires: 'yield',
@@ -217,7 +243,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'sublight',
     branch: 'Carrier',
     name: 'Sublight drive',
-    desc: '+20 % carrier drift speed',
     maxLevel: 4,
     cost: lin(1, 1),
   },
@@ -225,7 +250,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'reserveBarge',
     branch: 'Reserves',
     name: 'Barge reserve',
-    desc: 'Keep at least 1 barge per level; one rebuilt every 8 min',
     maxLevel: 2,
     cost: lin(3, 3),
   },
@@ -233,7 +257,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'reserveHauler',
     branch: 'Reserves',
     name: 'Hauler reserve',
-    desc: 'Keep at least 1 hauler per level; one rebuilt every 5 min',
     maxLevel: 2,
     cost: lin(2, 2),
   },
@@ -242,7 +265,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'tactics',
     branch: 'Automation',
     name: 'Tactical doctrine',
-    desc: 'Unlocks engagement stances and the frontier rule cards without reaching the frontier',
     maxLevel: 1,
     cost: () => 2,
   },
@@ -250,7 +272,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'autoRebuild',
     branch: 'Automation',
     name: 'Replacement orders',
-    desc: 'Lost ships of any class are rebuilt into their hangar, paid with credits',
     maxLevel: 1,
     cost: () => 3,
   },
@@ -258,7 +279,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'autoBuy',
     branch: 'Automation',
     name: 'Fleet requisition',
-    desc: 'Spare credits buy toward each hangar target composition',
     maxLevel: 1,
     cost: () => 4,
     requires: 'autoRebuild',
@@ -268,7 +288,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'voidRefining',
     branch: 'Carrier',
     name: 'Void refining',
-    desc: '+25 % refinery throughput',
     maxLevel: 3,
     cost: lin(4, 2),
     tier: 3,
@@ -277,7 +296,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'stormShielding',
     branch: 'Combat',
     name: 'Storm shielding',
-    desc: '-30 % storm damage to ships',
     maxLevel: 2,
     cost: lin(3, 2),
     tier: 3,
@@ -286,7 +304,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'deepFabrication',
     branch: 'Reserves',
     name: 'Deep fabrication',
-    desc: '-15 % rebuild cooldown, stacks with Fabricator',
     maxLevel: 2,
     cost: lin(4, 2),
     requires: 'reserveCd',
@@ -297,7 +314,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'droneSwarm',
     branch: 'drone',
     name: 'Swarm logic',
-    desc: 'Drones mine 10 % faster per drone in the same hangar (max +50 %)',
     maxLevel: 1,
     cost: () => 3,
   },
@@ -305,7 +321,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'bargeBay',
     branch: 'barge',
     name: 'Barge drone bay',
-    desc: 'Barges get +50 % hull, repair docked drones and carry a drone that launches from and docks at the barge',
     maxLevel: 1,
     cost: () => 3,
   },
@@ -313,7 +328,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'haulerArmor',
     branch: 'hauler',
     name: 'Armored holds',
-    desc: 'Haulers take 40 % less damage',
     maxLevel: 1,
     cost: () => 2,
   },
@@ -321,7 +335,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'fighterAce',
     branch: 'fighter',
     name: 'Ace wings',
-    desc: 'Fighters in a hangar of only fighters gain +25 % damage',
     maxLevel: 1,
     cost: () => 3,
   },
@@ -329,7 +342,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'scoutRelay',
     branch: 'scout',
     name: 'Sensor relay',
-    desc: 'Each scout adds +10 s pirate wave warning',
     maxLevel: 1,
     cost: () => 2,
   },
@@ -337,7 +349,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'repairNano',
     branch: 'repair',
     name: 'Nano swarm',
-    desc: 'Repair drones heal everything in range',
     maxLevel: 1,
     cost: () => 3,
   },
@@ -345,7 +356,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'droneSpeed',
     branch: 'drone',
     name: 'Ion drives',
-    desc: '+15 % drone speed',
     maxLevel: 3,
     cost: lin(1, 1),
   },
@@ -353,7 +363,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'droneHull',
     branch: 'drone',
     name: 'Hardened drills',
-    desc: '+30 % drone hull',
     maxLevel: 3,
     cost: lin(1, 1),
   },
@@ -361,7 +370,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'bargeThrust',
     branch: 'barge',
     name: 'Barge thrusters',
-    desc: '+25 % barge speed',
     maxLevel: 2,
     cost: lin(2, 1),
   },
@@ -369,7 +377,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'bargeShell',
     branch: 'barge',
     name: 'Reinforced shell',
-    desc: '-25 % damage to barges',
     maxLevel: 2,
     cost: lin(2, 2),
   },
@@ -377,7 +384,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'haulerHold',
     branch: 'hauler',
     name: 'Extended holds',
-    desc: '+25 % hauler cargo',
     maxLevel: 3,
     cost: lin(1, 1),
   },
@@ -385,7 +391,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'haulerHull',
     branch: 'hauler',
     name: 'Bulkheads',
-    desc: '+40 % hauler hull',
     maxLevel: 2,
     cost: lin(1, 1),
   },
@@ -393,7 +398,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'fighterRange',
     branch: 'fighter',
     name: 'Long-range optics',
-    desc: '+20 % fighter range',
     maxLevel: 3,
     cost: lin(1, 1),
   },
@@ -401,7 +405,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'fighterHull',
     branch: 'fighter',
     name: 'Ablative plating',
-    desc: '+25 % fighter hull',
     maxLevel: 3,
     cost: lin(1, 2),
   },
@@ -409,7 +412,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'scoutSpeed',
     branch: 'scout',
     name: 'Scout engines',
-    desc: '+25 % scout speed',
     maxLevel: 3,
     cost: lin(1, 1),
   },
@@ -417,7 +419,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'scoutSurvey',
     branch: 'scout',
     name: 'Deep survey',
-    desc: 'Scouts raise the rich-ore bonus of respawned asteroids by +50 %',
     maxLevel: 1,
     cost: () => 3,
   },
@@ -425,7 +426,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'repairBeam',
     branch: 'repair',
     name: 'Focused beams',
-    desc: '+25 % repair-drone healing',
     maxLevel: 3,
     cost: lin(1, 1),
   },
@@ -433,7 +433,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'repairSpeed',
     branch: 'repair',
     name: 'Repair thrusters',
-    desc: '+25 % repair-drone speed',
     maxLevel: 3,
     cost: lin(1, 1),
   },
@@ -441,7 +440,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'harvestCargo',
     branch: 'harvester',
     name: 'Larger tanks',
-    desc: '+25 % harvester H2 capacity',
     maxLevel: 3,
     cost: lin(1, 1),
     requires: 'fusion',
@@ -450,7 +448,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'harvestSpeed',
     branch: 'harvester',
     name: 'Skimmer thrusters',
-    desc: '+20 % harvester speed',
     maxLevel: 3,
     cost: lin(1, 1),
     requires: 'fusion',
@@ -459,7 +456,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'harvestHull',
     branch: 'harvester',
     name: 'Gas-proof hull',
-    desc: '+30 % harvester hull',
     maxLevel: 2,
     cost: lin(1, 2),
     requires: 'fusion',
@@ -469,7 +465,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'frame',
     branch: 'Carrier',
     name: 'Reinforced frame',
-    desc: '+12 % carrier hull',
     maxLevel: 5,
     cost: lin(2, 1),
   },
@@ -477,7 +472,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'reactor',
     branch: 'Carrier',
     name: 'Reactor tuning',
-    desc: '+10 % refinery throughput and +10 % shield regeneration',
     maxLevel: 5,
     cost: lin(2, 1),
   },
@@ -485,7 +479,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'bays',
     branch: 'Carrier',
     name: 'Catapult bays',
-    desc: '-8 % hangar launch interval',
     maxLevel: 4,
     cost: lin(2, 2),
     requires: 'slots',
@@ -494,7 +487,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'sensors',
     branch: 'Carrier',
     name: 'Long-range sensors',
-    desc: '-5 % jump energy and +5 s pirate wave warning',
     maxLevel: 4,
     cost: lin(2, 1),
   },
@@ -503,7 +495,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'deepYield',
     branch: 'Mining',
     name: 'Deep-core drilling',
-    desc: 'Repeatable; mining yield, diminishing toward +100 %',
     maxLevel: Infinity,
     cost: geo(10, 1.25),
     repeat: {
@@ -516,7 +507,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'deepEnergy',
     branch: 'Carrier',
     name: 'Superconducting banks',
-    desc: 'Repeatable; energy capacity (and with it solar), diminishing toward +100 %',
     maxLevel: Infinity,
     cost: geo(10, 1.25),
     repeat: {
@@ -529,7 +519,6 @@ export const RESEARCH: ResearchNode[] = [
     id: 'deepLaunch',
     branch: 'Carrier',
     name: 'Catapult rails',
-    desc: 'Repeatable; hangar launch interval, diminishing toward −50 %',
     maxLevel: Infinity,
     cost: geo(10, 1.25),
     // No finite node touches launch speed; Hangar frames is the closest hangar node.
@@ -588,7 +577,11 @@ function reserveCd(s: Sim): number {
     const m = HANGAR_TYPES[h.type].rebuildMult;
     if (m !== undefined && m < mult) mult = m;
   }
-  return (1 - 0.2 * lvl(s, 'reserveCd')) * (1 - 0.15 * lvl(s, 'deepFabrication')) * mult;
+  return (
+    (1 - SCALE_WORLD_RESERVECD * lvl(s, 'reserveCd')) *
+    (1 - SCALE_WORLD_DEEPFABRICATION * lvl(s, 'deepFabrication')) *
+    mult
+  );
 }
 
 /** Zero-allocation read of `reserveDefs` into a shared tuple array; valid until the next call (#241). */

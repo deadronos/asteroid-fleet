@@ -1,5 +1,5 @@
 import { useFrame, useLoader } from '@react-three/fiber';
-import { Suspense, useMemo, useRef } from 'react';
+import { Suspense, useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { engine } from '../game/engine';
@@ -30,6 +30,7 @@ function Field({
   const near = useRef<THREE.InstancedMesh>(null);
   const far = useRef<THREE.InstancedMesh>(null);
   const farGeo = useMemo(() => asteroidGeometry(0), []);
+  useEffect(() => () => farGeo.dispose(), [farGeo]);
   // Ore tier last written to each instance slot, so unchanged colours aren't re-uploaded.
   const nearTier = useMemo(() => new Uint8Array(MAX_ASTEROIDS).fill(255), []);
   const farTier = useMemo(() => new Uint8Array(MAX_ASTEROIDS).fill(255), []);
@@ -137,6 +138,7 @@ function ModelField({ lodDistance }: { lodDistance: number }) {
     g.deleteAttribute('color');
     return g;
   }, [gltf]);
+  useEffect(() => () => model.dispose(), [model]);
   return <Field model={model} lodDistance={lodDistance} />;
 }
 

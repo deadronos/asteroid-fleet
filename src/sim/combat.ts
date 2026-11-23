@@ -48,7 +48,14 @@ import {
   type Ctx,
 } from './ctx';
 import { copy, dist, dist2, moveToward, rand, randRange, seeded } from './math';
-import { lvl } from './research';
+import {
+  lvl,
+  SCALE_COMBAT_FIGHTERRANGE,
+  SCALE_COMBAT_WARNINGPERRELAY,
+  SCALE_COMBAT_WARNINGPERSENSORS,
+  SCALE_REPAIR_BEAM,
+  SCALE_REPAIR_FIELD,
+} from './research';
 import { clusterCenters, emit, isStowed, maxHull } from './state';
 import type { Sim, Pirate, Ship, Vec3 } from './types';
 
@@ -74,7 +81,11 @@ export function waveSize(s: Sim): number {
 export function waveWarning(s: Sim): number {
   let scouts = 0;
   for (const x of s.ships) if (x.cls === 'scout' && x.mode !== 'docked') scouts++;
-  return WAVE_WARNING + 5 * lvl(s, 'sensors') + (lvl(s, 'scoutRelay') > 0 ? 10 * scouts : 0);
+  return (
+    WAVE_WARNING +
+    SCALE_COMBAT_WARNINGPERSENSORS * lvl(s, 'sensors') +
+    (lvl(s, 'scoutRelay') > 0 ? SCALE_COMBAT_WARNINGPERRELAY * scouts : 0)
+  );
 }
 
 function fighterTarget(s: Sim, ship: Ship, ctx: Ctx, engagement: string): Pirate | null {
@@ -164,7 +175,8 @@ export function fighter(s: Sim, ship: Ship, dt: number, ctx: Ctx, engagement: st
   if (target) {
     ship.mode = 'attack';
     ship.targetId = target.id;
-    const range = SHIP_STATS.fighter.range * (1 + 0.2 * lvl(s, 'fighterRange'));
+    const range =
+      SHIP_STATS.fighter.range * (1 + SCALE_COMBAT_FIGHTERRANGE * lvl(s, 'fighterRange'));
     moveToward(ship.pos, target.pos, v, range * 0.7);
     if (dist(ship.pos, target.pos) <= range) {
       target.hull -= fighterDamage(s, ctx, ship) * dt;
@@ -292,7 +304,11 @@ export function repairDrone(s: Sim, ship: Ship, dt: number, ctx: Ctx) {
   ship.mode = 'repairing';
   const range = SHIP_STATS.repair.range;
   moveToward(ship.pos, patient.pos, v, range * 0.6);
-  const heal = 7 * (1 + 0.3 * lvl(s, 'repair')) * (1 + 0.25 * lvl(s, 'repairBeam')) * dt;
+  const heal =
+    7 *
+    (1 + SCALE_REPAIR_FIELD * lvl(s, 'repair')) *
+    (1 + SCALE_REPAIR_BEAM * lvl(s, 'repairBeam')) *
+    dt;
   const nano = lvl(s, 'repairNano') > 0;
   if (nano) {
     for (const o of damaged) {

@@ -38,6 +38,62 @@
       "rules": { "vitest/expect-expect": "off" }
     },
     {
+      // The sim must stay importable from a Web Worker and Node: no upper layers, no React/three (#250).
+      "files": ["src/sim/**/*.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "../game",
+                  "../game/*",
+                  "../game/**",
+                  "../../game",
+                  "../../game/*",
+                  "../../game/**",
+                  "../render",
+                  "../render/*",
+                  "../render/**",
+                  "../../render",
+                  "../../render/*",
+                  "../../render/**",
+                  "../ui",
+                  "../ui/*",
+                  "../ui/**",
+                  "../../ui",
+                  "../../ui/*",
+                  "../../ui/**",
+                  "three",
+                  "three/*",
+                  "react",
+                  "react/*",
+                  "react-dom",
+                  "react-dom/*",
+                  "@react-three/*"
+                ],
+                "message": "src/sim must stay pure: no imports from game/, render/, ui/ or React/three."
+              }
+            ]
+          }
+        ],
+        "no-restricted-properties": [
+          "error",
+          {
+            "object": "Math",
+            "property": "random",
+            "message": "src/sim must stay deterministic: use rand(s) instead of Math.random()."
+          }
+        ]
+      }
+    },
+    {
+      // Tests may cross layer lines to exercise saves and formatters; the sim itself may not.
+      "files": ["src/sim/**/*.test.ts"],
+      "rules": { "no-restricted-imports": "off" }
+    },
+    {
       // The sim protocol stays in game. The UI formats events when it renders them.
       "files": ["src/game/**/*.ts"],
       "rules": {

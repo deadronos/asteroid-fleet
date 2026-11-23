@@ -21,7 +21,7 @@ const VENDOR_GROUPS: [name: string, test: RegExp][] = [
 ];
 
 const SIM_FALLBACK =
-  /src[\\/](game[\\/](runner|localHost)|sim[\\/](actions|tick|background|routes|world))\.ts/;
+  /src[\\/](game[\\/](runner|localHost)|sim[\\/](actions|orders|reset|offline|tick|background|routes|world))\.ts/;
 
 export default defineConfig({
   plugins: [react()],

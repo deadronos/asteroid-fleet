@@ -18,9 +18,30 @@ import {
 } from './config';
 import { compileCards, firing, type CompiledCards } from './cards';
 import { effectiveStance } from './doctrine';
-import { carrierStorage, removeFromHangars } from './hangar';
+import { carrierStorage, removeFromHangars, repairSynergy, type Board } from './hangar';
 import { copy, dist, dist2, moveToward } from './math';
-import { lvl, repeatEffect } from './research';
+import {
+  lvl,
+  repeatEffect,
+  SCALE_CARGO_BARGE,
+  SCALE_CARGO_DRONE,
+  SCALE_CARGO_HAULER,
+  SCALE_CARGO_HARVESTER,
+  SCALE_SPEED_BARGE,
+  SCALE_SPEED_DRONE,
+  SCALE_SPEED_HAULER,
+  SCALE_SPEED_HARVESTER,
+  SCALE_SPEED_REPAIR,
+  SCALE_SPEED_SCOUT,
+  SCALE_COMBAT_BARGESHELL,
+  SCALE_COMBAT_DAMAGE,
+  SCALE_COMBAT_FIGHTERACEFLAT,
+  SCALE_HULL_HAULERARMORFLAT,
+  SCALE_MINING_SWARMCAP,
+  SCALE_MINING_SWARMPERDRONE,
+  SCALE_MINING_YIELD,
+  SCALE_REPAIR_FIELD,
+} from './research';
 import { emit } from './state';
 import { PointGrid } from './spatial';
 import {
@@ -43,8 +64,8 @@ export const SHIELD_HP = 600;
 export const CARRIER = -2;
 
 interface HangarInfo {
-  /** Slot -> ship id, or -1 when free. */
-  occ: number[];
+  /** Slot -> ship id, or null when free (the shared `Board` shape). */
+  occ: Board;
   drones: number;
   allFighters: boolean;
 }
@@ -184,7 +205,7 @@ export function buildCtx(s: Sim): Ctx {
 export function hangarInfo(c: Ctx, h: Hangar): HangarInfo {
   let info = c.hangarInfo.get(h);
   if (info) return info;
-  const occ: number[] = Array.from({ length: h.slots }, () => -1);
+  const occ: Board = Array.from({ length: h.slots }, () => null);
   let drones = 0;
   let allFighters = true;
   for (const it of h.items) {
@@ -200,27 +221,16 @@ export function hangarInfo(c: Ctx, h: Hangar): HangarInfo {
   return info;
 }
 
-function adjacentClass(c: Ctx, occ: number[], shipId: number, cls: ShipClass): boolean {
-  const idx = occ.indexOf(shipId);
-  if (idx < 0) return false;
-  let end = idx;
-  while (end + 1 < occ.length && occ[end + 1] === shipId) end++;
-  if (idx > 0 && occ[idx - 1] >= 0 && c.ships.get(occ[idx - 1])?.cls === cls) return true;
-  return end + 1 < occ.length && occ[end + 1] >= 0 && c.ships.get(occ[end + 1])?.cls === cls;
-}
-
 /** Same as `dockRepairRate` in hangar.ts, using the tick's cached boards. */
 export function dockRepair(s: Sim, c: Ctx, ship: Ship): number {
   const h = c.hangarOf.get(ship.id);
   if (!h) return 0;
-  let rate = HANGAR_TYPES[h.type].repairRate;
-  if (ship.cls === 'fighter' || ship.cls === 'barge') {
-    if (adjacentClass(c, hangarInfo(c, h).occ, ship.id, 'repair')) rate *= 3;
-  }
-  if (ship.cls === 'drone' && lvl(s, 'bargeBay') > 0) {
-    if (adjacentClass(c, hangarInfo(c, h).occ, ship.id, 'barge')) rate *= 2;
-  }
-  return rate * (1 + 0.3 * lvl(s, 'repair'));
+  const syn = repairSynergy(s, hangarInfo(c, h).occ, ship, c.ships);
+  return (
+    HANGAR_TYPES[h.type].repairRate *
+    (syn?.factor ?? 1) *
+    (1 + SCALE_REPAIR_FIELD * lvl(s, 'repair'))
+  );
 }
 
 export function recalled(c: Ctx, ship: Ship): boolean {
@@ -278,39 +288,40 @@ export function modCount(ship: Ship, id: ModuleId): number {
 export function cargoCap(s: Sim, cls: ShipClass, ship?: Ship): number {
   const base =
     SHIP_STATS[cls].cargo * (ship ? COMPRESSOR_CARGO ** modCount(ship, 'compressor') : 1);
-  if (cls === 'barge') return base * (1 + 0.2 * lvl(s, 'bargeCap'));
-  if (cls === 'drone') return base * (1 + 0.2 * lvl(s, 'droneCargo'));
-  if (cls === 'hauler') return base * (1 + 0.25 * lvl(s, 'haulerHold'));
-  if (cls === 'harvester') return base * (1 + 0.25 * lvl(s, 'harvestCargo'));
+  if (cls === 'barge') return base * (1 + SCALE_CARGO_BARGE * lvl(s, 'bargeCap'));
+  if (cls === 'drone') return base * (1 + SCALE_CARGO_DRONE * lvl(s, 'droneCargo'));
+  if (cls === 'hauler') return base * (1 + SCALE_CARGO_HAULER * lvl(s, 'haulerHold'));
+  if (cls === 'harvester') return base * (1 + SCALE_CARGO_HARVESTER * lvl(s, 'harvestCargo'));
   return base;
 }
 
 export function speed(s: Sim, ship: Ship): number {
   let v = SHIP_STATS[ship.cls].speed;
-  if (ship.cls === 'hauler') v *= 1 + 0.12 * lvl(s, 'haulSpeed');
-  else if (ship.cls === 'drone') v *= 1 + 0.15 * lvl(s, 'droneSpeed');
-  else if (ship.cls === 'barge') v *= 1 + 0.25 * lvl(s, 'bargeThrust');
-  else if (ship.cls === 'scout') v *= 1 + 0.25 * lvl(s, 'scoutSpeed');
-  else if (ship.cls === 'repair') v *= 1 + 0.25 * lvl(s, 'repairSpeed');
-  else if (ship.cls === 'harvester') v *= 1 + 0.2 * lvl(s, 'harvestSpeed');
+  if (ship.cls === 'hauler') v *= 1 + SCALE_SPEED_HAULER * lvl(s, 'haulSpeed');
+  else if (ship.cls === 'drone') v *= 1 + SCALE_SPEED_DRONE * lvl(s, 'droneSpeed');
+  else if (ship.cls === 'barge') v *= 1 + SCALE_SPEED_BARGE * lvl(s, 'bargeThrust');
+  else if (ship.cls === 'scout') v *= 1 + SCALE_SPEED_SCOUT * lvl(s, 'scoutSpeed');
+  else if (ship.cls === 'repair') v *= 1 + SCALE_SPEED_REPAIR * lvl(s, 'repairSpeed');
+  else if (ship.cls === 'harvester') v *= 1 + SCALE_SPEED_HARVESTER * lvl(s, 'harvestSpeed');
   return v * TRACTOR_SPEED ** modCount(ship, 'tractor');
 }
 
 export function fighterDamage(s: Sim, c: Ctx, ship: Ship): number {
-  let d = SHIP_STATS.fighter.damage * (1 + 0.15 * lvl(s, 'damage'));
+  let d = SHIP_STATS.fighter.damage * (1 + SCALE_COMBAT_DAMAGE * lvl(s, 'damage'));
   if (lvl(s, 'fighterAce') > 0) {
     const h = c.hangarOf.get(ship.id);
-    if (h && hangarInfo(c, h).allFighters) d *= 1.25;
+    if (h && hangarInfo(c, h).allFighters) d *= SCALE_COMBAT_FIGHTERACEFLAT;
   }
   return d * LASER_DAMAGE ** modCount(ship, 'laser');
 }
 
 export function miningRate(s: Sim, c: Ctx, ship: Ship): number {
-  let r = MINING_RATE * (1 + 0.15 * lvl(s, 'yield')) * (1 + repeatEffect(s, 'deepYield'));
+  let r =
+    MINING_RATE * (1 + SCALE_MINING_YIELD * lvl(s, 'yield')) * (1 + repeatEffect(s, 'deepYield'));
   if (lvl(s, 'droneSwarm') > 0) {
     const h = c.hangarOf.get(ship.id);
     const n = h ? hangarInfo(c, h).drones : 0;
-    r *= 1 + Math.min(0.5, 0.1 * n);
+    r *= 1 + Math.min(SCALE_MINING_SWARMCAP, SCALE_MINING_SWARMPERDRONE * n);
   }
   return r * LASER_RATE ** modCount(ship, 'laser');
 }
@@ -345,8 +356,8 @@ export function nearestPirate(s: Sim, p: Vec3, within: number): Pirate | null {
 // ---------- damage ----------
 
 export function damageShip(s: Sim, ship: Ship, dmg: number) {
-  if (ship.cls === 'hauler' && lvl(s, 'haulerArmor') > 0) dmg *= 0.6;
-  if (ship.cls === 'barge') dmg *= 1 - 0.25 * lvl(s, 'bargeShell');
+  if (ship.cls === 'hauler' && lvl(s, 'haulerArmor') > 0) dmg *= SCALE_HULL_HAULERARMORFLAT;
+  if (ship.cls === 'barge') dmg *= 1 - SCALE_COMBAT_BARGESHELL * lvl(s, 'bargeShell');
   dmg *= SHIELD_TAKEN ** modCount(ship, 'shield');
   ship.hull -= dmg;
 }

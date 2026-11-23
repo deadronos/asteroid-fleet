@@ -3,6 +3,7 @@ import { Profiler, act } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { engine } from '../game/engine';
 import { apply, order } from '../sim/actions';
+import { createShip } from '../sim/economy';
 import { focused, newGame, unlockRule } from '../sim/state';
 import { SaveNotice } from './App';
 import { CarrierPanel } from './CarrierPanel';
@@ -111,6 +112,21 @@ describe('FleetPanel', () => {
     const buy = dispatch.mock.calls.map((c) => c[0]).find((c) => c.type === 'buyShip');
     expect(buy).toBeDefined();
     expect(mine).toContain((buy as { hangarId: number }).hangarId);
+  });
+
+  it('shows the bargeBay drone repair bonus on the board (#250)', async () => {
+    const s = game();
+    const op = focused(s);
+    op.researchLevels.bargeBay = 1;
+    const h = op.hangars[1];
+    createShip(op, 'barge', h.id, 0);
+    const drone = createShip(op, 'drone', h.id, 4)!;
+    const m = await mount(<FleetPanel />, s);
+    cleanup = m.cleanup;
+    const tile = [...m.el.querySelectorAll<HTMLElement>('.ship-tile')].find((el) =>
+      el.getAttribute('aria-label')?.includes(`#${drone.id}`),
+    )!;
+    expect(tile.title).toContain('2×');
   });
 
   it('hides Scrap for a drone carried in a barge (#181)', async () => {

@@ -1,6 +1,6 @@
 # Simulation (`src/sim/`)
 
-Source of truth: `tick.ts`, `ctx.ts`, `view.ts`, `state.ts`, `types.ts`, `config.ts`, `actions.ts`, `background.ts`, `worldgen.ts`.
+Source of truth: `tick.ts`, `ctx.ts`, `hangar.ts`, `view.ts`, `state.ts`, `types.ts`, `config.ts`, `research.ts`, `actions.ts` (barrel over `orders.ts`, `reset.ts`, `offline.ts`), `background.ts`, `worldgen.ts`.
 
 ## State model
 
@@ -17,7 +17,7 @@ There is one field per system for the whole run. While any carrier is on the map
 ## The tick
 
 - Fixed step: `TICK_HZ = 10`, `DT = 0.1` (`config.ts`).
-- `step(g, op)` moves the run clock, plays one operation through `stepOp`, then runs the supply routes (`stepRoutes`). It does not touch other carriers: the runner (`src/game/runner.ts`) steps those in `stepOthers`, through `stepOp` for carriers in the viewed system (Tier A) and `stepBackground` for the rest (Tier B, one aggregate step per second, `background.ts`). Live Tier B steps count earned credits toward `stats.oreValueDelivered` (RP and challenge progress) and burn stored H2 for Fusion when energy is below capacity (#230). Dropping a carrier to Tier B resolves a wave that is still active, with the same roll as a background wave (#177). Offline time is Tier C: `settleOffline` (`actions.ts`) runs the background model over the time away with `waves: false`, `countsForRp: false` and `fusion: false`, so no new wave rolls (#179), offline credits do not count toward RP and offline H2 tanks stay untouched (#230). A wave already on the map is resolved with events first (#177).
+- `step(g, op)` moves the run clock, plays one operation through `stepOp`, then runs the supply routes (`stepRoutes`). It does not touch other carriers: the runner (`src/game/runner.ts`) steps those in `stepOthers`, through `stepOp` for carriers in the viewed system (Tier A) and `stepBackground` for the rest (Tier B, one aggregate step per second, `background.ts`). Live Tier B steps count earned credits toward `stats.oreValueDelivered` (RP and challenge progress) and burn stored H2 for Fusion when energy is below capacity (#230). Dropping a carrier to Tier B resolves a wave that is still active, with the same roll as a background wave (#177). Offline time is Tier C: `settleOffline` (`offline.ts`) runs the background model over the time away with `waves: false`, `countsForRp: false` and `fusion: false`, so no new wave rolls (#179), offline credits do not count toward RP and offline H2 tanks stay untouched (#230). A wave already on the map is resolved with events first (#177).
 - `stepSim(s)` does the same for one bound operation and is the test and benchmark entry point.
 - `stepOp` runs in a fixed order: fx decay → power → threats → launch → each ship's behaviour → turrets → pirates → hazards → refine → field → containers → reserves → automation → drift → cleanup → challenge check → income averages → warp. Order matters for determinism and for golden tests, so don't reorder it casually.
 - Behaviour per ship class lives in `mining.ts` (drone, barge, hauler, harvester) and `combat.ts` (fighter, scout, repair, pirates). Environment is in `world.ts`, jumps in `warp.ts`, supply routes in `routes.ts`.
@@ -28,12 +28,13 @@ There is one field per system for the whole run. While any carrier is on the map
 
 ## Determinism
 
-- All randomness goes through `rand(s)` / `randRange(s, ...)` (`math.ts`, mulberry32). The RNG state is `Operation.rng`, so it lives in the save. Generation from a fixed seed uses `seeded(seed)`. Never call `Math.random()` in `sim/`.
+- All randomness goes through `rand(s)` / `randRange(s, ...)` (`math.ts`, mulberry32). The RNG state is `Operation.rng`, so it lives in the save. Generation from a fixed seed uses `seeded(seed)`. Never call `Math.random()` in `sim/`: an oxlint override on `src/sim/**/*.ts` rejects `Math.random` and imports from `game/`, `render/`, `ui/` or the React/three stack (#250). Tests may cross layer lines and are exempt from the import rule.
 - Background carriers and supply routes use only their own rng and the run clock, so a result never depends on what else was stepped (`background.ts`, `routes.ts` headers).
 - Floating-point results differ across platforms (libm), so tests compare two in-process runs rather than stored hashes (`cards.golden.test.ts`).
 
-## Player commands (`actions.ts`)
+## Player commands (`actions.ts` facade)
 
+- `actions.ts` is only a barrel: order interpretation lives in `orders.ts`, run resets in `reset.ts` and offline settlement in `offline.ts`. Importing from `actions.ts` keeps every caller stable (#250).
 - `Order` is a discriminated union of every player action. `Command = Order & { carrierId }`.
 - `apply(g, cmd)` and `order(s, order)` return `null` on success or a short human-readable refusal string, which the UI shows. They never throw for invalid input.
 - Resets that build a new run (`prestige`, `admiralty`, `startChallenge`) return a new `GameState`, and the runner adopts it.
@@ -42,7 +43,8 @@ There is one field per system for the whole run. While any carrier is on the map
 ## Tuning and data tables
 
 - `config.ts` holds every gameplay constant and data table (`SHIP_STATS`, `HULLS`, `MODULES`, `PRESETS`, `HANGAR_TYPES`...). Magic numbers belong there (#133), with a doc comment saying what they are, and the issue number when one exists.
-- Research nodes are in `research.ts`. Repeatable nodes use a soft cap, `cap × (1 − (1 − step)^level)` (`softcap`), with geometric cost. Admiralty upgrades (`admiralty.ts`) follow the same shape.
+- Research nodes are in `research.ts`. Repeatable nodes use a soft cap, `cap × (1 − (1 − step)^level)` (`softcap`), with geometric cost. Admiralty upgrades (`admiralty.ts`) follow the same shape. Every per-level multiplier lives in the `SCALE_*` exports in that file, so a node's number is defined once and the sim and panels read the same value (#250). Node descriptions are player-facing text and live in `ui/researchText.ts`, not in the worker bundle.
+- Hangar board occupancy, adjacency and dock-repair rules live in `hangar.ts` and accept an optional `byId` lookup so hot paths stay O(slots). `repairSynergy` names each rule and its multiplier; the tick context and `FleetPanel` both derive from it, so the panel cannot omit a bonus the sim applies (#250).
 - Run modifiers (`modifiers.ts`) are read through one small hook each, so every rule has one place that names it. Add a hook there rather than checking `s.modifiers` inline.
 - Stances resolve from most specific to least: active card > hangar > ship type > fleet doctrine (`doctrine.ts`, `cards.ts`). Cards are compiled once per tick into per-action lists that are already in priority order.
 - `SOLAR_RATE`, `RP_DIVISOR` and `HEAT_FACTOR_CAP` set the pre-Fusion income, prestige and wave-size curves (#242).

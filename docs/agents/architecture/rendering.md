@@ -24,6 +24,11 @@ Source of truth: `Scene.tsx`, `Environment.tsx`, `Effects.tsx`, `Fx.tsx`, `Audio
 - Read the engine directly in `useFrame` (`engine.view`, `lerpPos`, `lerpCarrier`). Don't route positions through React state.
 - R3F mutates three.js objects inside `useFrame` by design, which is why the `react/immutability` lint rule is off.
 
+## Resource lifetime
+
+- Geometries, materials, textures, render targets and baked models allocated in `useMemo` are owned by that component instance and get a `useEffect(() => () => resource.dispose(), [resource])` cleanup. R3F still disposes JSX-declared children; the explicit cleanup covers objects passed through `args` or `material={...}` (#250).
+- Module-level scratch objects (`dummy`, `ORE_COLORS`, shard buffers) outlive mounts and are never disposed. `Sky`'s baker target and `CarrierModel`'s baked hull use the same per-instance cleanup rule as everything else.
+
 ## LOD and models
 
 - Near entities draw glTF models, and far ones draw an instanced placeholder that scales up so it stays at least `FAR_SHIP_MIN_PX` long.

@@ -15,7 +15,14 @@ import {
 import { SHIELD_HP, card, damageShip, inHazard, type Ctx } from './ctx';
 import { oreNear } from './mining';
 import { dist, dist2, moveToward, rand } from './math';
-import { lvl, reserveDefsView } from './research';
+import {
+  lvl,
+  reserveDefsView,
+  SCALE_COMBAT_STORMSHIELDING,
+  SCALE_ENERGY_REACTOR,
+  SCALE_SPEED_DRIFT,
+  SCALE_WORLD_SCOUTSURVEY,
+} from './research';
 import {
   clusterCenters,
   createShip,
@@ -54,7 +61,11 @@ export function power(s: Sim, dt: number, ctx: Ctx) {
     const mult = s.powerMode === 'defense' ? 2 : s.powerMode === 'income' ? 0.5 : 1;
     const regen = Math.min(
       1 - c.shield,
-      SHIELD_REGEN * HULLS[c.hullClass].shield * (1 + 0.1 * lvl(s, 'reactor')) * mult * dt,
+      SHIELD_REGEN *
+        HULLS[c.hullClass].shield *
+        (1 + SCALE_ENERGY_REACTOR * lvl(s, 'reactor')) *
+        mult *
+        dt,
     );
     const cost = regen * SHIELD_HP * SHIELD_REGEN_ENERGY_PER_HP;
     if (c.energy >= cost) {
@@ -91,7 +102,7 @@ export function refine(s: Sim, dt: number, ctx: Ctx) {
 }
 
 export function hazards(s: Sim, dt: number) {
-  const shield = 1 - 0.3 * lvl(s, 'stormShielding');
+  const shield = 1 - SCALE_COMBAT_STORMSHIELDING * lvl(s, 'stormShielding');
   const h2 = h2Storm(s);
   const solarStorm = s.storm.active > 0 && !h2;
   const gas = h2 ? gasGiantPos(s.systems[s.systemId]) : null;
@@ -137,7 +148,7 @@ export function field(s: Sim, dt: number, ctx?: Ctx) {
         () => rand(s),
         c,
         sys,
-        Math.min(0.3, scouts * 0.06 * (1 + 0.5 * lvl(s, 'scoutSurvey'))),
+        Math.min(0.3, scouts * 0.06 * (1 + SCALE_WORLD_SCOUTSURVEY * lvl(s, 'scoutSurvey'))),
       );
       s.asteroids[i] = fresh;
       respawned = true;
@@ -195,6 +206,7 @@ export function drift(s: Sim, dt: number, ctx?: Ctx) {
   }
   if (c.stance === 'hold') c.target = null;
   if (c.target && c.energy > maxEnergy(s) * 0.1) {
-    if (!moveToward(c.pos, c.target, 1.2 * (1 + 0.2 * lvl(s, 'sublight')) * dt)) c.energy -= 1 * dt;
+    if (!moveToward(c.pos, c.target, 1.2 * (1 + SCALE_SPEED_DRIFT * lvl(s, 'sublight')) * dt))
+      c.energy -= 1 * dt;
   }
 }

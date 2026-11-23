@@ -22,7 +22,7 @@ Source of truth: the code itself, plus `.oxlintrc.json` and `.oxfmtrc.json`. Whe
 
 - oxfmt: 100 columns, single quotes. Run `pnpm run format` instead of hand-formatting.
 - oxlint runs with `--deny-warnings`. A rule turned off project-wide goes in `.oxlintrc.json` with a one-line comment saying why. A single deliberate exception can use `// oxlint-disable-next-line <rule>` (see `game/host.ts`).
-- `src/game/**` must not import `src/ui` (enforced by lint). The `sim/` purity rule ([architecture/overview.md](architecture/overview.md)) is not lint-enforced, so keep it by hand.
+- `src/game/**` must not import `src/ui` (enforced by lint). The `sim/` purity rule ([architecture/overview.md](architecture/overview.md)) is now lint-enforced too: an override on `src/sim/**/*.ts` in `.oxlintrc.json` rejects imports from `game/`, `render/`, `ui/` and the React/three stack, plus `Math.random()` (`no-restricted-properties`). Sim test files are exempt from the import rule because tests may cross layer lines (#250).
 
 ## Performance idioms (sim hot path and `useFrame`)
 
