@@ -18,7 +18,15 @@ import {
 } from './config';
 import { compileCards, firing, type CompiledCards } from './cards';
 import { effectiveStance } from './doctrine';
-import { carrierStorage, removeFromHangars, repairSynergy, type Board } from './hangar';
+import {
+  boardEffects,
+  boardBoosts,
+  carrierStorage,
+  removeFromHangars,
+  repairSynergy,
+  setBoardEffects,
+  type Board,
+} from './hangar';
 import { copy, dist, dist2, moveToward } from './math';
 import {
   lvl,
@@ -41,6 +49,7 @@ import {
   SCALE_MINING_SWARMPERDRONE,
   SCALE_MINING_YIELD,
   SCALE_REPAIR_FIELD,
+  SCALE_SHIELD_BUFFER,
 } from './research';
 import { emit } from './state';
 import { PointGrid } from './spatial';
@@ -62,6 +71,11 @@ import {
 
 export const SHIELD_HP = 600;
 export const CARRIER = -2;
+
+/** Carrier shield strength in HP, deepened by Emergency shields research (#245). */
+export function shieldHp(s: Sim): number {
+  return SHIELD_HP * (1 + SCALE_SHIELD_BUFFER * lvl(s, 'emergencyShield'));
+}
 
 interface HangarInfo {
   /** Slot -> ship id, or null when free (the shared `Board` shape). */
@@ -191,6 +205,16 @@ export function buildCtx(s: Sim): Ctx {
   for (const h of s.hangars)
     for (const it of h.items) if (!ctx.hangarOf.has(it.shipId)) ctx.hangarOf.set(it.shipId, h);
 
+  // Board synergies are fixed within a tick; cache each ship's multipliers once so the
+  // per-ship stat helpers stay O(1) in the hot loop (#244).
+  for (const h of s.hangars) {
+    const info = hangarInfo(ctx, h);
+    for (const it of h.items) {
+      const ship = ctx.ships.get(it.shipId);
+      if (ship) setBoardEffects(ship, boardBoosts(s, info.occ, ship, ctx.ships));
+    }
+  }
+
   compileCards(s, ctx.cards);
   // Recall is decided once, at the start of the tick.
   const recall = ctx.cards.recall;
@@ -287,7 +311,8 @@ export function modCount(ship: Ship, id: ModuleId): number {
 /** Cargo capacity of a class, including `ship`'s compressors when given. */
 export function cargoCap(s: Sim, cls: ShipClass, ship?: Ship): number {
   const base =
-    SHIP_STATS[cls].cargo * (ship ? COMPRESSOR_CARGO ** modCount(ship, 'compressor') : 1);
+    SHIP_STATS[cls].cargo *
+    (ship ? COMPRESSOR_CARGO ** modCount(ship, 'compressor') * boardEffects(ship).cargo : 1);
   if (cls === 'barge') return base * (1 + SCALE_CARGO_BARGE * lvl(s, 'bargeCap'));
   if (cls === 'drone') return base * (1 + SCALE_CARGO_DRONE * lvl(s, 'droneCargo'));
   if (cls === 'hauler') return base * (1 + SCALE_CARGO_HAULER * lvl(s, 'haulerHold'));
@@ -303,7 +328,7 @@ export function speed(s: Sim, ship: Ship): number {
   else if (ship.cls === 'scout') v *= 1 + SCALE_SPEED_SCOUT * lvl(s, 'scoutSpeed');
   else if (ship.cls === 'repair') v *= 1 + SCALE_SPEED_REPAIR * lvl(s, 'repairSpeed');
   else if (ship.cls === 'harvester') v *= 1 + SCALE_SPEED_HARVESTER * lvl(s, 'harvestSpeed');
-  return v * TRACTOR_SPEED ** modCount(ship, 'tractor');
+  return v * TRACTOR_SPEED ** modCount(ship, 'tractor') * boardEffects(ship).speed;
 }
 
 export function fighterDamage(s: Sim, c: Ctx, ship: Ship): number {
@@ -312,7 +337,7 @@ export function fighterDamage(s: Sim, c: Ctx, ship: Ship): number {
     const h = c.hangarOf.get(ship.id);
     if (h && hangarInfo(c, h).allFighters) d *= SCALE_COMBAT_FIGHTERACEFLAT;
   }
-  return d * LASER_DAMAGE ** modCount(ship, 'laser');
+  return d * LASER_DAMAGE ** modCount(ship, 'laser') * boardEffects(ship).damage;
 }
 
 export function miningRate(s: Sim, c: Ctx, ship: Ship): number {
@@ -323,7 +348,7 @@ export function miningRate(s: Sim, c: Ctx, ship: Ship): number {
     const n = h ? hangarInfo(c, h).drones : 0;
     r *= 1 + Math.min(SCALE_MINING_SWARMCAP, SCALE_MINING_SWARMPERDRONE * n);
   }
-  return r * LASER_RATE ** modCount(ship, 'laser');
+  return r * LASER_RATE ** modCount(ship, 'laser') * boardEffects(ship).mining;
 }
 
 export function inHazard(s: Sim, p: Vec3): boolean {
@@ -364,9 +389,10 @@ export function damageShip(s: Sim, ship: Ship, dmg: number) {
 
 export function damageCarrier(s: Sim, dmg: number) {
   const c = s.carrier;
+  const hp = shieldHp(s);
   if (c.shield > 0) {
-    const absorbed = Math.min(dmg, c.shield * SHIELD_HP);
-    c.shield -= absorbed / SHIELD_HP;
+    const absorbed = Math.min(dmg, c.shield * hp);
+    c.shield -= absorbed / hp;
     dmg -= absorbed;
   }
   c.hull -= dmg;

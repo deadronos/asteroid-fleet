@@ -11,8 +11,10 @@ import {
   PRESETS,
   STANCE_SWITCHES,
 } from './config';
+import { admiraltyEffect } from './admiralty';
 import { cargoCap, type Ctx } from './ctx';
 import { dist, dist2 } from './math';
+import { lvl, SCALE_CARD_SLOTS } from './research';
 import { maxEnergy, maxHull, stateOf } from './state';
 import {
   type ActionKind,
@@ -129,8 +131,13 @@ export function nextCardId(s: Sim): number {
   return id + 1;
 }
 
-export function cardSlots(_s: Sim): number {
-  return CARD_SLOTS;
+/** Card capacity: the base grid plus Doctrine slots research and the Admiralty charter (#245). */
+export function cardSlots(s: Sim): number {
+  return (
+    CARD_SLOTS +
+    SCALE_CARD_SLOTS * lvl(s, 'doctrineSlots') +
+    Math.round(admiraltyEffect(s, 'admDoctrine'))
+  );
 }
 
 export function presetCard(id: RuleId, cardId: number, enabled: boolean, param?: number): RuleCard {

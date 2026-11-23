@@ -11,7 +11,6 @@ import { formatEvent } from './events';
 import { type CarrierFilter, type SeverityFilter } from './inbox';
 import { LogPanel } from './LogPanel';
 import { SceneBoundary } from './ErrorBoundary';
-import { FleetPanel } from './FleetPanel';
 import { CarrierBar } from './CarrierBar';
 import { useHotkeys } from './hotkeys';
 import { HotkeyHelp } from './HotkeyHelp';
@@ -24,14 +23,18 @@ import { Modal } from './Modal';
 import { Tabs } from './Tabs';
 import { ICON_SHAPE, PALETTE } from './palette';
 
-// Not needed for the first frame: the scene (three.js + r3f), the research tree
-// and the settings menu load as separate chunks right after first paint.
+// Not needed for the first frame: the scene (three.js + r3f), the hangar board,
+// the research tree and the settings menu load as separate chunks after first paint.
 const Scene = lazy(() => import('../render/Scene').then((m) => ({ default: m.Scene })));
+// The hangar board grew with the loadout and synergy controls (#244); keep it out of the
+// first-frame chunk like the other side panels, warmed on idle so the tab still opens instantly.
+const loadFleet = () => import('./FleetPanel').then((m) => ({ default: m.FleetPanel }));
 const loadCarrier = () => import('./CarrierPanel').then((m) => ({ default: m.CarrierPanel }));
 const loadDoctrine = () => import('./DoctrinePanel').then((m) => ({ default: m.DoctrinePanel }));
 const loadResearch = () => import('./ResearchPanel').then((m) => ({ default: m.ResearchPanel }));
 const loadSettings = () => import('./Settings').then((m) => ({ default: m.SettingsMenu }));
 const loadGuide = () => import('./Guide').then((m) => ({ default: m.Guide }));
+const FleetPanel = lazy(loadFleet);
 const CarrierPanel = lazy(loadCarrier);
 const DoctrinePanel = lazy(loadDoctrine);
 const ResearchPanel = lazy(loadResearch);
@@ -46,6 +49,7 @@ const whenIdle = (fn: () => void) =>
     ? requestIdleCallback(fn, { timeout: 2000 })
     : setTimeout(fn, 2000);
 whenIdle(() => {
+  void loadFleet();
   void loadCarrier();
   void loadDoctrine();
   void loadResearch();
@@ -390,7 +394,11 @@ export function App() {
             role="tabpanel"
             aria-labelledby={`side-tab-${tab}`}
           >
-            {tab === 'fleet' && <FleetPanel />}
+            {tab === 'fleet' && (
+              <Suspense fallback={null}>
+                <FleetPanel />
+              </Suspense>
+            )}
             {tab === 'doctrine' && (
               <Suspense fallback={null}>
                 <DoctrinePanel />

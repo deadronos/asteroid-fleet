@@ -10,6 +10,9 @@ export const SYNERGY_LABEL: Record<RepairSynergyKind, string> = {
   repair: 'Repair drone adjacent: repairs 3× faster when docked',
   bargeBay: 'Barge bay neighbour: docked drones repair 2× faster',
   boosting: 'Boosting the repairs of its neighbours',
+  catapult: 'Lead slot: faster flight (Board mastery)',
+  sensorLink: 'Scout-linked: more mining yield or fighter damage (Board mastery)',
+  dispatchLink: 'Barge-dispatched hauler: faster and roomier (Board mastery)',
 };
 
 const MODE_LABEL: Record<string, string> = {

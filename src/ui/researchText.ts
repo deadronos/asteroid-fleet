@@ -60,4 +60,10 @@ export const RESEARCH_DESC: Record<string, string> = {
   deepYield: 'Repeatable; mining yield, diminishing toward +100 %',
   deepEnergy: 'Repeatable; energy capacity (and with it solar), diminishing toward +100 %',
   deepLaunch: 'Repeatable; hangar launch interval, diminishing toward −50 %',
+  doctrineSlots: '+2 rule card slots per level',
+  boardMastery:
+    'Unlocks positional board synergies and amplifies them: slot-0 catapult speed, scout-linked mining or damage, and barge-dispatched hauler speed and cargo',
+  emergencyShield: '+25 % carrier shield strength per level',
+  hullRegen: 'Carrier hull slowly regenerates, +2 % of max per second per level',
+  deepScan: '+25 % scout survey and vein-scan radius per level',
 };

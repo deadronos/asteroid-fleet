@@ -1,10 +1,11 @@
-import { DEFAULT_STANCE, ENERGY_MAX, HULLS } from './config';
+import { DEFAULT_STANCE, ENERGY_MAX, HULLS, ZONE_RULE_UNLOCKS, ZONE_UNLOCKS } from './config';
+import { admiraltyEffect } from './admiralty';
 import { startSystem } from './modifiers';
 import { v3 } from './math';
 import { softcap, SCALE_HULL_FRAME, SCALE_WORLD_STARTCREDITS } from './research';
-import { createShip, maxEnergy } from './economy';
+import { createShip, maxEnergy, unlockHulls } from './economy';
 import { emit } from './events';
-import { enterSystem, makeSystems } from './worldgen';
+import { enterSystem, makeSystems, unlockRule } from './worldgen';
 import { bind } from './view';
 import type {
   ChallengeId,
@@ -14,6 +15,7 @@ import type {
   Operation,
   RuleId,
   ShipClass,
+  Sim,
 } from './types';
 
 // The sim's public surface lives in focused modules; this file re-exports it so imports stay stable.
@@ -23,7 +25,7 @@ export * from './economy';
 export { SEVERITY, emit } from './events';
 
 /** Bump together with a `migrations[n]` step and a fixture. See docs/agents/save-and-migrations.md. */
-export const SAVE_VERSION = 19;
+export const SAVE_VERSION = 20;
 
 interface Carry {
   research: number;
@@ -44,6 +46,7 @@ interface Carry {
   alerts?: GameState['alerts'];
   cards?: GameState['cards'];
   automation?: GameState['automation'];
+  loadouts?: GameState['loadouts'];
 }
 
 /** A fresh operation: carrier, hangars and empty fields, not yet in any system. */
@@ -52,8 +55,11 @@ function buildOp(
   seed: number,
   hullClass: HullId,
   levels: Record<string, number>,
+  admiralty: Record<string, number> = {},
 ): Operation {
-  const slotsBonus = levels.slots ?? 0;
+  // Fleet Logistics makes every new hangar roomier as well as speeding routes (#245).
+  const slotsBonus =
+    (levels.slots ?? 0) + Math.floor(admiraltyEffect({ admiralty }, 'admLogistics') * 5);
   const hd = HULLS[hullClass];
   return {
     id,
@@ -113,13 +119,28 @@ function buildOp(
 }
 
 /**
+ * Forward Charter (#245): a maxed Charter charts the Frontier from launch. Discovery and
+ * tier-2 unlocks are derived here so no extra save field is needed for the permanent perk.
+ */
+function applyForwardCharter(s: Sim): void {
+  if (admiraltyEffect(s, 'admCharter') < 1) return;
+  for (const sys of s.systems) if (sys.tier <= 2) sys.discovered = true;
+  if (s.stats.furthestTier < 2) s.stats.furthestTier = 2;
+  for (let t = 1; t <= 2; t++) {
+    for (const cls of ZONE_UNLOCKS[t]) if (!s.unlocked.includes(cls)) s.unlocked.push(cls);
+    for (const rid of ZONE_RULE_UNLOCKS[t]) unlockRule(s, rid);
+  }
+  unlockHulls(s);
+}
+
+/**
  * Add a second (or later) carrier to the run (#78). It gets an id no ship or other
  * carrier uses, hangar ids no other carrier's hangars use (rules and stances name
  * hangars globally), its own rng seed, and starts in the home system.
  */
 export function addCarrier(g: GameState): Operation {
   const id = g.nextId++;
-  const op = buildOp(id, g.seed + id * 7919, 'standard', g.researchLevels);
+  const op = buildOp(id, g.seed + id * 7919, 'standard', g.researchLevels, g.admiralty);
   const top = Math.max(...g.ops.flatMap((o) => o.hangars.map((h) => h.id)));
   for (const h of op.hangars) h.id += top;
   g.ops.push(op);
@@ -135,7 +156,7 @@ export function newGame(seed = 1337, carry?: Carry): GameState {
   const hulls = carry?.hulls ?? ['standard'];
   const hullClass =
     carry?.hullClass && hulls.includes(carry.hullClass) ? carry.hullClass : 'standard';
-  const op = buildOp(0, seed, hullClass, carry?.researchLevels ?? {});
+  const op = buildOp(0, seed, hullClass, carry?.researchLevels ?? {}, carry?.admiralty ?? {});
   const g: GameState = {
     version: SAVE_VERSION,
     seed,
@@ -181,6 +202,7 @@ export function newGame(seed = 1337, carry?: Carry): GameState {
     challenge: carry?.challenge ?? null,
     challengesDone: [...(carry?.challengesDone ?? [])],
     admiralty: carry?.admiralty ?? {},
+    loadouts: structuredClone(carry?.loadouts ?? {}),
     powerMode: 'balanced',
     log: [],
     events: [],
@@ -196,6 +218,7 @@ export function newGame(seed = 1337, carry?: Carry): GameState {
   enterSystem(s, 0);
   const start = startSystem(s);
   if (start !== 0) enterSystem(s, start);
+  applyForwardCharter(s);
   for (let i = 0; i < 4; i++) createShip(s, 'drone', 1);
   emit(s, 'CarrierOnline', { system: s.systems[s.systemId].name });
   return g;

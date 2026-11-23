@@ -6,6 +6,7 @@ import {
   HULLS,
   MAX_CONDITIONS,
   MODULES,
+  MODULE_SLOTS,
   PRESETS,
   STANCE_SWITCHES,
   warpCost,
@@ -17,6 +18,7 @@ import {
   SHIP_CLASSES,
   type GameState,
   type HullId,
+  type ModuleId,
   type RuleCard,
   type RuleId,
   type Severity,
@@ -233,6 +235,11 @@ export const migrations: Record<number, Migration> = {
       }
     return save;
   },
+  // v20: per-class module loadout templates, run-wide and shared across carriers (#244).
+  19: (save) => {
+    save.loadouts = {};
+    return save;
+  },
 };
 
 const LEGACY_TONE: Record<string, Severity> = {
@@ -343,6 +350,25 @@ function validCard(card: unknown): boolean {
   return true;
 }
 
+/**
+ * Loadout templates map a ship class to a fixed-length slot list of ModuleIds or null
+ * (an explicit empty slot). Repair anything malformed to `{}` rather than rejecting the
+ * save: a template is a convenience, never progress that must be preserved at all costs (#244).
+ */
+export function validLoadouts(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  for (const [cls, list] of Object.entries(value)) {
+    if (!SHIP_CLASSES.includes(cls as ShipClass) || !Array.isArray(list)) return false;
+    if (list.length > MODULE_SLOTS[cls as ShipClass]) return false;
+    for (const m of list) {
+      if (m === null) continue;
+      if (typeof m !== 'string' || !Object.hasOwn(MODULES, m)) return false;
+      if (!MODULES[m as ModuleId].fits.includes(cls as ShipClass)) return false;
+    }
+  }
+  return true;
+}
+
 function validCarrier(c: unknown): boolean {
   if (!isRecord(c) || !isVec3(c.pos)) return false;
   if (c.target !== null && !isVec3(c.target)) return false;
@@ -436,6 +462,7 @@ function validateSave(save: SaveBlob, fromVersion: number): MigrateResult {
     return { ok: false, reason: 'corrupt' };
   if (!Array.isArray(save.routes)) save.routes = [];
   if (!Array.isArray(save.challengesDone)) save.challengesDone = [];
+  if (!validLoadouts(save.loadouts)) save.loadouts = {};
   if (
     save.challenge !== null &&
     (typeof save.challenge !== 'string' || !Object.hasOwn(CHALLENGES, save.challenge))

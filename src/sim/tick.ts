@@ -31,7 +31,7 @@ import {
 import { copy, moveAway, onSphere, rand } from './math';
 import { lvl, repeatEffect, SCALE_ENERGY_LAUNCHINTERVAL } from './research';
 import { CHALLENGES, challengeProgress } from './modifiers';
-import { bind, emit, isStowed, maxHull, stateOf } from './state';
+import { bind, carrierHullRegen, emit, isStowed, maxHull, stateOf } from './state';
 import { stepRoutes } from './routes';
 import { carrierDisabled, executeJump, warpStep } from './warp';
 import { drift, field, hazards, power, refine, reserves } from './world';
@@ -72,6 +72,9 @@ export function stepOp(s: Sim, dt = DT) {
   s.fx.length = live;
 
   power(s, dt, ctx);
+  const regen = carrierHullRegen(s);
+  if (regen > 0 && s.carrier.hull < s.carrier.maxHull)
+    s.carrier.hull = Math.min(s.carrier.maxHull, s.carrier.hull + regen * dt);
   threats(s, dt);
   launch(s, dt, ctx);
   for (const ship of s.ships) {

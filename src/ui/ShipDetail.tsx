@@ -2,10 +2,11 @@ import { engine, useGame } from '../game/engine';
 import { cargoCap } from '../sim/ctx';
 import { MODULE_IDS, MODULE_SLOTS, MODULES, SHIP_STATS, moduleLocked } from '../sim/config';
 import { effectiveStance, stanceSource } from '../sim/doctrine';
+import { activeSynergies, occupancy } from '../sim/hangar';
 import { maxHull } from '../sim/state';
 import type { ModuleId, ShipClass } from '../sim/types';
 import { deepEqual } from './equal';
-import { modeLabel } from './fleetBoard';
+import { modeLabel, shipIndex, SYNERGY_LABEL } from './fleetBoard';
 
 function ModuleSlots({
   id,
@@ -70,6 +71,12 @@ export function ShipDetail({ id }: { id: number }) {
     if (!ship) return null;
     const st = effectiveStance(s, ship);
     const fits = MODULE_IDS.filter((m) => MODULES[m].fits.includes(ship.cls));
+    const byId = shipIndex(s);
+    const hangar = s.hangars.find((x) => x.id === ship.hangarId);
+    const syn = hangar
+      ? [...new Set(activeSynergies(s, occupancy(s, hangar, byId), ship, byId).map((x) => x.kind))]
+      : [];
+    const template = s.loadouts[ship.cls];
     return {
       id: ship.id,
       cls: ship.cls,
@@ -88,6 +95,10 @@ export function ShipDetail({ id }: { id: number }) {
       srcUnderFire: stanceSource(s, ship, 'underFire'),
       srcMining: stanceSource(s, ship, 'mining'),
       modules: [...ship.modules],
+      synergy: syn.map((k) => SYNERGY_LABEL[k]).join(' · '),
+      loadout: template
+        ? template.map((m) => (m ? MODULES[m].short : '—')).join(' / ') || 'empty'
+        : null,
       furthestTier: s.stats.furthestTier,
       affordable: fits.map((m) => s.credits >= MODULES[m].cost),
     };
@@ -122,6 +133,29 @@ export function ShipDetail({ id }: { id: number }) {
         Stance: {d.engagement} <small>({d.srcEngagement})</small> ·{' '}
         {d.underFire === 'retreatHull' ? `retreat at ${d.retreatAt} %` : d.underFire}{' '}
         <small>({d.srcUnderFire})</small> · {d.mining} <small>({d.srcMining})</small>
+      </div>
+      {d.synergy && <div className="hint">Board synergy: {d.synergy}</div>}
+      <div className="row">
+        <span className="blurb grow">Class loadout: {d.loadout ?? 'none'}</span>
+        <button
+          onClick={() =>
+            engine.dispatch({
+              type: 'setLoadout',
+              cls: d.cls,
+              modules: Array.from({ length: MODULE_SLOTS[d.cls] }, (_, i) => d.modules[i] ?? null),
+            })
+          }
+          title="Save this ship's modules as the template for every ship of this class"
+        >
+          Save as class loadout
+        </button>
+        <button
+          disabled={!d.loadout}
+          onClick={() => engine.dispatch({ type: 'applyLoadout', cls: d.cls })}
+          title="Refit every docked ship of this class from the saved template"
+        >
+          Apply to docked
+        </button>
       </div>
       <ModuleSlots
         id={d.id}

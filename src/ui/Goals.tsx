@@ -27,7 +27,7 @@ export function Goals() {
   return (
     <aside className="goals" aria-label="First goals">
       <div className="row">
-        <b className="grow">First goals</b>
+        <b className="grow">Goals · {list[0]?.phaseLabel}</b>
         <button
           aria-label="Dismiss goals"
           onClick={() => {

@@ -1,4 +1,5 @@
 import { shipCost } from './costs';
+import { fitLoadout } from './loadouts';
 import { firstFit } from './hangar';
 import { lvl } from './research';
 import { shipBanned } from './modifiers';
@@ -38,8 +39,10 @@ function tryBuy(s: Sim, cls: ShipClass, hangarId: number): boolean {
   if (s.credits - cost < s.automation.creditFloor) return false;
   const h = s.hangars.find((x) => x.id === hangarId);
   if (!h || firstFit(s, h, cls) < 0) return false;
-  if (!createShip(s, cls, hangarId)) return false;
+  const ship = createShip(s, cls, hangarId);
+  if (!ship) return false;
   s.credits -= cost;
+  fitLoadout(s, ship, s.automation.creditFloor);
   return true;
 }
 
@@ -70,8 +73,10 @@ export function automation(s: Sim, dt: number) {
       }
       const cost = shipCost(s, next.cls);
       if (!s.unlocked.includes(next.cls) || s.credits - cost < a.creditFloor) break;
-      if (!createShip(s, next.cls, home)) break;
+      const ship = createShip(s, next.cls, home);
+      if (!ship) break;
       s.credits -= cost;
+      fitLoadout(s, ship, a.creditFloor);
       q.shift();
       emit(s, 'ShipRebuilt', { cls: next.cls, cost });
     }

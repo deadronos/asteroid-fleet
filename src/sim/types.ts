@@ -467,6 +467,8 @@ export interface GameState {
   challengesDone: ChallengeId[];
   /** Admiralty shop levels by upgrade id (#69). Survive both prestige layers. */
   admiralty: Record<string, number>;
+  /** Per-class module templates, shared across carriers and surviving both resets (#244). */
+  loadouts: Partial<Record<ShipClass, (ModuleId | null)[]>>;
   powerMode: 'balanced' | 'income' | 'defense';
   /** The last few events, newest first, for the Log tab. Saved. */
   log: SimEvent[];

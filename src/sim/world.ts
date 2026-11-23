@@ -12,7 +12,7 @@ import {
   SHIELD_REGEN,
   SHIELD_REGEN_ENERGY_PER_HP,
 } from './config';
-import { SHIELD_HP, card, damageShip, inHazard, type Ctx } from './ctx';
+import { card, damageShip, inHazard, shieldHp, type Ctx } from './ctx';
 import { oreNear } from './mining';
 import { dist, dist2, moveToward, rand } from './math';
 import {
@@ -67,7 +67,7 @@ export function power(s: Sim, dt: number, ctx: Ctx) {
         mult *
         dt,
     );
-    const cost = regen * SHIELD_HP * SHIELD_REGEN_ENERGY_PER_HP;
+    const cost = regen * shieldHp(s) * SHIELD_REGEN_ENERGY_PER_HP;
     if (c.energy >= cost) {
       c.energy -= cost;
       c.shield += regen;

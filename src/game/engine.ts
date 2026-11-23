@@ -34,6 +34,7 @@ const SAVE_ORDERS = new Set<Order['type']>([
   'upgradeRefinery',
   'addRoute',
   'removeRoute',
+  'setLoadout',
 ]);
 
 /**

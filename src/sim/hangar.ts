@@ -3,7 +3,13 @@
 // of scanning the whole fleet once per item (#250).
 
 import { BASE_STORAGE, HANGAR_TYPES, SHIP_STATS } from './config';
-import { lvl, SCALE_REPAIR_FIELD } from './research';
+import {
+  lvl,
+  SCALE_BOARD_CATAPULT,
+  SCALE_BOARD_DISPATCH,
+  SCALE_BOARD_SENSOR,
+  SCALE_REPAIR_FIELD,
+} from './research';
 import type { Sim, Hangar, Ship, ShipClass } from './types';
 
 /** Slot -> ship id on a hangar board; `null` marks a free slot. */
@@ -76,14 +82,36 @@ export function carrierStorage(s: Sim): number {
   return BASE_STORAGE + s.hangars.reduce((a, h) => a + HANGAR_TYPES[h.type].storage, 0);
 }
 
-/** Which dock-repair rule fired, for the panel to name without restating the condition. */
-export type RepairSynergyKind = 'repair' | 'bargeBay' | 'boosting';
+/**
+ * Every board rule the sim applies, named once so the panel can show exactly the same set (#250).
+ * The first three are dock-repair rules; the rest are positional boosts unlocked by Board mastery (#244).
+ */
+export type BoardSynergyKind =
+  | 'repair'
+  | 'bargeBay'
+  | 'boosting'
+  | 'catapult'
+  | 'sensorLink'
+  | 'dispatchLink';
+
+/** Kept as the public name used by the Fleet panel's label table. */
+export type RepairSynergyKind = BoardSynergyKind;
+
+/** Which stat a synergy scales. `boost` is the reciprocal hint on a repair drone. */
+export type BoardSynergyStat = 'repair' | 'speed' | 'cargo' | 'mining' | 'damage' | 'boost';
+
+/** One board rule: its identity, the stat it scales and its multiplier. */
+export interface BoardSynergy {
+  kind: BoardSynergyKind;
+  stat: BoardSynergyStat;
+  factor: number;
+}
 
 /** One repair-bonus rule: its multiplier and identity, shared by sim and UI (#250). */
 export interface RepairSynergy {
   /** Rate multiplier for the docked ship; 1 for the reciprocal hint on a repair drone. */
   factor: number;
-  kind: RepairSynergyKind;
+  kind: BoardSynergyKind;
 }
 
 /**
@@ -119,6 +147,94 @@ export function dockRepairRate(s: Sim, shipId: number, byId?: Map<number, Ship>)
     (syn?.factor ?? 1) *
     (1 + SCALE_REPAIR_FIELD * lvl(s, 'repair'))
   );
+}
+
+/**
+ * Positional board boosts in force for a ship (#244). All require Board mastery, so starter
+ * fleets and the golden runs are unchanged. A scout link favours mining drones and harvesters
+ * or fighters, a barge dispatch favours haulers, and the lead slot favours any ship in slot 0.
+ */
+export function boardBoosts(
+  s: Sim,
+  occ: readonly (number | null)[],
+  ship: Ship,
+  byId?: Map<number, Ship>,
+): BoardSynergy[] {
+  const mastery = lvl(s, 'boardMastery');
+  if (mastery <= 0) return [];
+  const out: BoardSynergy[] = [];
+  const adjacent = boardNeighbours(occ, ship.id).map(
+    (id) => (byId ? byId.get(id) : s.ships.find((x) => x.id === id))?.cls,
+  );
+  if (occ[0] === ship.id)
+    out.push({ kind: 'catapult', stat: 'speed', factor: 1 + SCALE_BOARD_CATAPULT * mastery });
+  if (adjacent.includes('scout')) {
+    if (ship.cls === 'drone' || ship.cls === 'harvester')
+      out.push({ kind: 'sensorLink', stat: 'mining', factor: 1 + SCALE_BOARD_SENSOR * mastery });
+    else if (ship.cls === 'fighter')
+      out.push({ kind: 'sensorLink', stat: 'damage', factor: 1 + SCALE_BOARD_SENSOR * mastery });
+  }
+  if (ship.cls === 'hauler' && adjacent.includes('barge')) {
+    const factor = 1 + SCALE_BOARD_DISPATCH * mastery;
+    out.push({ kind: 'dispatchLink', stat: 'speed', factor });
+    out.push({ kind: 'dispatchLink', stat: 'cargo', factor });
+  }
+  return out;
+}
+
+/** Every board synergy in force for a ship, repair rules first, for the panel (#244, #250). */
+export function activeSynergies(
+  s: Sim,
+  occ: readonly (number | null)[],
+  ship: Ship,
+  byId?: Map<number, Ship>,
+): BoardSynergy[] {
+  const out: BoardSynergy[] = [];
+  const repair = repairSynergy(s, occ, ship, byId);
+  if (repair)
+    out.push({
+      kind: repair.kind,
+      stat: repair.kind === 'boosting' ? 'boost' : 'repair',
+      factor: repair.factor,
+    });
+  out.push(...boardBoosts(s, occ, ship, byId));
+  return out;
+}
+
+/** Aggregated stat multipliers for one ship, computed once per tick by `buildCtx`. */
+export interface BoardEffects {
+  speed: number;
+  cargo: number;
+  mining: number;
+  damage: number;
+}
+
+const NEUTRAL: BoardEffects = { speed: 1, cargo: 1, mining: 1, damage: 1 };
+// Keyed by ship object, never saved. The tick context refills these in place each step.
+const effects = new WeakMap<Ship, BoardEffects>();
+
+/** This tick's board multipliers for `ship` (all 1 when the tick has not seen it). */
+export function boardEffects(ship: Ship): BoardEffects {
+  return effects.get(ship) ?? NEUTRAL;
+}
+
+/** Refill a ship's cached multipliers from the synergies that fired this tick. */
+export function setBoardEffects(ship: Ship, boosts: readonly BoardSynergy[]): void {
+  let e = effects.get(ship);
+  if (!e) {
+    e = { speed: 1, cargo: 1, mining: 1, damage: 1 };
+    effects.set(ship, e);
+  }
+  e.speed = 1;
+  e.cargo = 1;
+  e.mining = 1;
+  e.damage = 1;
+  for (const b of boosts) {
+    if (b.stat === 'speed') e.speed *= b.factor;
+    else if (b.stat === 'cargo') e.cargo *= b.factor;
+    else if (b.stat === 'mining') e.mining *= b.factor;
+    else if (b.stat === 'damage') e.damage *= b.factor;
+  }
 }
 
 /** Take a ship out of every hangar slot it occupies. */

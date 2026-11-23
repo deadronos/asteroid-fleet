@@ -23,6 +23,7 @@ import { cardSlots, checkCard, nextCardId } from './cards';
 import { shipBanned } from './modifiers';
 import { moveShip as moveOnBoard, removeFromHangars } from './hangar';
 import { carrierSlots } from './milestones';
+import { applyLoadout, fitLoadout, setLoadout } from './loadouts';
 import { buyAdmiralty } from './admiralty';
 import { buyResearch as buyNode, lvl, SCALE_ENERGY_WARPCHARGE } from './research';
 import { addCarrier, bind, createShip, emit, jumpCost, maxEnergy, stateOf } from './state';
@@ -85,7 +86,9 @@ export type Order =
   | { type: 'setHangarTarget'; hangarId: number; cls: ShipClass; count: number }
   | { type: 'upgradeRefinery' }
   | { type: 'refit'; hull: HullId }
-  | { type: 'fitModule'; shipId: number; slot: number; module: ModuleId | null };
+  | { type: 'fitModule'; shipId: number; slot: number; module: ModuleId | null }
+  | { type: 'setLoadout'; cls: ShipClass; modules: (ModuleId | null)[] }
+  | { type: 'applyLoadout'; cls: ShipClass };
 
 /** Every command names the carrier (operation) it is for. */
 export type Command = Order & { carrierId: number };
@@ -108,6 +111,8 @@ export function order(s: Sim, c: Order): string | null {
       const ship = createShip(s, c.cls, c.hangarId, c.start);
       if (!ship) return 'No free hangar slots';
       s.credits -= cost;
+      // A manual buy fits the class template too, if credits allow (#244).
+      fitLoadout(s, ship);
       return null;
     }
     case 'addRoute':
@@ -344,5 +349,10 @@ export function order(s: Sim, c: Order): string | null {
       else h.target[c.cls] = n;
       return null;
     }
+    case 'setLoadout':
+      return setLoadout(s, c.cls, c.modules);
+    case 'applyLoadout':
+      applyLoadout(s, c.cls);
+      return null;
   }
 }

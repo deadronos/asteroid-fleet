@@ -63,6 +63,17 @@ describe('UI snapshot', () => {
     );
   });
 
+  it('carries run-wide loadout templates in the global part (#244)', () => {
+    const g = stateOf(busyGame());
+    g.loadouts = { drone: ['laser'], barge: ['tractor', null] };
+    const { snap } = encodeSnapshot(g, false);
+    expect(snap.global.loadouts).toEqual(g.loadouts);
+    const { snap: cloned } = encodeSnapshot(g, false);
+    expect(applySnapshot(null, structuredClone(cloned, { transfer: [] })).loadouts).toEqual(
+      g.loadouts,
+    );
+  });
+
   it('lists every carrier with its hangar ids (#178)', () => {
     const g = stateOf(busyGame());
     const copy = structuredClone(g.ops[0]);
