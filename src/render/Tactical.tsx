@@ -53,20 +53,23 @@ void main() {
 }`;
 
 // Shapes in SHAPES order: circle, triangle, diamond, cross, square, down-triangle.
+// Each shape is a signed distance; smoothstep gives anti-aliased edges (#235).
 const ICON_FRAG = /* glsl */ `
 varying vec3 vColor;
 varying float vShape;
 void main() {
   vec2 p = (gl_PointCoord - 0.5) * 2.0;
   float r = length(p), a = abs(p.x), b = abs(p.y), s = vShape;
-  float t = s > 4.5 ? 0.9 - p.y : p.y + 0.9;
-  bool k = s < 0.5 ? r < 0.9
-    : s < 1.5 || s > 4.5 && s < 5.5 ? a < t * 0.5 && abs(p.y) < 0.9
-    : s < 2.5 ? a + b < 1.0
-    : s < 3.5 ? abs(a - b) < 0.28
-    : a < 0.75 && b < 0.75;
-  if (!k) discard;
-  gl_FragColor = vec4(vColor, 1.0);
+  float d;
+  if (s < 0.5) d = 0.9 - r;
+  else if (s < 1.5) d = min((p.y + 0.9) * 0.5 - a, 0.9 - b);
+  else if (s < 2.5) d = 1.0 - (a + b);
+  else if (s < 3.5) d = 0.28 - abs(a - b);
+  else if (s < 4.5) d = min(0.75 - a, 0.75 - b);
+  else d = min((0.9 - p.y) * 0.5 - a, 0.9 - b);
+  float alpha = smoothstep(-0.14, 0.14, d);
+  if (alpha <= 0.0) discard;
+  gl_FragColor = vec4(vColor, alpha);
   #include <colorspace_fragment>
 }`;
 
@@ -83,6 +86,7 @@ export function Tactical({ on }: { on: boolean }) {
     return g;
   }, []);
   const ring = useRef<THREE.Group>(null);
+  const warn = useRef<THREE.Mesh>(null);
   useFrame(() => {
     if (!on) return;
     const s = engine.view;
@@ -114,6 +118,14 @@ export function Tactical({ on }: { on: boolean }) {
     col.needsUpdate = true;
     shp.needsUpdate = true;
     ring.current?.position.set(carrierAt.x, carrierAt.y, carrierAt.z);
+    if (warn.current) {
+      warn.current.visible = s.wave.warning;
+      if (s.wave.warning) {
+        const pulse = 0.5 + 0.5 * Math.sin(s.wave.timer * 5);
+        (warn.current.material as THREE.MeshBasicMaterial).opacity = 0.22 + 0.5 * pulse;
+        warn.current.scale.setScalar(1 + 0.08 * pulse);
+      }
+    }
   });
   if (!on) return null;
   return (
@@ -123,6 +135,8 @@ export function Tactical({ on }: { on: boolean }) {
           vertexShader={ICON_VERT}
           fragmentShader={ICON_FRAG}
           uniforms={{ uPx: { value: dpr } }}
+          transparent
+          depthWrite={false}
         />
       </points>
       <group ref={ring}>
@@ -133,6 +147,16 @@ export function Tactical({ on }: { on: boolean }) {
         <mesh rotation={[-Math.PI / 2, 0, 0]}>
           <ringGeometry args={[44.6, 45, 96]} />
           <meshBasicMaterial color="#5ab4ff" transparent opacity={0.2} side={THREE.DoubleSide} />
+        </mesh>
+        <mesh ref={warn} rotation={[-Math.PI / 2, 0, 0]} visible={false} raycast={() => null}>
+          <ringGeometry args={[37, 38, 96]} />
+          <meshBasicMaterial
+            color={PALETTE.pirate}
+            transparent
+            opacity={0.3}
+            side={THREE.DoubleSide}
+            depthWrite={false}
+          />
         </mesh>
       </group>
       <gridHelper args={[400, 40, '#1d3a5c', '#10243a']} position={[0, -12, 0]} />

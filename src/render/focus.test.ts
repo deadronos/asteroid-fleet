@@ -11,6 +11,9 @@ import {
   stepTactical,
   takeTacticalExit,
   shortestArc,
+  shakeDecay,
+  tacticalEase,
+  warpFov,
 } from './focus';
 
 const ships = (...m: [number, string][]) => ({
@@ -101,5 +104,38 @@ describe('shortestArc', () => {
     expect(shortestArc(3, -3)).toBeCloseTo(2 * Math.PI - 6);
     expect(shortestArc(-3, 3)).toBeCloseTo(6 - 2 * Math.PI);
     expect(shortestArc(0.5, 1)).toBeCloseTo(0.5);
+  });
+});
+
+describe('tacticalEase', () => {
+  it('starts at 0, ends at 1 and eases in and out', () => {
+    expect(tacticalEase(-1)).toBe(0);
+    expect(tacticalEase(0)).toBe(0);
+    expect(tacticalEase(0.5)).toBeCloseTo(0.5);
+    expect(tacticalEase(0.25)).toBeLessThan(0.25);
+    expect(tacticalEase(0.75)).toBeGreaterThan(0.75);
+    expect(tacticalEase(1)).toBe(1);
+    expect(tacticalEase(2)).toBe(1);
+  });
+});
+
+describe('shakeDecay', () => {
+  it('decays monotonically and is frame-rate independent', () => {
+    expect(shakeDecay(1, 0)).toBe(1);
+    const one = shakeDecay(1, 0.1);
+    expect(one).toBeLessThan(1);
+    expect(one).toBeGreaterThan(0);
+    expect(shakeDecay(one, 0.1)).toBeCloseTo(shakeDecay(1, 0.2), 6);
+    expect(shakeDecay(1, -1)).toBe(1);
+  });
+});
+
+describe('warpFov', () => {
+  it('kicks only in the final two seconds of countdown and returns to base', () => {
+    expect(warpFov(10)).toBe(55);
+    expect(warpFov(2)).toBe(55);
+    expect(warpFov(1)).toBeCloseTo(57.5);
+    expect(warpFov(0.01)).toBeCloseTo(60, 1);
+    expect(warpFov(0)).toBe(55); // jump: charge complete
   });
 });

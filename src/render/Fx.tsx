@@ -2,12 +2,17 @@ import { useFrame } from '@react-three/fiber';
 import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { engine } from '../game/engine';
+import { clusterCenters } from '../sim/state';
+import { focus } from './focus';
 import { asteroidById, fleetFrame, MAX_ENTITIES } from './frameState';
 
 const MAX_SEG = 1024;
 const MAX_EXPLOSIONS = 128;
 const SPARKS_PER_FX = 8;
 const MAX_SPARKS = MAX_EXPLOSIONS * SPARKS_PER_FX;
+const MAX_MINING_SPARKS = 128;
+const MAX_PINGS = 12;
+const PING_LIFE = 1.2;
 
 const BEAM_SPECS: Record<string, { color: THREE.Color; radius: number; ttl: number }> = {
   mine: { color: new THREE.Color('#7fe7ff').multiplyScalar(2.2), radius: 0.09, ttl: 0 },
@@ -359,5 +364,242 @@ export function Explosions() {
         visible={false}
       />
     </>
+  );
+}
+
+const RETICLE_COLOR = new THREE.Color('#9b7bff').multiplyScalar(3.2);
+
+/** Additive bracket around the focused ship, read straight from the fleet frame (#235). */
+export function FocusReticle() {
+  const group = useRef<THREE.Group>(null);
+  const geo = useMemo(() => new THREE.RingGeometry(2.5, 2.75, 28), []);
+  const mat = useMemo(
+    () =>
+      new THREE.MeshBasicMaterial({
+        color: RETICLE_COLOR,
+        transparent: true,
+        opacity: 0.85,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        blending: THREE.AdditiveBlending,
+        toneMapped: false,
+      }),
+    [],
+  );
+  useEffect(
+    () => () => {
+      geo.dispose();
+      mat.dispose();
+    },
+    [geo, mat],
+  );
+  useFrame((st) => {
+    const g = group.current;
+    if (!g) return;
+    const id = focus.get();
+    const i = id === null ? -1 : fleetFrame.entityOf(id);
+    g.visible = i >= 0;
+    if (i < 0) return;
+    g.position.set(fleetFrame.pos[i * 3], fleetFrame.pos[i * 3 + 1], fleetFrame.pos[i * 3 + 2]);
+    const t = st.clock.elapsedTime;
+    g.rotation.y = t * 0.7;
+    g.scale.setScalar(1 + 0.05 * Math.sin(t * 5));
+  });
+  return (
+    <group ref={group} visible={false}>
+      <mesh geometry={geo} material={mat} rotation={[-Math.PI / 2, 0, 0]} raycast={() => null} />
+    </group>
+  );
+}
+
+/** Glints where mining beams meet an asteroid, from preallocated, capped instances (#235). */
+export function MiningSparks() {
+  const mesh = useRef<THREE.InstancedMesh>(null);
+  const geo = useMemo(() => sparkGeometry(), []);
+  const mat = useMemo(
+    () =>
+      new THREE.MeshBasicMaterial({
+        toneMapped: false,
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      }),
+    [],
+  );
+  useEffect(
+    () => () => {
+      geo.dispose();
+      mat.dispose();
+    },
+    [geo, mat],
+  );
+  useFrame((st) => {
+    const m = mesh.current;
+    if (!m) return;
+    const s = engine.view;
+    const f = fleetFrame;
+    const rocks = asteroidById(s.asteroids);
+    const t = st.clock.elapsedTime;
+    let n = 0;
+    for (let k = 0; k < s.ships.length && k < MAX_ENTITIES && n < MAX_MINING_SPARKS; k++) {
+      const sh = s.ships[k];
+      if (sh.mode !== 'mining') continue;
+      const r = rocks.get(sh.targetId);
+      const i = f.shipEntity[k];
+      if (!r || i < 0) continue;
+      let dx = f.pos[i * 3] - r.pos.x;
+      let dy = f.pos[i * 3 + 1] - r.pos.y;
+      let dz = f.pos[i * 3 + 2] - r.pos.z;
+      const len = Math.hypot(dx, dy, dz) || 1;
+      dx /= len;
+      dy /= len;
+      dz /= len;
+      const u = fxSeed(r.pos.x + k, r.pos.y, r.pos.z) / 0x100000000;
+      const rad = r.radius * 0.92;
+      _a.set(
+        r.pos.x + dx * rad + Math.sin(t * 13 + u * 20) * 0.3,
+        r.pos.y + dy * rad + Math.cos(t * 11 + u * 17) * 0.3,
+        r.pos.z + dz * rad,
+      );
+      _dir.set(dx, dy, dz);
+      _quat.setFromUnitVectors(UP, _dir);
+      const flick = 0.45 + 0.55 * Math.abs(Math.sin(t * 9 + u * 30));
+      _scale.set(0.26, 1.1 * flick, 0.26);
+      _mat.compose(_a, _quat, _scale);
+      m.setMatrixAt(n, _mat);
+      _col.copy(n % 2 === 0 ? WARP_CYAN : SPARK_HOT).multiplyScalar(0.9 * flick);
+      m.setColorAt(n, _col);
+      n++;
+    }
+    m.visible = n > 0;
+    if (n > 0) {
+      m.count = n;
+      m.instanceMatrix.needsUpdate = true;
+      if (m.instanceColor) m.instanceColor.needsUpdate = true;
+    }
+  });
+  return (
+    <instancedMesh
+      ref={mesh}
+      args={[geo, mat, MAX_MINING_SPARKS]}
+      frustumCulled={false}
+      raycast={() => null}
+      visible={false}
+    />
+  );
+}
+
+type PingPool = {
+  x: Float32Array;
+  y: Float32Array;
+  z: Float32Array;
+  start: Float64Array;
+  hazard: Uint8Array;
+  head: number;
+  seenC: number;
+  seenH: number;
+  op: number;
+  sys: number;
+};
+const pingPool = (): PingPool => ({
+  x: new Float32Array(MAX_PINGS),
+  y: new Float32Array(MAX_PINGS),
+  z: new Float32Array(MAX_PINGS),
+  start: new Float64Array(MAX_PINGS).fill(-Infinity),
+  hazard: new Uint8Array(MAX_PINGS),
+  head: 0,
+  seenC: 0,
+  seenH: 0,
+  op: -1,
+  sys: -1,
+});
+function addPing(p: PingPool, x: number, y: number, z: number, hazard: boolean, t: number): void {
+  const i = p.head;
+  p.head = (i + 1) % MAX_PINGS;
+  p.x[i] = x;
+  p.y[i] = y;
+  p.z[i] = z;
+  p.hazard[i] = hazard ? 1 : 0;
+  p.start[i] = t;
+}
+
+/** Expanding radar rings when a scout surveys a cluster or charts a hazard (#235). */
+export function SurveyPings() {
+  const mesh = useRef<THREE.InstancedMesh>(null);
+  const geo = useMemo(() => new THREE.RingGeometry(0.92, 1, 24), []);
+  const mat = useMemo(
+    () =>
+      new THREE.MeshBasicMaterial({
+        transparent: true,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        blending: THREE.AdditiveBlending,
+        toneMapped: false,
+      }),
+    [],
+  );
+  const p = useMemo(() => pingPool(), []);
+  useEffect(
+    () => () => {
+      geo.dispose();
+      mat.dispose();
+    },
+    [geo, mat],
+  );
+  useFrame((st) => {
+    const m = mesh.current;
+    if (!m) return;
+    const s = engine.view;
+    const t = st.clock.elapsedTime;
+    if (p.op !== s.id || p.sys !== s.systemId) {
+      p.op = s.id;
+      p.sys = s.systemId;
+      p.seenC = s.recon.clusters.length;
+      p.seenH = s.recon.hazards.length;
+    }
+    if (s.recon.clusters.length > p.seenC) {
+      const centers = clusterCenters(s.systems[s.systemId]);
+      for (let i = p.seenC; i < s.recon.clusters.length; i++) {
+        const c = centers[s.recon.clusters[i]];
+        if (c) addPing(p, c.x, c.y, c.z, false, t);
+      }
+    }
+    p.seenC = s.recon.clusters.length;
+    for (let i = p.seenH; i < s.recon.hazards.length; i++) {
+      const h = s.hazards[s.recon.hazards[i]];
+      if (h) addPing(p, h.pos.x, h.pos.y, h.pos.z, true, t);
+    }
+    p.seenH = s.recon.hazards.length;
+
+    _quat.setFromEuler(_euler.set(-Math.PI / 2, 0, 0));
+    let n = 0;
+    for (let i = 0; i < MAX_PINGS; i++) {
+      const age = t - p.start[i];
+      if (age < 0 || age > PING_LIFE) continue;
+      const k = age / PING_LIFE;
+      const radius = 0.6 + (1 - (1 - k) * (1 - k)) * 18;
+      _a.set(p.x[i], p.y[i], p.z[i]);
+      _scale.setScalar(radius);
+      _mat.compose(_a, _quat, _scale);
+      m.setMatrixAt(n, _mat);
+      _col.copy(p.hazard[i] ? RING_ORANGE : WARP_CYAN).multiplyScalar((1 - k) * (1 - k));
+      m.setColorAt(n, _col);
+      n++;
+    }
+    m.visible = n > 0;
+    if (n > 0) {
+      m.count = n;
+      m.instanceMatrix.needsUpdate = true;
+      if (m.instanceColor) m.instanceColor.needsUpdate = true;
+    }
+  });
+  return (
+    <instancedMesh
+      ref={mesh}
+      args={[geo, mat, MAX_PINGS]}
+      frustumCulled={false}
+      raycast={() => null}
+      visible={false}
+    />
   );
 }

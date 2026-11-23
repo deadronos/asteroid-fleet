@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import { engine, useGame } from '../game/engine';
 import { lvl } from '../sim/research';
 import { maxEnergy, refineThroughput } from '../sim/state';
@@ -41,6 +42,7 @@ export function Hud({
     const emax = maxEnergy(s);
     const heat = heatFactor(s);
     return {
+      carrierId: s.id,
       credits: fmt(s.credits),
       income: `${s.incomeAvg >= 0 ? '+' : ''}${s.incomeAvg.toFixed(1)}`,
       energy: Math.floor(c.energy),
@@ -65,6 +67,13 @@ export function Hud({
       speed: engine.speed,
     };
   }, shallowEqual);
+  const prevHull = useRef({ id: h.carrierId, pct: h.hullPct });
+  const [hullHit, setHullHit] = useState(0);
+  useEffect(() => {
+    if (prevHull.current.id === h.carrierId && h.hullPct < prevHull.current.pct)
+      setHullHit((n) => n + 1);
+    prevHull.current = { id: h.carrierId, pct: h.hullPct };
+  }, [h.carrierId, h.hullPct]);
   return (
     <>
       <div className="hud">
@@ -184,6 +193,7 @@ export function Hud({
         </div>
       </div>
       <Alerts />
+      {hullHit > 0 && <div key={hullHit} className="hull-vignette" aria-hidden="true" />}
     </>
   );
 }
