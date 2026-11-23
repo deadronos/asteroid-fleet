@@ -17,15 +17,7 @@ Also open from earlier: **#161** (Combat fidelity: firing arcs, hit chance, evas
 - #224, #225, #226, #227, #228: Batch 1 quick bug fixes (#251)
 - #229, #230, #249: Batch 2 shield constants, Tier B RP/Fusion, save durability & deep validation (#252) — completes umbrella #219
 - #238, #239, #240, #241: Batch 3 GPU, React UI, and sim hot-path performance (#253) — completes umbrella #221
-
-## Batch 4a — 3D visuals & FX (#220)
-
-Core 3D visual upgrades with zero extra per-frame allocations.
-
-- #231: replace 1px `LineSegments` beams with volumetric additive cylinders/quads
-- #232: upgrade explosions and warp flashes with particles, shockwaves, and distinct warp FX
-- #233: preserve unlit blooming `glow` slots on baked Foundry ship models
-- #234: Fresnel carrier shield with impact flash and upgraded hazard/storm visuals
+- #231, #232, #233, #234: Batch 4a volumetric beams, particle explosions, ship glow, Fresnel shields & hazards (#254)
 
 ## Batch 4b — Audio, UI feel & diegetic cues (#220)
 
