@@ -4,7 +4,7 @@ The v0.0.14 review is grouped under five umbrellas:
 
 - **#219** — Bugs and spec drift (#224–#230) — _done_
 - **#220** — Visuals, FX and game feel (#231–#237)
-- **#221** — Performance and render hygiene (#238–#241)
+- **#221** — Performance and render hygiene (#238–#241) — _done_
 - **#222** — Gameplay, balance and progression (#242–#245)
 - **#223** — UX, accessibility, saves and maintainability (#246–#250)
 
@@ -16,24 +16,19 @@ Also open from earlier: **#161** (Combat fidelity: firing arcs, hit chance, evas
 
 - #224, #225, #226, #227, #228: Batch 1 quick bug fixes (#251)
 - #229, #230, #249: Batch 2 shield constants, Tier B RP/Fusion, save durability & deep validation (#252) — completes umbrella #219
+- #238, #239, #240, #241: Batch 3 GPU, React UI, and sim hot-path performance (#253) — completes umbrella #221
 
-## Batch 3 — GPU & UI performance foundation (#221)
+## Batch 4a — 3D visuals & FX (#220)
 
-Clear GPU/React headroom before layering richer shaders and FX on top.
-
-- #238: bake static per-tier nebula skybox instead of running 5-octave 3D fBm every frame
-- #239: tune MSAA/DPR, skip paused asteroid matrix uploads, and throttle paused `frameloop`
-- #240: scope `useGame()` selectors across panels to eliminate 5 Hz full-panel re-renders
-- #241: clean up remaining sim hot-path allocations (`launch`, `reserveDefs`) and linear scans (`asteroidFarther`, `oreNear`, `repairDrone`)
-
-## Batch 4 — Visuals, FX & game feel: biggest player-facing lift (#220)
-
-Do #231–#234 for immediate 3D impact, then #236–#237 for sound and tactile feel.
+Core 3D visual upgrades with zero extra per-frame allocations.
 
 - #231: replace 1px `LineSegments` beams with volumetric additive cylinders/quads
-- #232: upgrade explosions and warp flashes with particles, shockwaves, and distinct warp FX (depends on #224)
+- #232: upgrade explosions and warp flashes with particles, shockwaves, and distinct warp FX
 - #233: preserve unlit blooming `glow` slots on baked Foundry ship models
 - #234: Fresnel carrier shield with impact flash and upgraded hazard/storm visuals
+
+## Batch 4b — Audio, UI feel & diegetic cues (#220)
+
 - #236: procedural Web Audio synthesizer for combat, warp, alerts and UI (with Settings volume/mute)
 - #237: UI micro-transitions, hull-hit/warp camera feedback, and eased tactical camera transitions
 - #235: diegetic 3D cues (focused-ship reticle, mining sparks, scout survey pings, antialiased tactical icons, wave direction)
@@ -53,7 +48,7 @@ Fix the pre-Fusion plateau and onboarding friction so the improved visuals back 
 Larger feature/refactor bets once the core loop feels crisp.
 
 - #244: deepen hangar board synergies and add per-class/per-hangar module loadout templates
-- #245 _(design decision)_: rework Research/Admiralty unlocks, add RP/hr & run stats, and extend mid/late goals
+- #245 _(Option A decided)_: rework Research/Admiralty unlocks, add RP/hr & run stats, and extend mid/late goals
 - #250: code health pass (deduplicate hangar board helpers, lint-enforce `sim/` purity, dispose GPU resources, co-locate research scalars, split monoliths)
 - #161: combat fidelity (carrier heading, firing arcs, tracking/evasion, pirate types)
 
