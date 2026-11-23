@@ -10,7 +10,7 @@ const snapshot = () => {
 };
 
 /** Shortcut list generated from whatever is registered right now. */
-export function HotkeyHelp({ onClose }: { onClose: () => void }) {
+export function HotkeyHelp({ onClose, onHelp }: { onClose: () => void; onHelp: () => void }) {
   // `?` toggles this overlay; every other background key is blocked while it is open.
   useHotkeys([{ keys: ['?'], priority: MODAL_PRIORITY, run: () => onClose() }]);
   const list = useSyncExternalStore(subscribeHotkeys, snapshot);
@@ -34,7 +34,10 @@ export function HotkeyHelp({ onClose }: { onClose: () => void }) {
           </dl>
         </section>
       ))}
-      <button onClick={onClose}>Close</button>
+      <div className="row">
+        <button onClick={onClose}>Close</button>
+        <button onClick={onHelp}>How to play</button>
+      </div>
     </Modal>
   );
 }

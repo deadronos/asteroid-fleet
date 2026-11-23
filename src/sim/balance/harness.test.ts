@@ -33,7 +33,7 @@ describe('balance harness', () => {
 
   it('prints a report with the table and milestones', () => {
     const text = formatReport(runBalance(short()));
-    expect(text).toContain('RP@10k');
+    expect(text).toContain(`RP@${compact(RP_DIVISOR)}`);
     expect(text).toContain('RP@1M');
     expect(text).toContain('First prestige');
     expect(text).toContain('Prestige at end');

@@ -10,9 +10,8 @@ it.skipIf(!process.env.BALANCE)('module balance', () => {
   const builds: (ModuleId | 'none')[] = ['none', 'laser', 'drill', 'tractor', 'compressor'];
   for (const mod of builds) {
     const s = game(42);
-    // Greedy drones: with 'safe' the opening stalls once the carrier parks
-    // away from covered rocks, which would swamp the module differences.
-    s.doctrine.byClass.drone = { mining: 'greedy' };
+    // Default 'safe' drones now mine reliably in covered systems (#243), so modules are compared
+    // under the stance a new player actually uses.
     for (let t = 0; t < 3600 * 10; t++) {
       stepSim(s);
       if (process.env.TRACE && t % 3000 === 0)

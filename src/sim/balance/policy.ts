@@ -132,10 +132,7 @@ export function steadyPolicy(p: Partial<SteadyParams> = {}): Policy {
     name: 'steady',
     describe:
       'drones, a barge+hauler per 8 drones, 1 scout, fighters 1:4 once unlocked; warps out when big and calm, back when mauled',
-    setup(s) {
-      // 'safe' drones stall once the carrier parks away from covered rocks (see balance.test.ts).
-      order(s, { type: 'setStance', scope: 'drone', patch: { mining: 'greedy' } });
-    },
+    // No stance override: the default 'safe' drones now mine reliably in covered systems (#243).
     act(s) {
       if (autoRebuildUnlocked(s) && !s.automation.autoRebuild)
         order(s, { type: 'setAutomation', patch: { autoRebuild: true } });

@@ -1,8 +1,9 @@
 import { expect, it } from 'vitest';
 import { stepSim } from './tick';
-import { COVER_BACKOFF, TICK_HZ } from './config';
+import { COVER_BACKOFF, COVER_RADIUS, TICK_HZ } from './config';
 import { game } from './testing';
 import { enterSystem } from './state';
+import { dist } from './math';
 
 // #156: a held carrier parked away from all ore must not leave safe drones docked forever.
 it('safe drones still mine when no ore is inside cover and no pirates are around', () => {
@@ -13,12 +14,21 @@ it('safe drones still mine when no ore is inside cover and no pirates are around
   expect(s.asteroids.length).toBeGreaterThan(0);
   for (let i = 0; i < 600; i++) stepSim(s);
   expect(s.pirates.length).toBe(0);
-  expect(s.ships.some((x) => x.mode === 'mining')).toBe(true);
+  // Drones cycle through toAsteroid/mining/toCarrier, so check the whole window, not one tick.
+  let mined = false;
+  for (let i = 0; i < 600; i++) {
+    stepSim(s);
+    mined ||= s.ships.some((x) => x.mode === 'mining');
+  }
+  expect(mined).toBe(true);
 });
 
-// #156 follow-up: with a pirate about, cover stays strict, so the fleet must not thrash the hangar.
+// #156 follow-up: with a pirate about, cover stays strict outside the raid-free Starter zone,
+// so the fleet must not thrash the hangar (#243).
 function raidedAwayFromOre() {
   const s = game(1);
+  enterSystem(s, 4);
+  s.wave.timer = Infinity;
   s.carrier.stance = 'hold';
   s.carrier.pos = { x: 0, y: 0, z: 0 };
   s.asteroids = s.asteroids.filter((a) => Math.hypot(a.pos.x, a.pos.z) > 60);
@@ -72,6 +82,48 @@ it('does not flag "no ore in cover" or back drones off when the field has no ore
   for (let i = 0; i < 400; i++) stepSim(s);
   expect(s.noCoverAt).toBeUndefined();
   expect(s.ships.every((x) => x.idleUntil === undefined)).toBe(true);
+});
+
+// #243: Starter systems have no raids, so cover protects nothing even if a pirate is about.
+it('Tier 1 safe drones mine uncovered ore while a pirate is present', () => {
+  const s = game(1);
+  s.carrier.stance = 'hold';
+  s.carrier.pos = { x: 0, y: 0, z: 0 };
+  s.asteroids = s.asteroids.filter((a) => Math.hypot(a.pos.x, a.pos.z) > 60);
+  s.pirates.push({
+    id: s.nextId++,
+    pos: { x: 400, y: 0, z: 400 },
+    hull: 1e9,
+    maxHull: 1e9,
+    damage: 0,
+    speed: 0,
+    targetId: -1,
+    fireCooldown: 0,
+  });
+  let mined = false;
+  for (let i = 0; i < 600; i++) {
+    stepSim(s);
+    mined ||= s.ships.some((x) => x.mode === 'mining');
+  }
+  expect(s.pirates.length).toBeGreaterThan(0);
+  expect(mined).toBe(true);
+  expect(s.noCoverAt).toBeUndefined();
+});
+
+// #243: following rich clusters must park inside cover, or the default safe stance idles.
+it('followRich keeps a Frontier cluster inside carrier cover', () => {
+  const s = game(7);
+  enterSystem(s, 4);
+  s.wave.timer = Infinity; // test the positioning, not a raid
+  let mined = false;
+  for (let i = 0; i < 1200; i++) {
+    stepSim(s);
+    mined ||= s.ships.some((x) => x.cls === 'drone' && x.mode === 'mining');
+  }
+  const covered = s.asteroids.filter((a) => dist(a.pos, s.carrier.pos) < COVER_RADIUS);
+  expect(covered.length).toBeGreaterThan(10);
+  expect(s.noCoverAt).toBeUndefined();
+  expect(mined).toBe(true);
 });
 
 it('entering a new system clears the back-off and the hint', () => {

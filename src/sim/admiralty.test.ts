@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { admiralty, apply, marksPayout, prestige, researchPayout } from './actions';
 import { admiraltyCost, admiraltyEffect, buyAdmiralty } from './admiralty';
+import { RP_DIVISOR } from './config';
 import { newGame, spawnAsteroid } from './state';
 import { game } from './testing';
 import { migrate } from '../game/migrate';
@@ -86,7 +87,7 @@ describe('Admiralty (#68)', () => {
 
   it('raises RP by 15 % per Mark ever earned', () => {
     const g = newGame(3);
-    g.stats.oreValueDelivered = 1_000_000; // ⌊√100⌋ = 10
+    g.stats.oreValueDelivered = RP_DIVISOR * 100; // ⌊√100⌋ = 10
     g.stats.furthestTier = 2;
     expect(researchPayout(g)).toBe(20);
     g.lifetime.marksEarned = 4;

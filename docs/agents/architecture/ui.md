@@ -14,6 +14,9 @@ Source of truth: `App.tsx`, `../game/engine.ts` (`useGame`), `hotkeys.ts`, `Moda
 - One component per panel file (`FleetPanel`, `CarrierPanel`, `DoctrinePanel`, `RuleCards`, `ResearchPanel`, `StarMap`, `Shipyard`, `Goals`, `LogPanel`...). Pure helpers sit beside them as `.ts` files (`format.ts`, `inbox.ts`, `cardText.ts`, `mapLayout.ts`, `carriers.ts`) and are unit-tested on their own.
 - Text for sim data lives in the UI: event text in `events.ts`, card labels in `cardText.ts`, numbers via `fmt` / `formatSimTime` in `format.ts`.
 - Disabled buttons explain why. Refusal reasons come from shared sim helpers such as `warpBlocked` (`sim/warpReason.ts`) or the cost checks in `sim/costs.ts`, so the UI and the command interpreter agree.
+- `RuleCards` derives live firing status and ship counts from the mirror with one structural-equality selector at the 5 Hz tick, using the sim's own condition helpers rather than a second source of truth (#246).
+- `ResearchPanel` hides Admiralty, challenges, the shop and carrier buying until the player has prestiged or imported equivalent progress, and only renders branches for unlocked ship classes (#247). The full glossary is a lazy `Guide` reached from Settings and the shortcut help; first-run shows a short `Launch` card (#247).
+- `FleetPanel` dispatches `moveShip` from tap/click on a ship followed by a highlighted empty slot, or the same pair with Enter/Space; Escape clears the selection. Desktop drag and drop still works (#248).
 
 ## Hotkeys and modals
 

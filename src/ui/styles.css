@@ -335,7 +335,8 @@ input[type='range'] {
   border-radius: 5px;
   background: var(--surface-faint);
 }
-.slot.drop {
+.slot.drop,
+.slot.valid {
   border-color: var(--accent);
   background: var(--surface-accent-soft);
 }
@@ -528,6 +529,11 @@ select.inherit {
 .rule .when b {
   color: var(--accent);
   font-weight: 600;
+}
+.rule .card-live {
+  color: var(--accent);
+  opacity: 0.8;
+  white-space: nowrap;
 }
 .rule .param {
   grid-column: 2;

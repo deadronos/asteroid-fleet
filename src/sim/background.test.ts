@@ -10,7 +10,7 @@ import {
   stepBackground,
 } from './background';
 import { order, settleOffline } from './actions';
-import { FUSION_H2, FUSION_RATE, OFFLINE_EFFICIENCY } from './config';
+import { FUSION_H2, FUSION_RATE, OFFLINE_EFFICIENCY, RP_DIVISOR } from './config';
 import { researchPayout } from './costs';
 import { mulberry } from './math';
 import { challengeProgress } from './modifiers';
@@ -396,12 +396,13 @@ describe('Tier B RP, challenge progress and Fusion (#230)', () => {
   it('counts live Tier B credits toward oreValueDelivered, RP and challenge progress', () => {
     const s = game(10);
     s.miningIncomeAvg = 2500;
+    s.stats.oreValueDelivered = RP_DIVISOR - 1000; // the background payout crosses the RP threshold
     s.challenge = 'pacifist';
     const rpBefore = researchPayout(s);
     const progBefore = challengeProgress(s)!;
     const rep = runBackground(s, 10);
     expect(rep.credits).toBeCloseTo(25_000);
-    expect(s.stats.oreValueDelivered).toBeCloseTo(25_000);
+    expect(s.stats.oreValueDelivered).toBeCloseTo(RP_DIVISOR - 1000 + 25_000);
     expect(researchPayout(s)).toBeGreaterThan(rpBefore);
     expect(challengeProgress(s)!).toBeGreaterThan(progBefore);
   });

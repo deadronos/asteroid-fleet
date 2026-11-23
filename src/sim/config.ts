@@ -400,7 +400,8 @@ export const ZONE_RULE_UNLOCKS: Record<number, RuleId[]> = {
 // ---------- Power ----------
 
 export const ENERGY_MAX = 1000;
-export const SOLAR_RATE = 6; // energy/s at brightness 1
+/** Energy/s at brightness 1. Pre-Fusion this is the whole refinery budget, so it sets income (#242). */
+export const SOLAR_RATE = 12;
 /**
  * Solar grows with the pool: × (capacity ÷ ENERGY_MAX)^exp, counting the hull and capacity
  * upgrades but not challenge modifiers. Refining runs on solar once the pool settles, so without
@@ -582,8 +583,10 @@ export const PIRATE_BASE = { hull: 45, damage: 5, speed: 9 };
 export const WAVE_SIZE_BASE = 1;
 export const WAVE_SIZE_PER_DISTANCE = 0.7;
 export const WAVE_SIZE_PER_TIER = 2;
-/** Cargo value per system tier that adds +1 (capped at +2) to the pirate heat factor. */
+/** Cargo value per system tier that adds +1 to the pirate heat factor. */
 export const HEAT_CARGO_PER_TIER = 2500;
+/** Cargo heat adds at most this much to the wave-size factor; the old +2 mauled Tier 3 (#242). */
+export const HEAT_FACTOR_CAP = 1.5;
 /** Pirate hull scales by 1 + distance * this; damage by 1 + distance * PIRATE_DAMAGE_PER_DISTANCE. */
 export const PIRATE_HULL_PER_DISTANCE = 0.25;
 export const PIRATE_DAMAGE_PER_DISTANCE = 0.15;
@@ -631,10 +634,11 @@ export const GAS_PIRATE_HARVESTER_BIAS = 3;
 
 /**
  * RP = floor(sqrt(ore value delivered / D)) * furthest tier * (1 + RP_PER_MARK * Marks earned).
- * The concept doc's placeholder uses D = 1,000,000; this build uses 10,000 so a
- * first run pays out in about an hour. Tune here.
+ * The concept doc's placeholder is D = 1,000,000. A faster pre-Fusion economy needed a larger
+ * divisor than the old 10,000, which paid the first RP five minutes into a run (#242). At 500,000
+ * the first RP arrives around twenty minutes in and a four-hour run pays about a dozen RP.
  */
-export const RP_DIVISOR = 10_000;
+export const RP_DIVISOR = 500_000;
 /** RP bonus per Admiralty Mark ever earned, so each Admiralty reset climbs back faster (#214). */
 export const RP_PER_MARK = 0.15;
 /** Admiralty Marks = floor(sqrt(lifetime RP / D)), less Marks already paid (#68). */

@@ -2,7 +2,7 @@
 import { Profiler, act } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { engine } from '../game/engine';
-import { apply } from '../sim/actions';
+import { apply, order } from '../sim/actions';
 import { focused, newGame, unlockRule } from '../sim/state';
 import { SaveNotice } from './App';
 import { CarrierPanel } from './CarrierPanel';
@@ -175,6 +175,108 @@ describe('FleetPanel', () => {
 
     expect(m.el.textContent).toContain(`${usedBefore + 1}/${slotsBefore + 1}`);
     expect(board().querySelectorAll('.ship-tile').length).toBe(usedBefore + 1);
+  });
+});
+
+async function setupFleetBoard() {
+  const s = game(3);
+  const dispatch = vi.spyOn(engine, 'dispatch').mockImplementation(() => {});
+  const m = await mount(<FleetPanel />, s);
+  cleanup = m.cleanup;
+  const board = [...m.el.querySelectorAll<HTMLElement>('[aria-label*=" board"]')].find((b) =>
+    b.querySelector('.ship-tile'),
+  )!;
+  const tile = board.querySelector<HTMLElement>('.ship-tile')!;
+  const hangarId = Number(board.getAttribute('aria-label')!.match(/Hangar (\d+)/)![1]);
+  const shipId = Number(tile.getAttribute('aria-label')!.match(/#(\d+)/)![1]);
+  return { board, tile, hangarId, shipId, dispatch };
+}
+
+const pressKey = (el: HTMLElement, k: string) =>
+  act(async () => el.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true })));
+
+describe('touch and keyboard ship movement (#248)', () => {
+  it('selects a ship by tap and moves it to a highlighted empty slot', async () => {
+    const { board, tile, hangarId, shipId, dispatch } = await setupFleetBoard();
+    await click(tile);
+    expect(tile.getAttribute('aria-pressed')).toBe('true');
+    const slot = board.querySelector<HTMLElement>('.slot.valid')!;
+    expect(slot).not.toBeNull();
+    const start = Number(slot.getAttribute('aria-label')!.match(/slot (\d+)/)![1]) - 1;
+    await click(slot);
+    expect(dispatch).toHaveBeenCalledWith({ type: 'moveShip', shipId, hangarId, start });
+  });
+
+  it('supports Enter/Space to move and Escape to cancel', async () => {
+    const { board, tile, hangarId, shipId, dispatch } = await setupFleetBoard();
+    await pressKey(tile, 'Enter');
+    expect(board.querySelectorAll('.slot.valid').length).toBeGreaterThan(0);
+    const slot = board.querySelector<HTMLElement>('.slot.valid')!;
+    const start = Number(slot.getAttribute('aria-label')!.match(/slot (\d+)/)![1]) - 1;
+    await pressKey(slot, ' ');
+    expect(dispatch).toHaveBeenCalledWith({ type: 'moveShip', shipId, hangarId, start });
+
+    dispatch.mockClear();
+    await click(tile);
+    await pressKey(tile, 'Escape');
+    expect(board.querySelectorAll('.slot.valid').length).toBe(0);
+    expect(dispatch.mock.calls.some(([c]) => c.type === 'moveShip')).toBe(false);
+  });
+});
+
+describe('live rule card status (#246)', () => {
+  it('shows a ship count on a firing ship-scoped card', async () => {
+    const s = game(3);
+    focused(s).credits = 10_000;
+    expect(order(focused(s), { type: 'buyShip', cls: 'hauler', hangarId: 1 })).toBeNull();
+    const m = await mount(<RuleCards />, s);
+    cleanup = m.cleanup;
+    const live = [...m.el.querySelectorAll('.card-live')].map((e) => e.textContent ?? '');
+    expect(live.some((text) => /1 ship\b/.test(text))).toBe(true);
+  });
+
+  it('shows a plain active badge on a firing carrier-scoped card', async () => {
+    const s = game(3);
+    const v = focused(s);
+    unlockRule(v, 'reserveWarpEnergy');
+    v.cards.find((c) => c.preset === 'reserveWarpEnergy')!.enabled = true;
+    const m = await mount(<RuleCards />, s);
+    cleanup = m.cleanup;
+    const live = [...m.el.querySelectorAll('.card-live')].map((e) => e.textContent ?? '');
+    expect(live.some((text) => text.includes('active') && !text.includes('ship'))).toBe(true);
+  });
+});
+
+describe('progressive research disclosure (#247)', () => {
+  it('hides late layers and locked class branches on a fresh run', async () => {
+    const m = await mount(<ResearchPanel />, game(3));
+    cleanup = m.cleanup;
+    expect(m.el.textContent).toContain('Research points available');
+    for (const label of ['Admiralty Marks', 'Challenge runs', 'Admiralty shop', 'Buy carrier'])
+      expect(m.el.textContent).not.toContain(label);
+    const branches = [...m.el.querySelectorAll('.branch h3')].map((h) => h.textContent ?? '');
+    expect(branches.some((b) => b.startsWith('Fighter'))).toBe(false);
+    expect(branches.some((b) => b.startsWith('Repair drone'))).toBe(false);
+  });
+
+  it('reveals late layers after a prestige and class branches once unlocked', async () => {
+    const s = game(3);
+    s.lifetime.prestiges = 1;
+    focused(s).unlocked.push('fighter');
+    const m = await mount(<ResearchPanel />, s);
+    cleanup = m.cleanup;
+    for (const label of ['Admiralty Marks', 'Challenge runs', 'Admiralty shop', 'Buy carrier'])
+      expect(m.el.textContent).toContain(label);
+    const branches = [...m.el.querySelectorAll('.branch h3')].map((h) => h.textContent ?? '');
+    expect(branches.some((b) => b.startsWith('Fighter'))).toBe(true);
+  });
+
+  it('reveals carrier buying for an imported multi-carrier save', async () => {
+    const s = game(3);
+    s.lifetime.admiralties = 3;
+    const m = await mount(<ResearchPanel />, s);
+    cleanup = m.cleanup;
+    expect(m.el.textContent).toContain('Buy carrier');
   });
 });
 

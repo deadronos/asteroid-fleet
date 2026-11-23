@@ -90,6 +90,8 @@ export function ResearchPanel() {
       researchMult: researchMult(s).toFixed(2),
       hullClass: s.carrier.hullClass,
       hulls: [...s.hulls],
+      unlocked: [...s.unlocked],
+      prestiges: s.lifetime.prestiges,
       modifiers: [...s.modifiers],
       challenge: s.challenge,
       progressPct: progress !== null ? Math.floor(progress * 100) : null,
@@ -124,6 +126,15 @@ export function ResearchPanel() {
   const [confirmAdm, setConfirmAdm] = useState(false);
   const [confirmChallenge, setConfirmChallenge] = useState<ChallengeId | null>(null);
   const [hull, setHull] = useState<HullId | null>(null);
+  // Late layers only appear once the player has earned a prestige, or already owns the progress
+  // they unlock (an imported save, a challenge or a second carrier) (#247).
+  const lateGame =
+    r.prestiges > 0 ||
+    r.admiralties > 0 ||
+    r.marks > 0 ||
+    r.challengesDone.length > 0 ||
+    r.challenge !== null ||
+    r.ownedCarriers > 1;
   const pick = hull && r.hulls.includes(hull) ? hull : r.hullClass;
   const nodeById = new Map(r.nodes.map((n) => [n.id, n]));
   const branch = (b: Branch) => {
@@ -225,130 +236,134 @@ export function ResearchPanel() {
           </div>
         )}
       </div>
-      <div className="prestige-box">
-        <Pair
-          a="Admiralty Marks"
-          av={fmt(r.marks)}
-          b="Admiralty now pays"
-          bv={`+${fmt(r.marksGain)}`}
-        />
-        <details>
-          <summary className="hint">How Marks work</summary>
-          <p className="hint">
-            Marks = ⌊√(lifetime RP ÷ {MARKS_DIVISOR})⌋ minus Marks paid. Resets research and
-            discovered systems; automation and hulls stay.
-          </p>
-        </details>
-        {!confirmAdm ? (
-          <button disabled={r.marksGain <= 0} onClick={() => setConfirmAdm(true)}>
-            Admiralty reset…
-          </button>
-        ) : (
-          <div className="row">
-            <span>Reset for +{fmt(r.marksGain)} Marks?</span>
-            <button
-              onClick={() => {
-                engine.doAdmiralty();
-                setConfirmAdm(false);
-              }}
-            >
-              Yes, reset
-            </button>
-            <button onClick={() => setConfirmAdm(false)}>Cancel</button>
-          </div>
-        )}
-      </div>
-      <div className="prestige-box" aria-label="Challenge runs">
-        <div className="hint" style={{ margin: 0 }}>
-          Challenge runs
-        </div>
-        {r.modifiers.length > 0 && (
-          <p className="hint">
-            Active modifiers: {r.modifiers.map((m) => MODIFIERS[m].name).join(', ')}.
-            {r.challenge && r.progressPct !== null && ` Goal ${r.progressPct}% delivered.`}
-          </p>
-        )}
-        {CHALLENGE_IDS.map((id) => {
-          const def = CHALLENGES[id];
-          const done = r.challengesDone.includes(id);
-          return (
-            <div className="row" key={id}>
-              <div className="grow">
-                <b>{def.name}</b>
-                {done && ' (complete)'}
-                <div className="hint" style={{ margin: 0 }}>
-                  {def.blurb} Deliver {fmt(def.goal)} ore value with{' '}
-                  {def.modifiers.map((m) => MODIFIERS[m].name.toLowerCase()).join(' + ')}. Pays +
-                  {def.marks} Marks and +{Math.round(def.oreBonus * 100)}% ore value for good.
-                </div>
-              </div>
-              {confirmChallenge === id ? (
-                <>
-                  <button
-                    onClick={() => {
-                      engine.doChallenge(id, pick);
-                      setConfirmChallenge(null);
-                    }}
-                  >
-                    Reset and start
-                  </button>
-                  <button onClick={() => setConfirmChallenge(null)}>Cancel</button>
-                </>
-              ) : (
-                <button disabled={done} onClick={() => setConfirmChallenge(id)}>
-                  {r.challenge === id ? 'Restart…' : 'Start…'}
-                </button>
-              )}
-            </div>
-          );
-        })}
-        <p className="hint">Starting a challenge resets the operation like a prestige.</p>
-      </div>
-      <div className="branch">
-        <h3>
-          Admiralty shop <span className="hint">{fmt(r.marks)} Marks</span>
-        </h3>
-        {ADMIRALTY_UPGRADES.map((u, idx) => {
-          const st = r.admiraltyUpgrades[idx];
-          return (
-            <div className="row" key={u.id}>
-              <div className="grow">
-                <b>{u.name}</b>
-                <div className="hint" style={{ margin: 0 }}>
-                  {u.desc} · level {st.level}: {st.label}
-                </div>
-              </div>
-              <button
-                disabled={!st.canBuy}
-                onClick={() => engine.dispatch({ type: 'buyAdmiralty', id: u.id })}
-              >
-                {st.cost} Marks
+      {lateGame && (
+        <>
+          <div className="prestige-box">
+            <Pair
+              a="Admiralty Marks"
+              av={fmt(r.marks)}
+              b="Admiralty now pays"
+              bv={`+${fmt(r.marksGain)}`}
+            />
+            <details>
+              <summary className="hint">How Marks work</summary>
+              <p className="hint">
+                Marks = ⌊√(lifetime RP ÷ {MARKS_DIVISOR})⌋ minus Marks paid. Resets research and
+                discovered systems; automation and hulls stay.
+              </p>
+            </details>
+            {!confirmAdm ? (
+              <button disabled={r.marksGain <= 0} onClick={() => setConfirmAdm(true)}>
+                Admiralty reset…
               </button>
-            </div>
-          );
-        })}
-      </div>
-      <div className="prestige-box">
-        <Pair
-          a="Admiralty resets"
-          av={String(r.admiralties)}
-          b="Carrier slots"
-          bv={String(r.carrierSlots)}
-        />
-        {MILESTONES.map((m) => (
-          <div key={m.at} className="hint">
-            {r.admiralties >= m.at ? '✓' : '○'} {m.at}: {m.label}
+            ) : (
+              <div className="row">
+                <span>Reset for +{fmt(r.marksGain)} Marks?</span>
+                <button
+                  onClick={() => {
+                    engine.doAdmiralty();
+                    setConfirmAdm(false);
+                  }}
+                >
+                  Yes, reset
+                </button>
+                <button onClick={() => setConfirmAdm(false)}>Cancel</button>
+              </div>
+            )}
           </div>
-        ))}
-        <BuyCarrier
-          owned={r.ownedCarriers}
-          cost={r.carrierCost}
-          canAfford={r.canBuyCarrier}
-          slots={r.carrierSlots}
-        />
-      </div>
+          <div className="prestige-box" aria-label="Challenge runs">
+            <div className="hint" style={{ margin: 0 }}>
+              Challenge runs
+            </div>
+            {r.modifiers.length > 0 && (
+              <p className="hint">
+                Active modifiers: {r.modifiers.map((m) => MODIFIERS[m].name).join(', ')}.
+                {r.challenge && r.progressPct !== null && ` Goal ${r.progressPct}% delivered.`}
+              </p>
+            )}
+            {CHALLENGE_IDS.map((id) => {
+              const def = CHALLENGES[id];
+              const done = r.challengesDone.includes(id);
+              return (
+                <div className="row" key={id}>
+                  <div className="grow">
+                    <b>{def.name}</b>
+                    {done && ' (complete)'}
+                    <div className="hint" style={{ margin: 0 }}>
+                      {def.blurb} Deliver {fmt(def.goal)} ore value with{' '}
+                      {def.modifiers.map((m) => MODIFIERS[m].name.toLowerCase()).join(' + ')}. Pays
+                      +{def.marks} Marks and +{Math.round(def.oreBonus * 100)}% ore value for good.
+                    </div>
+                  </div>
+                  {confirmChallenge === id ? (
+                    <>
+                      <button
+                        onClick={() => {
+                          engine.doChallenge(id, pick);
+                          setConfirmChallenge(null);
+                        }}
+                      >
+                        Reset and start
+                      </button>
+                      <button onClick={() => setConfirmChallenge(null)}>Cancel</button>
+                    </>
+                  ) : (
+                    <button disabled={done} onClick={() => setConfirmChallenge(id)}>
+                      {r.challenge === id ? 'Restart…' : 'Start…'}
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+            <p className="hint">Starting a challenge resets the operation like a prestige.</p>
+          </div>
+          <div className="branch">
+            <h3>
+              Admiralty shop <span className="hint">{fmt(r.marks)} Marks</span>
+            </h3>
+            {ADMIRALTY_UPGRADES.map((u, idx) => {
+              const st = r.admiraltyUpgrades[idx];
+              return (
+                <div className="row" key={u.id}>
+                  <div className="grow">
+                    <b>{u.name}</b>
+                    <div className="hint" style={{ margin: 0 }}>
+                      {u.desc} · level {st.level}: {st.label}
+                    </div>
+                  </div>
+                  <button
+                    disabled={!st.canBuy}
+                    onClick={() => engine.dispatch({ type: 'buyAdmiralty', id: u.id })}
+                  >
+                    {st.cost} Marks
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+          <div className="prestige-box">
+            <Pair
+              a="Admiralty resets"
+              av={String(r.admiralties)}
+              b="Carrier slots"
+              bv={String(r.carrierSlots)}
+            />
+            {MILESTONES.map((m) => (
+              <div key={m.at} className="hint">
+                {r.admiralties >= m.at ? '✓' : '○'} {m.at}: {m.label}
+              </div>
+            ))}
+            <BuyCarrier
+              owned={r.ownedCarriers}
+              cost={r.carrierCost}
+              canAfford={r.canBuyCarrier}
+              slots={r.carrierSlots}
+            />
+          </div>
+        </>
+      )}
       {GLOBAL.map(branch)}
-      {SHIP_CLASSES.map((c) => branch(c))}
+      {SHIP_CLASSES.filter((c) => r.unlocked.includes(c)).map((c) => branch(c))}
     </>
   );
 }

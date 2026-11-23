@@ -45,6 +45,9 @@ There is one field per system for the whole run. While any carrier is on the map
 - Research nodes are in `research.ts`. Repeatable nodes use a soft cap, `cap × (1 − (1 − step)^level)` (`softcap`), with geometric cost. Admiralty upgrades (`admiralty.ts`) follow the same shape.
 - Run modifiers (`modifiers.ts`) are read through one small hook each, so every rule has one place that names it. Add a hook there rather than checking `s.modifiers` inline.
 - Stances resolve from most specific to least: active card > hangar > ship type > fleet doctrine (`doctrine.ts`, `cards.ts`). Cards are compiled once per tick into per-action lists that are already in priority order.
+- `SOLAR_RATE`, `RP_DIVISOR` and `HEAT_FACTOR_CAP` set the pre-Fusion income, prestige and wave-size curves (#242).
+- `field()` refills mined-out rocks at cluster centres clear of hazards. A rock that respawns inside a charted hazard is unminable to both safe and greedy drones, so without that filter the field fills with ore nobody can collect and income collapses hours into a run (#242).
+- `pickAsteroid` only enforces cover outside the raid-free Starter tier, and `drift` parks a `followRich` carrier close enough to a cluster that its rocks stay within `COVER_RADIUS` (#243).
 
 ## Events
 

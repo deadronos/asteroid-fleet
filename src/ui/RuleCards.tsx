@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { engine, useGame } from '../game/engine';
-import { cardSlots, checkCard } from '../sim/cards';
+import { cardActive, cardSlots, checkCard, conditionHolds } from '../sim/cards';
 import {
   ACTION_DEFS,
   CONDITION_DEFS,
@@ -19,10 +19,41 @@ import type {
   ConditionKind,
   RuleCard,
   RuleId,
+  Sim,
   StanceSwitch,
 } from '../sim/types';
 
 type Draft = Omit<RuleCard, 'id'>;
+
+interface Activity {
+  active: boolean;
+  count: number;
+}
+
+/**
+ * Live firing status per card, derived from the UI mirror on each 5 Hz tick (#246). Carrier cards
+ * check their conditions once; ship cards count the units their scope and conditions cover.
+ */
+function cardActivity(s: Sim): Record<number, Activity> {
+  const out: Record<number, Activity> = {};
+  for (const card of s.cards) {
+    const carrier = ACTION_DEFS[card.then.kind].classes === null;
+    if (!card.enabled || !cardActive(s, card)) {
+      out[card.id] = { active: false, count: 0 };
+    } else if (carrier) {
+      out[card.id] = { active: card.when.every((c) => conditionHolds(s, c, null)), count: 0 };
+    } else {
+      let count = 0;
+      for (const sh of s.ships) {
+        if (card.scope.kind === 'hangar' && sh.hangarId !== card.scope.id) continue;
+        if (card.scope.kind === 'class' && sh.cls !== card.scope.cls) continue;
+        if (card.when.every((c) => conditionHolds(s, c, sh))) count++;
+      }
+      out[card.id] = { active: count > 0, count };
+    }
+  }
+  return out;
+}
 
 const CONDITION_KINDS = Object.keys(CONDITION_DEFS) as ConditionKind[];
 const ACTION_KINDS = Object.keys(ACTION_DEFS) as ActionKind[];
@@ -236,6 +267,7 @@ export function RuleCards() {
     }),
     deepEqual,
   );
+  const activity = useGame(cardActivity, deepEqual);
   const [editing, setEditing] = useState<number | 'new' | null>(null);
   const full = r.cards.length >= r.slots;
   const presets = (Object.keys(PRESETS) as RuleId[]).filter((id) => r.unlockedRules.includes(id));
@@ -252,8 +284,9 @@ export function RuleCards() {
         specific scope wins (hangar, then ship type, then fleet), then the higher card.
         {presets.length < Object.keys(PRESETS).length && ' More actions unlock further out.'}
       </p>
-      {r.cards.map((card, i) =>
-        editing === card.id ? (
+      {r.cards.map((card, i) => {
+        const live = activity[card.id];
+        return editing === card.id ? (
           <Editor
             key={card.id}
             initial={card}
@@ -281,6 +314,16 @@ export function RuleCards() {
             <div className="when">
               <b>{scopeLabel(card.scope)}</b> · when {card.when.map(conditionText).join(' and ')} →{' '}
               {actionText(card)}
+              {live?.active && (
+                <span
+                  className="card-live"
+                  aria-label={live.count ? `${live.count} ships firing` : 'Card firing'}
+                >
+                  {' '}
+                  ● active
+                  {live.count ? ` · ${live.count} ${live.count === 1 ? 'ship' : 'ships'}` : ''}
+                </span>
+              )}
             </div>
             <div className="card-tools">
               <button
@@ -308,8 +351,8 @@ export function RuleCards() {
               </button>
             </div>
           </div>
-        ),
-      )}
+        );
+      })}
       {editing === 'new' ? (
         <Editor
           initial={newDraft(r.unlockedRules)}
