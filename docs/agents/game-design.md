@@ -18,6 +18,9 @@ A browser idle game with an autobattler setup, in 3D. The player is the admiral,
 - Prospecting Charter (Admiralty, id `admYield`) raises the ore value of new asteroids, not mining yield: mining is rarely the limit, ore value always counts.
 - Stance resolution is most specific first: card > hangar > ship type > fleet.
 - Multiple carriers share credits and RP. Per-carrier resources (ore, H2, energy) move only through supply routes.
+- Pre-Fusion solar is the refinery budget: raising it lets refinery levels turn a larger fleet into income instead of pinning energy at the reserve floor (#242). RP uses a divisor of 500,000, so the first RP arrives around twenty minutes in rather than five (#242).
+- Cargo heat adds at most +1.5 to wave size, so a rich cargo train in Deep space is dangerous without wiping a fresh fleet (#242).
+- Cover is a threat response, not a mining requirement: Starter systems have no raids, so safe drones mine there regardless of cover, and a following carrier parks inside a rich cluster so its ore stays covered (#243).
 
 ## Reading the concept docs
 

@@ -10,6 +10,7 @@ describe('tuning constants', () => {
   it('keep their pre-extraction values', () => {
     expect(config.SCRAP_REFUND).toBe(0.5);
     expect(config.HEAT_CARGO_PER_TIER).toBe(2500);
+    expect(config.HEAT_FACTOR_CAP).toBe(1.5);
     expect(config.ORE_VALUE_DISTANCE_SCALE).toBe(140);
     expect([
       config.WAVE_SIZE_BASE,

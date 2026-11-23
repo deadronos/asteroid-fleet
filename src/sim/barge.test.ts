@@ -61,9 +61,12 @@ describe('barge drone bay', () => {
     barge.mode = 'retreat';
     for (let i = 0; i < 1200 && (barge.mode as string) !== 'docked'; i++) stepSim(s);
     expect(barge.mode).toBe('docked');
+    // Hold launches so the barge does not immediately leave again with the drone still aboard.
+    for (const h of s.hangars) h.launchTimer = 100;
     // The drone notices on its next update, which can be a tick or two later.
     for (let i = 0; i < 5 && bayDrone.mode === 'carried'; i++) stepSim(s);
-    expect(bayDrone.mode).toBe('docked');
+    // The drone leaves the bay with the barge; it may already be relaunching on the next tick.
+    expect(bayDrone.mode).not.toBe('carried');
     expect(bayDrone.bargeId).toBe(-1);
   });
 

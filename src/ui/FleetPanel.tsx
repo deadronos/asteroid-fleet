@@ -151,11 +151,14 @@ function HangarBoard({
     const slotCost = HANGAR_SLOT_COST(h.slots);
     const autoBuy = autoBuyUnlocked(s);
     const unlocked = SHIP_CLASSES.filter((c) => s.unlocked.includes(c));
+    const selected = selShip >= 0 ? s.ships.find((x) => x.id === selShip) : undefined;
     return {
       id: h.id,
       type: h.type,
       slots: h.slots,
       used,
+      occ,
+      selSize: selected ? SHIP_STATS[selected.cls].slots : 0,
       ships,
       furthestTier: s.stats.furthestTier,
       noCover: s.noCoverAt !== undefined && s.time - s.noCoverAt < COVER_BACKOFF + 5,
@@ -170,6 +173,24 @@ function HangarBoard({
   const [over, setOver] = useState(-1);
   if (!board) return null;
   const byStart = new Map(board.ships.map((sh) => [sh.start, sh]));
+  // Tap/keyboard movement: a ship stays selected until it is moved or Escape cancels it.
+  // Allow overlapping the ship's own slots (matches sim/hangar.ts `fits`), so multi-slot ships can shift left.
+  const free = (start: number) =>
+    board.selSize > 0 &&
+    start + board.selSize <= board.slots &&
+    board.occ.slice(start, start + board.selSize).every((id) => id === null || id === selShip);
+  const move = (start: number) => {
+    if (!free(start)) return;
+    engine.dispatch({ type: 'moveShip', shipId: selShip, hangarId: board.id, start });
+    onShip(-1);
+  };
+  const cancel = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape' && selShip >= 0) {
+      e.preventDefault();
+      e.stopPropagation();
+      onShip(-1);
+    }
+  };
   const cells: React.ReactNode[] = [];
   const drop = (e: React.DragEvent, start: number) => {
     e.preventDefault();
@@ -183,15 +204,29 @@ function HangarBoard({
       cells.push(
         <div
           key={'e' + i}
-          className={`slot ${over === i ? 'drop' : ''}`}
+          className={`slot ${over === i ? 'drop' : ''} ${free(i) ? 'valid' : ''}`}
           style={{ gridColumn: `${i + 1}` }}
+          role="button"
+          tabIndex={free(i) ? 0 : -1}
+          aria-label={
+            free(i)
+              ? `Move selected ship to slot ${i + 1}`
+              : `Empty slot ${i + 1} in hangar ${board.id}`
+          }
           onDragOver={(e) => {
             e.preventDefault();
             setOver(i);
           }}
           onDragLeave={() => setOver(-1)}
           onDrop={(e) => drop(e, i)}
-          onClick={onSelect}
+          onClick={() => (free(i) ? move(i) : onSelect())}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              e.stopPropagation();
+              move(i);
+            } else cancel(e);
+          }}
         />,
       );
       continue;
@@ -212,13 +247,14 @@ function HangarBoard({
         role="button"
         tabIndex={0}
         aria-pressed={selShip === ship.id}
+        aria-label={`${st.name} #${ship.id}, slot ${i + 1}`}
         onClick={() => onShip(ship.id)}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
             e.stopPropagation();
             onShip(ship.id);
-          }
+          } else cancel(e);
         }}
         title={`${st.name}${ship.syn ? ' · ' + ship.syn : ''}${ship.modules.length ? ' · ' + ship.modules.map((m) => MODULES[m].name).join(', ') : ''}`}
       >
@@ -294,7 +330,8 @@ function HangarBoard({
         onClick={onSelect}
         onKeyDown={(e) => {
           if (e.target !== e.currentTarget) return;
-          if (e.key === 'Enter' || e.key === ' ') {
+          if (e.key === 'Escape') cancel(e);
+          else if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
             onSelect();
           }
@@ -620,9 +657,9 @@ export function FleetPanel() {
       <h3>Hangars</h3>
       <AutomationBar />
       <p className="hint">
-        Hangar slots are the board. Drag ships between slots; put a repair drone next to fighters or
-        barges and they repair 3× faster when docked. Click a hangar to build into it, click a
-        docked ship to fit modules.
+        Hangar slots are the board. Drag, tap or press Enter on a ship, then an empty slot, to move
+        it; Escape cancels. Put a repair drone next to fighters or barges and they repair 3× faster
+        when docked. Click a hangar to build into it, click a docked ship to fit modules.
       </p>
       {f.ids.map((id, i) => (
         <div key={id}>
@@ -632,8 +669,9 @@ export function FleetPanel() {
             onSelect={() => setPicked(id)}
             selShip={selShip}
             onShip={(id) => {
-              setSelShip(id === selShip ? -1 : id);
-              focus.set(id === selShip ? null : id);
+              const next = id < 0 || id === selShip ? -1 : id;
+              setSelShip(next);
+              focus.set(next < 0 ? null : next);
             }}
           />
           {selShip >= 0 && f.hasSel[i] && <ShipDetail id={selShip} />}

@@ -11,6 +11,7 @@ import {
   ESCORT_ORBIT_RADIUS,
   GAS_PIRATE_HARVESTER_BIAS,
   HEAT_CARGO_PER_TIER,
+  HEAT_FACTOR_CAP,
   PATROL_ORBIT_RADIUS,
   PIRATE_BASE,
   PIRATE_DAMAGE_PER_DISTANCE,
@@ -59,7 +60,7 @@ export function cargoHeat(s: Sim): number {
 
 export function heatFactor(s: Sim): number {
   const tier = s.systems[s.systemId].tier;
-  return 1 + Math.min(2, cargoHeat(s) / (HEAT_CARGO_PER_TIER * tier));
+  return 1 + Math.min(HEAT_FACTOR_CAP, cargoHeat(s) / (HEAT_CARGO_PER_TIER * tier));
 }
 
 /** Pirates in the next wave: grows with system distance and tier, scaled by cargo heat. */

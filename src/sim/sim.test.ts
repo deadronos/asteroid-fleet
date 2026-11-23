@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { order, prestige, researchPayout, settleOffline, shipCost } from './actions';
 import { fits, neighbours, occupancy } from './hangar';
-import { SOLAR_RATE } from './config';
+import { RP_DIVISOR, SOLAR_RATE } from './config';
 import { lvl } from './research';
 import { addCarrier, maxEnergy, upkeepRate, stateOf } from './state';
 import { stepSim } from './tick';
@@ -78,7 +78,7 @@ describe('simulation', () => {
 
   it('pays research by the documented formula and keeps research on prestige', () => {
     const s = game(6);
-    s.stats.oreValueDelivered = 250_000;
+    s.stats.oreValueDelivered = RP_DIVISOR * 25;
     s.stats.furthestTier = 2;
     expect(researchPayout(s)).toBe(10);
     s.researchLevels.yield = 2;
@@ -163,8 +163,8 @@ describe('simulation', () => {
     const sys = s.systems[s.systemId];
     const rate = SOLAR_RATE * sys.brightness * (1 + 0.2 * lvl(s, 'solar')) - upkeepRate(s);
     s.carrier.energy = 0;
-    settleOffline(stateOf(s), 100);
-    expect(s.carrier.energy).toBeCloseTo(Math.min(maxEnergy(s), rate * 100));
+    settleOffline(stateOf(s), 30);
+    expect(s.carrier.energy).toBeCloseTo(Math.min(maxEnergy(s), rate * 30));
     expect(s.carrier.energy).toBeLessThan(maxEnergy(s));
     s.carrier.energy = 0;
     settleOffline(stateOf(s), 12 * 3600);

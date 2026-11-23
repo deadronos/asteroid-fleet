@@ -154,6 +154,8 @@ function pickAsteroid(s: Sim, ship: Ship, ctx: Ctx, mining: 'greedy' | 'safe'): 
   // A revealed vein can score up to VEIN_BONUS times its value; keep the prune bound safe.
   const maxV = ctx.maxValue * (ctx.veins.size > 0 ? VEIN_BONUS : 1);
   const charted = s.recon.hazards;
+  // Starter systems have no raids, so there is no threat for cover to protect against (#243).
+  const needCover = mining === 'safe' && s.systems[s.systemId].tier > 1;
   let best = -1;
   let bestScore = -Infinity;
   ctx.asteroidGrid.rings(
@@ -171,7 +173,7 @@ function pickAsteroid(s: Sim, ship: Ship, ctx: Ctx, mining: 'greedy' | 'safe'): 
         score = v / (d + 8) - crowd * 0.05;
         // Cheap score check first; hazard and cover are the expensive part.
         if (score < bestScore || (score === bestScore && i > best)) return;
-        if (inHazard(s, a.pos) || !covered(s, a.pos, ctx)) return;
+        if (inHazard(s, a.pos) || (needCover && !covered(s, a.pos, ctx))) return;
       } else {
         score = (v * v) / (d + 25) - crowd * 0.2;
         // Greedy drones still steer clear of hazards a scout has charted.

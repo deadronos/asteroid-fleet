@@ -115,6 +115,10 @@ export function field(s: Sim, dt: number, ctx?: Ctx) {
   let scouts = -1;
   let centers: Vec3[] | null = null;
   let respawned = false;
+  // Rocks that refill inside a hazard cannot be mined by safe or greedy drones once a scout
+  // charts it. Left unchecked they accumulate until the whole field is unminable and ore
+  // delivery collapses hours into a run (#242). Keep the refill centres clear of hazards.
+  let clear: Vec3[] | null = null;
   for (let i = 0; i < s.asteroids.length; i++) {
     const a = s.asteroids[i];
     if (a.ore > 0 || a.respawn <= 0) continue;
@@ -125,7 +129,9 @@ export function field(s: Sim, dt: number, ctx?: Ctx) {
         for (const x of s.ships) if (x.cls === 'scout' && x.mode !== 'docked') scouts++;
       }
       centers ??= clusterCenters(sys);
-      const c = centers[Math.floor(rand(s) * centers.length)];
+      clear ??= centers.filter((cc) => s.hazards.every((h) => dist(cc, h.pos) > h.radius + 10));
+      const pool = clear.length > 0 ? clear : centers;
+      const c = pool[Math.floor(rand(s) * pool.length)];
       const fresh = spawnAsteroid(
         s,
         () => rand(s),
@@ -180,9 +186,10 @@ export function drift(s: Sim, dt: number, ctx?: Ctx) {
       }
     }
     if (best) {
-      // park just short of the cluster so it sits inside carrier cover
+      // Park inside the cluster so its rocks stay in carrier cover; 22 units left only the
+      // near edge covered and stalled default safe drones (#243).
       const d = dist(best, c.pos) || 1;
-      const f = Math.max(0, (d - 22) / d);
+      const f = Math.max(0, (d - 12) / d);
       c.target = { x: c.pos.x + (best.x - c.pos.x) * f, y: 0, z: c.pos.z + (best.z - c.pos.z) * f };
     } else c.target = null;
   }
