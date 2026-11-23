@@ -120,9 +120,42 @@ function PowerReadout() {
 }
 
 export function CarrierPanel() {
-  const s = useGame();
-  const sys = s.systems[s.systemId];
-  const refCost = REFINERY_COST(s.carrier.refinery);
+  const c = useGame((s) => {
+    const sys = s.systems[s.systemId];
+    const refCost = REFINERY_COST(s.carrier.refinery);
+    return {
+      powerMode: s.powerMode,
+      hullClass: s.carrier.hullClass,
+      multiHull: s.hulls.length > 1,
+      refinery: s.carrier.refinery,
+      refineThroughput: refineThroughput(s).toFixed(0),
+      refineEnergy: refineEnergy(s).toFixed(2),
+      refCost,
+      canUpgradeRefinery: s.carrier.refinery < MAX_REFINERY && s.credits >= refCost,
+      stance: s.carrier.stance,
+      systems: s.systems.map((o) => {
+        const here = o.id === s.systemId;
+        const cost = jumpCost(s, sys.distance, o.distance);
+        const pay = warpPayment(cost, s.carrier.energy, s.carrier.h2);
+        return {
+          id: o.id,
+          name: o.name,
+          tier: o.tier,
+          discovered: o.discovered,
+          gasGiant: o.gasGiant,
+          oreMult: o.oreMult.toFixed(2),
+          brightness: o.brightness.toFixed(2),
+          distance: o.distance,
+          here,
+          cost,
+          payEnergy: pay && pay.h2 > 0 ? Math.round(pay.energy) : 0,
+          payH2: pay && pay.h2 > 0 ? pay.h2 : 0,
+          blocked: here ? null : !o.discovered ? 'Not discovered yet' : warpBlocked(s, o.id),
+          outward: o.distance >= sys.distance,
+        };
+      }),
+    };
+  }, deepEqual);
   return (
     <>
       <PowerReadout />
@@ -136,7 +169,7 @@ export function CarrierPanel() {
         ).map(([m, l, tip]) => (
           <button
             key={m}
-            className={s.powerMode === m ? 'on' : ''}
+            className={c.powerMode === m ? 'on' : ''}
             onClick={() => engine.dispatch({ type: 'setPower', mode: m })}
             title={tip}
           >
@@ -146,35 +179,35 @@ export function CarrierPanel() {
       </div>
 
       <p className="hint">
-        {HULLS[s.carrier.hullClass].name}: {HULLS[s.carrier.hullClass].blurb}
+        {HULLS[c.hullClass].name}: {HULLS[c.hullClass].blurb}
       </p>
 
-      {s.hulls.length > 1 && <Shipyard />}
+      {c.multiHull && <Shipyard />}
 
-      <h3>Refinery · level {s.carrier.refinery}</h3>
+      <h3>Refinery · level {c.refinery}</h3>
       <div className="row">
         <span className="grow hint" style={{ margin: 0 }}>
-          {refineThroughput(s).toFixed(0)} ore/s, {refineEnergy(s).toFixed(2)} energy per unit (each
-          level −{Math.round((1 - REFINE_ENERGY_STEP) * 100)} %)
+          {c.refineThroughput} ore/s, {c.refineEnergy} energy per unit (each level −
+          {Math.round((1 - REFINE_ENERGY_STEP) * 100)} %)
         </span>
         <button
-          disabled={s.carrier.refinery >= MAX_REFINERY || s.credits < refCost}
+          disabled={!c.canUpgradeRefinery}
           onClick={() => engine.dispatch({ type: 'upgradeRefinery' })}
         >
-          Upgrade · {fmt(refCost)} cr
+          Upgrade · {fmt(c.refCost)} cr
         </button>
       </div>
 
       <h3>Sublight</h3>
       <div className="row">
         <button
-          className={s.carrier.stance === 'followRich' ? 'on' : ''}
+          className={c.stance === 'followRich' ? 'on' : ''}
           onClick={() => engine.dispatch({ type: 'setCarrierStance', stance: 'followRich' })}
         >
           Follow richest cluster
         </button>
         <button
-          className={s.carrier.stance === 'hold' ? 'on' : ''}
+          className={c.stance === 'hold' ? 'on' : ''}
           onClick={() => engine.dispatch({ type: 'setCarrierStance', stance: 'hold' })}
         >
           Hold position
@@ -187,48 +220,39 @@ export function CarrierPanel() {
         seconds while the fleet is recalled. Ships still outside at jump time are lost. Pirates
         scale with distance and cargo heat.
       </p>
-      {s.systems.map((o) => {
-        const here = o.id === s.systemId;
-        const cost = jumpCost(s, sys.distance, o.distance);
-        const pay = warpPayment(cost, s.carrier.energy, s.carrier.h2);
-        const blocked = here ? null : !o.discovered ? 'Not discovered yet' : warpBlocked(s, o.id);
-        return (
-          <div key={o.id} className={`sys ${here ? 'here' : ''} ${o.discovered ? '' : 'unknown'}`}>
-            <span className={`tier t${o.tier}`}>{TIER_NAMES[o.tier]}</span>
-            <div className="grow">
-              <div>
-                <b>{o.discovered ? o.name : 'Uncharted'}</b>{' '}
-                {o.gasGiant && o.discovered && <span title="Gas giant: H2 for fusion">🪐</span>}
-              </div>
-              {o.discovered && (
-                <div className="hint" style={{ margin: 0 }}>
-                  ore ×{o.oreMult.toFixed(2)} · ☀ {o.brightness.toFixed(2)} · distance {o.distance}
-                </div>
-              )}
+      {c.systems.map((o) => (
+        <div key={o.id} className={`sys ${o.here ? 'here' : ''} ${o.discovered ? '' : 'unknown'}`}>
+          <span className={`tier t${o.tier}`}>{TIER_NAMES[o.tier]}</span>
+          <div className="grow">
+            <div>
+              <b>{o.discovered ? o.name : 'Uncharted'}</b>{' '}
+              {o.gasGiant && o.discovered && <span title="Gas giant: H2 for fusion">🪐</span>}
             </div>
-            {here ? (
-              <span className="tone-good">here</span>
-            ) : (
-              <button
-                disabled={!!blocked}
-                onClick={() => engine.dispatch({ type: 'warp', systemId: o.id })}
-                title={
-                  blocked ??
-                  (o.distance < sys.distance ? 'Warp back to a safer system' : 'Warp outward')
-                }
-              >
-                Warp · {cost} E
-                {pay && pay.h2 > 0 && (
-                  <span className="hint" title="Energy short: H2 covers the gap at a poor rate">
-                    {' '}
-                    ({Math.round(pay.energy)} E + {pay.h2} H2)
-                  </span>
-                )}
-              </button>
+            {o.discovered && (
+              <div className="hint" style={{ margin: 0 }}>
+                ore ×{o.oreMult} · ☀ {o.brightness} · distance {o.distance}
+              </div>
             )}
           </div>
-        );
-      })}
+          {o.here ? (
+            <span className="tone-good">here</span>
+          ) : (
+            <button
+              disabled={!!o.blocked}
+              onClick={() => engine.dispatch({ type: 'warp', systemId: o.id })}
+              title={o.blocked ?? (o.outward ? 'Warp outward' : 'Warp back to a safer system')}
+            >
+              Warp · {o.cost} E
+              {o.payH2 > 0 && (
+                <span className="hint" title="Energy short: H2 covers the gap at a poor rate">
+                  {' '}
+                  ({o.payEnergy} E + {o.payH2} H2)
+                </span>
+              )}
+            </button>
+          )}
+        </div>
+      ))}
     </>
   );
 }

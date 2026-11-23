@@ -62,16 +62,17 @@ export function asteroidGeometry(detail = 1): THREE.BufferGeometry {
 }
 
 export const NEBULA_VERT = /* glsl */ `
-varying vec3 vDir;
+varying vec2 vUv;
 void main() {
-  vDir = normalize(position);
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  vUv = uv;
+  gl_Position = vec4(position.xy, 0.0, 1.0);
 }`;
 
 export const NEBULA_FRAG = /* glsl */ `
 uniform vec3 uA;
 uniform vec3 uB;
-varying vec3 vDir;
+varying vec2 vUv;
+const float PI = 3.141592653589793;
 float hash(vec3 p) { return fract(sin(dot(p, vec3(12.9898, 78.233, 37.719))) * 43758.5453); }
 float noise(vec3 p) {
   vec3 i = floor(p); vec3 f = fract(p); f = f * f * (3.0 - 2.0 * f);
@@ -81,6 +82,11 @@ float noise(vec3 p) {
 }
 float fbm(vec3 p) { float v = 0.0; float a = 0.5; for (int i = 0; i < 5; i++) { v += a * noise(p); p *= 2.03; a *= 0.5; } return v; }
 void main() {
+  // Match Three.js SphereGeometry UV-to-direction mapping so the baked equirectangular map aligns identically.
+  float phi = vUv.x * 2.0 * PI;
+  float theta = (1.0 - vUv.y) * PI;
+  float st = sin(theta);
+  vec3 vDir = vec3(-cos(phi) * st, cos(theta), sin(phi) * st);
   float n = fbm(vDir * 2.5);
   float m = smoothstep(0.45, 0.85, n);
   float band = exp(-pow(vDir.y * 3.0, 2.0));

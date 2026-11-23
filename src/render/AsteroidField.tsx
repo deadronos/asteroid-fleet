@@ -33,17 +33,58 @@ function Field({
   // Ore tier last written to each instance slot, so unchanged colours aren't re-uploaded.
   const nearTier = useMemo(() => new Uint8Array(MAX_ASTEROIDS).fill(255), []);
   const farTier = useMemo(() => new Uint8Array(MAX_ASTEROIDS).fill(255), []);
-  useFrame((st) => {
+  const spinTime = useRef(0);
+  const lastState = useRef<{
+    drawn: boolean;
+    version: number;
+    systemId: number;
+    hasNear: boolean;
+    lodDistance: number;
+    asteroids: typeof engine.view.asteroids | null;
+    cam: THREE.Vector3;
+  }>({
+    drawn: false,
+    version: -1,
+    systemId: -1,
+    hasNear: false,
+    lodDistance: -1,
+    asteroids: null,
+    cam: new THREE.Vector3(),
+  });
+  useFrame((st, dt) => {
     const nm = near.current;
     const fm = far.current;
     if (!fm) return;
-    const t = st.clock.elapsedTime;
     const hasNear = nm !== null;
+    const s = engine.view;
+    const version = engine.getVersion();
     camPos.copy(st.camera.position);
+    const prev = lastState.current;
+    if (
+      engine.paused &&
+      prev.drawn &&
+      prev.version === version &&
+      prev.systemId === s.systemId &&
+      prev.hasNear === hasNear &&
+      prev.lodDistance === lodDistance &&
+      prev.asteroids === s.asteroids &&
+      camPos.distanceToSquared(prev.cam) <= 1
+    ) {
+      return;
+    }
+    if (!engine.paused) spinTime.current += Math.min(dt, 0.1);
+    const t = spinTime.current;
+    prev.drawn = true;
+    prev.version = version;
+    prev.systemId = s.systemId;
+    prev.hasNear = hasNear;
+    prev.lodDistance = lodDistance;
+    prev.asteroids = s.asteroids;
+    prev.cam.copy(camPos);
     let nn = 0;
     let nf = 0;
     colorDirty[0] = colorDirty[1] = false;
-    for (const a of engine.view.asteroids) {
+    for (const a of s.asteroids) {
       if (a.ore <= 0) continue;
       if (nn + nf >= MAX_ASTEROIDS) break;
       const k = 0.45 + 0.55 * (a.ore / a.maxOre);

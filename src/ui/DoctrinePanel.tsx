@@ -14,6 +14,7 @@ import type {
 import { TOAST_POLICY } from '../game/toasts';
 import { formatEventKind } from './events';
 import { carrierRoster } from './carriers';
+import { deepEqual, shallowEqual } from './equal';
 import { carrierChoices } from './inbox';
 import { RuleCards } from './RuleCards';
 
@@ -39,15 +40,27 @@ type Scope = 'fleet' | ShipClass | number;
 function StanceRow({
   label,
   scope,
-  value,
   inherited,
 }: {
   label: React.ReactNode;
   scope: Scope;
-  value: Partial<Stance>;
   inherited: boolean;
 }) {
-  const s = useGame();
+  const row = useGame((s) => {
+    const st: Partial<Stance> =
+      scope === 'fleet'
+        ? s.doctrine.fleet
+        : typeof scope === 'number'
+          ? (s.hangars.find((h) => h.id === scope)?.stance ?? {})
+          : (s.doctrine.byClass[scope] ?? {});
+    return {
+      engageLocked: !engagementUnlocked(s),
+      engagement: st.engagement,
+      underFire: st.underFire,
+      retreatAt: st.retreatAt,
+      mining: st.mining,
+    };
+  }, shallowEqual);
   const set = (key: keyof Stance, raw: string) => {
     if (raw === '') engine.dispatch({ type: 'setStance', scope, patch: null, key });
     else
@@ -57,9 +70,8 @@ function StanceRow({
         patch: { [key]: key === 'retreatAt' ? Number(raw) : raw },
       });
   };
-  const engageLocked = !engagementUnlocked(s);
   const cell = (key: keyof Stance, opts: [string | number, string][], disabled = false) => {
-    const v = value[key];
+    const v = row[key];
     return (
       <td>
         <select
@@ -85,7 +97,7 @@ function StanceRow({
   return (
     <tr>
       <td>{label}</td>
-      {cell('engagement', ENGAGE, engageLocked)}
+      {cell('engagement', ENGAGE, row.engageLocked)}
       {cell('underFire', FIRE)}
       {cell(
         'retreatAt',
@@ -127,14 +139,21 @@ const ALERT_OTHER = (Object.keys(TOAST_POLICY) as SimEventKind[]).filter(
 if (ALERT_OTHER.length) ALERT_GROUPS.push(['Other', ALERT_OTHER]);
 
 function AlertRules() {
-  const s = useGame();
-  const choices = carrierChoices(carrierRoster(engine.carriers, engine.state.ops), s.systems);
   const [scope, setScope] = useState<'fleet' | number>('fleet');
-  const active = scope === 'fleet' || choices.some((c) => c.id === scope) ? scope : 'fleet';
+  const a = useGame((s) => {
+    const choices = carrierChoices(carrierRoster(engine.carriers, engine.state.ops), s.systems);
+    const active = scope === 'fleet' || choices.some((c) => c.id === scope) ? scope : 'fleet';
+    const rules = active === 'fleet' ? s.alerts.fleet : (s.alerts.byCarrier[active] ?? {});
+    return {
+      choices,
+      active,
+      rules: { ...rules },
+    };
+  }, deepEqual);
   const set = (kind: SimEventKind, raw: string) =>
     engine.dispatch({
       type: 'setAlert',
-      scope: active,
+      scope: a.active,
       kind,
       mode: raw === '' ? null : (raw as AlertMode),
     });
@@ -146,18 +165,18 @@ function AlertRules() {
         hides the event from the inbox too. Unset events use the default; “inherit” means a carrier
         follows the fleet-wide rule.
       </p>
-      {choices.length > 1 && (
+      {a.choices.length > 1 && (
         <label>
           Rules for{' '}
           <select
             aria-label="Alert scope"
-            value={String(active)}
+            value={String(a.active)}
             onChange={(e) =>
               setScope(e.target.value === 'fleet' ? 'fleet' : Number(e.target.value))
             }
           >
             <option value="fleet">Whole fleet</option>
-            {choices.map((c) => (
+            {a.choices.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.label}
               </option>
@@ -171,8 +190,7 @@ function AlertRules() {
           <table className="doc">
             <tbody>
               {kinds.map((kind) => {
-                const own =
-                  active === 'fleet' ? s.alerts.fleet[kind] : s.alerts.byCarrier[active]?.[kind];
+                const own = a.rules[kind];
                 return (
                   <tr key={kind}>
                     <td>{formatEventKind(kind)}</td>
@@ -183,7 +201,7 @@ function AlertRules() {
                         value={own ?? ''}
                         onChange={(e) => set(kind, e.target.value)}
                       >
-                        <option value="">{active === 'fleet' ? 'default' : 'inherit'}</option>
+                        <option value="">{a.active === 'fleet' ? 'default' : 'inherit'}</option>
                         {ALERT_LABEL.map(([m, l]) => (
                           <option key={m} value={m}>
                             {l}
@@ -203,7 +221,14 @@ function AlertRules() {
 }
 
 export function DoctrinePanel() {
-  const s = useGame();
+  const d = useGame(
+    (s) => ({
+      fighterUnlocked: s.unlocked.includes('fighter'),
+      unlocked: [...s.unlocked],
+      hangarIds: s.hangars.map((h) => h.id),
+    }),
+    deepEqual,
+  );
   return (
     <>
       <h3>Stances</h3>
@@ -212,7 +237,7 @@ export function DoctrinePanel() {
         doctrine, then per ship type, then per hangar. The most specific setting wins; rule cards
         below override stances while they are active. “Inherit” means: use the broader scope’s
         setting.
-        {!s.unlocked.includes('fighter') && ' Engagement stances unlock in the frontier.'}
+        {!d.fighterUnlocked && ' Engagement stances unlock in the frontier.'}
       </p>
       <table className="doc">
         <thead>
@@ -225,13 +250,8 @@ export function DoctrinePanel() {
           </tr>
         </thead>
         <tbody>
-          <StanceRow
-            label={<b>Fleet</b>}
-            scope="fleet"
-            value={s.doctrine.fleet}
-            inherited={false}
-          />
-          {s.unlocked.map((c) => (
+          <StanceRow label={<b>Fleet</b>} scope="fleet" inherited={false} />
+          {d.unlocked.map((c) => (
             <StanceRow
               key={c}
               label={
@@ -241,18 +261,11 @@ export function DoctrinePanel() {
                 </>
               }
               scope={c}
-              value={s.doctrine.byClass[c] ?? {}}
               inherited
             />
           ))}
-          {s.hangars.map((h) => (
-            <StanceRow
-              key={h.id}
-              label={`Hangar ${h.id}`}
-              scope={h.id}
-              value={h.stance}
-              inherited
-            />
+          {d.hangarIds.map((id) => (
+            <StanceRow key={id} label={`Hangar ${id}`} scope={id} inherited />
           ))}
         </tbody>
       </table>

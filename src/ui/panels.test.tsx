@@ -1,12 +1,16 @@
 // @vitest-environment happy-dom
-import { act } from 'react';
+import { Profiler, act } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { engine } from '../game/engine';
 import { apply } from '../sim/actions';
-import { focused, newGame } from '../sim/state';
+import { focused, newGame, unlockRule } from '../sim/state';
+import { SaveNotice } from './App';
 import { CarrierPanel } from './CarrierPanel';
+import { DoctrinePanel } from './DoctrinePanel';
 import { FleetPanel } from './FleetPanel';
 import { Hud } from './Hud';
+import { ResearchPanel } from './ResearchPanel';
+import { RuleCards } from './RuleCards';
 import { StarMap } from './StarMap';
 import { click, mount } from './testUtils';
 
@@ -217,5 +221,100 @@ describe('StarMap', () => {
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     });
     expect(onClose).toHaveBeenCalled();
+  });
+});
+
+describe('scoped panel selectors (#240)', () => {
+  const cases: {
+    name: string;
+    ui: () => React.ReactElement;
+    relevant: (s: ReturnType<typeof game>) => void;
+  }[] = [
+    {
+      name: 'FleetPanel',
+      ui: () => <FleetPanel />,
+      relevant: (s) => {
+        focused(s).ships[0].mode = 'mining';
+      },
+    },
+    {
+      name: 'CarrierPanel',
+      ui: () => <CarrierPanel />,
+      relevant: (s) => {
+        focused(s).powerMode = 'defense';
+      },
+    },
+    {
+      name: 'DoctrinePanel',
+      ui: () => <DoctrinePanel />,
+      relevant: (s) => {
+        focused(s).doctrine.fleet.mining = 'greedy';
+      },
+    },
+    {
+      name: 'RuleCards',
+      ui: () => <RuleCards />,
+      relevant: (s) => {
+        unlockRule(focused(s), 'fightersEscortOnWave');
+      },
+    },
+    {
+      name: 'ResearchPanel',
+      ui: () => <ResearchPanel />,
+      relevant: (s) => {
+        s.research += 5;
+      },
+    },
+    {
+      name: 'StarMap',
+      ui: () => <StarMap onClose={() => {}} />,
+      relevant: (s) => {
+        focused(s).systems.find((x) => !x.discovered)!.discovered = true;
+      },
+    },
+    {
+      name: 'SaveNotice',
+      ui: () => <SaveNotice />,
+      relevant: () => {
+        engine.saveNotice = 'Corrupt save';
+      },
+    },
+  ];
+
+  it.each(cases)('$name skips unrelated ticks and updates on relevant changes', async (c) => {
+    const s = game(5);
+    engine.saveNotice = null;
+    let renders = 0;
+    const m = await mount(
+      <Profiler
+        id={c.name}
+        onRender={() => {
+          renders++;
+        }}
+      >
+        {c.ui()}
+      </Profiler>,
+      s,
+    );
+    cleanup = async () => {
+      engine.saveNotice = null;
+      await m.cleanup();
+    };
+    const baseline = renders;
+    // Unrelated 5 Hz tick: time/energy/asteroid/small credit ticks must not re-render panels.
+    await act(async () => {
+      const f = focused(s);
+      f.time += 0.2;
+      f.carrier.energy += 1;
+      f.ships[0].pos.x += 5;
+      engine.emit();
+    });
+    expect(renders).toBe(baseline);
+
+    await act(async () => {
+      c.relevant(s);
+      engine.emit();
+    });
+    expect(renders).toBeGreaterThan(baseline);
   });
 });

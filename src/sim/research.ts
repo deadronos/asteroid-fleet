@@ -567,17 +567,46 @@ export function lvl(s: Sim, id: string): number {
   return s.researchLevels[id] ?? 0;
 }
 
+const RESERVE_SPECS: readonly [ShipClass, string, number, number][] = [
+  ['drone', 'reserveDrone', 2, 120],
+  ['fighter', 'reserveFighter', 1, 300],
+  ['barge', 'reserveBarge', 1, 480],
+  ['hauler', 'reserveHauler', 1, 300],
+];
+
+const reserveScratch: [ShipClass, number, number][] = [
+  ['drone', 0, 0],
+  ['fighter', 0, 0],
+  ['barge', 0, 0],
+  ['hauler', 0, 0],
+];
+
+function reserveCd(s: Sim): number {
+  // A fabrication bay speeds rebuilds; more than one doesn't stack.
+  let mult = 1;
+  for (const h of s.hangars) {
+    const m = HANGAR_TYPES[h.type].rebuildMult;
+    if (m !== undefined && m < mult) mult = m;
+  }
+  return (1 - 0.2 * lvl(s, 'reserveCd')) * (1 - 0.15 * lvl(s, 'deepFabrication')) * mult;
+}
+
+/** Zero-allocation read of `reserveDefs` into a shared tuple array; valid until the next call (#241). */
+export function reserveDefsView(s: Sim): readonly (readonly [ShipClass, number, number])[] {
+  const cd = reserveCd(s);
+  for (let i = 0; i < RESERVE_SPECS.length; i++) {
+    const [cls, node, mult, baseCd] = RESERVE_SPECS[i];
+    reserveScratch[i][0] = cls;
+    reserveScratch[i][1] = mult * lvl(s, node);
+    reserveScratch[i][2] = baseCd * cd;
+  }
+  return reserveScratch;
+}
+
 /** Reserve classes, their minimum count and rebuild cooldown (seconds). */
 export function reserveDefs(s: Sim): [ShipClass, number, number][] {
-  let cd = (1 - 0.2 * lvl(s, 'reserveCd')) * (1 - 0.15 * lvl(s, 'deepFabrication'));
-  // A fabrication bay speeds rebuilds; more than one doesn't stack.
-  cd *= Math.min(1, ...s.hangars.map((h) => HANGAR_TYPES[h.type].rebuildMult ?? 1));
-  return [
-    ['drone', 2 * lvl(s, 'reserveDrone'), 120 * cd],
-    ['fighter', lvl(s, 'reserveFighter'), 300 * cd],
-    ['barge', lvl(s, 'reserveBarge'), 480 * cd],
-    ['hauler', lvl(s, 'reserveHauler'), 300 * cd],
-  ];
+  const cd = reserveCd(s);
+  return RESERVE_SPECS.map(([cls, node, mult, baseCd]) => [cls, mult * lvl(s, node), baseCd * cd]);
 }
 
 export function canBuyResearch(s: Sim, id: string): boolean {

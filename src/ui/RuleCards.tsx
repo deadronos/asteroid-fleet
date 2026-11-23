@@ -11,12 +11,12 @@ import {
 } from '../sim/config';
 import { carrierRoster } from './carriers';
 import { ACTION_LABEL, CONDITION_LABEL, fmtValue, STANCE_LABEL } from './cardText';
+import { deepEqual } from './equal';
 import type {
   ActionKind,
   CardScope,
   Condition,
   ConditionKind,
-  Sim,
   RuleCard,
   RuleId,
   StanceSwitch,
@@ -56,8 +56,8 @@ const scopeOption = (sc: CardScope, label: string) => (
   </option>
 );
 
-function newDraft(s: Sim): Draft {
-  const then = ACTION_KINDS.find((a) => s.unlockedRules.includes(ACTION_DEFS[a].unlock));
+function newDraft(unlockedRules: readonly RuleId[]): Draft {
+  const then = ACTION_KINDS.find((a) => unlockedRules.includes(ACTION_DEFS[a].unlock));
   return {
     enabled: true,
     scope: { kind: 'fleet' },
@@ -95,12 +95,18 @@ function Editor({
   onDone: () => void;
   submit: (d: Draft) => void;
 }) {
-  const s = useGame();
   const [d, setD] = useState<Draft>(() => structuredClone(initial));
-  // Hangars of every carrier: the mirror holds only the focused operation (#178).
-  const hangarIds = carrierRoster(engine.carriers, engine.state.ops).flatMap((c) => c.hangars);
-  // The sim's own check, on a copy, so the editor can say what is wrong before sending.
-  const err = checkCard(s, structuredClone(d), hangarIds);
+  const e = useGame((s) => {
+    // Hangars of every carrier: the mirror holds only the focused operation (#178).
+    const hangarIds = carrierRoster(engine.carriers, engine.state.ops).flatMap((c) => c.hangars);
+    return {
+      unlocked: [...s.unlocked],
+      unlockedRules: [...s.unlockedRules],
+      hangarIds,
+      // The sim's own check, on a copy, so the editor can say what is wrong before sending.
+      err: checkCard(s, structuredClone(d), hangarIds),
+    };
+  }, deepEqual);
   const setCond = (i: number, c: Condition) =>
     setD({ ...d, when: d.when.map((x, j) => (j === i ? c : x)) });
   const pickCond = (i: number, kind: ConditionKind) => {
@@ -118,13 +124,13 @@ function Editor({
         Who
         <select
           value={JSON.stringify(d.scope)}
-          onChange={(e) => setD({ ...d, scope: JSON.parse(e.target.value) as CardScope })}
+          onChange={(ev) => setD({ ...d, scope: JSON.parse(ev.target.value) as CardScope })}
         >
           {scopeOption({ kind: 'fleet' }, 'All ships')}
-          {s.unlocked.map((cls) =>
+          {e.unlocked.map((cls) =>
             scopeOption({ kind: 'class', cls }, `${SHIP_STATS[cls].short}s`),
           )}
-          {hangarIds.map((id) => scopeOption({ kind: 'hangar', id }, `Hangar ${id}`))}
+          {e.hangarIds.map((id) => scopeOption({ kind: 'hangar', id }, `Hangar ${id}`))}
         </select>
       </label>
       {d.when.map((c, i) => (
@@ -133,7 +139,7 @@ function Editor({
           <select
             value={c.kind}
             aria-label={`Condition ${i + 1}`}
-            onChange={(e) => pickCond(i, e.target.value as ConditionKind)}
+            onChange={(ev) => pickCond(i, ev.target.value as ConditionKind)}
           >
             {CONDITION_KINDS.map((k) => (
               <option key={k} value={k}>
@@ -162,10 +168,10 @@ function Editor({
         <select
           value={d.then.kind}
           aria-label="Action"
-          onChange={(e) => pickAction(e.target.value as ActionKind)}
+          onChange={(ev) => pickAction(ev.target.value as ActionKind)}
         >
           {ACTION_KINDS.map((a) => (
-            <option key={a} value={a} disabled={!s.unlockedRules.includes(ACTION_DEFS[a].unlock)}>
+            <option key={a} value={a} disabled={!e.unlockedRules.includes(ACTION_DEFS[a].unlock)}>
               {ACTION_LABEL[a]}
             </option>
           ))}
@@ -176,8 +182,8 @@ function Editor({
           Switch to
           <select
             value={d.then.to}
-            onChange={(e) =>
-              setD({ ...d, then: { ...d.then, to: e.target.value as StanceSwitch } })
+            onChange={(ev) =>
+              setD({ ...d, then: { ...d.then, to: ev.target.value as StanceSwitch } })
             }
           >
             {STANCE_SWITCHES.map((to) => (
@@ -194,8 +200,8 @@ function Editor({
               max={600}
               value={d.then.seconds ?? 0}
               aria-label="Seconds to hold"
-              onChange={(e) => {
-                const sec = Math.max(0, Math.round(Number(e.target.value) || 0));
+              onChange={(ev) => {
+                const sec = Math.max(0, Math.round(Number(ev.target.value) || 0));
                 setD({ ...d, then: { ...d.then, seconds: sec || undefined } });
               }}
             />
@@ -203,11 +209,11 @@ function Editor({
           </span>
         </label>
       )}
-      {err && <p className="hint">{err}</p>}
+      {e.err && <p className="hint">{e.err}</p>}
       <div className="row">
         <button
           className="on"
-          disabled={!!err}
+          disabled={!!e.err}
           onClick={() => {
             submit(d);
             onDone();
@@ -222,17 +228,23 @@ function Editor({
 }
 
 export function RuleCards() {
-  const s = useGame();
+  const r = useGame(
+    (s) => ({
+      slots: cardSlots(s),
+      cards: structuredClone(s.cards),
+      unlockedRules: [...s.unlockedRules],
+    }),
+    deepEqual,
+  );
   const [editing, setEditing] = useState<number | 'new' | null>(null);
-  const slots = cardSlots(s);
-  const full = s.cards.length >= slots;
-  const presets = (Object.keys(PRESETS) as RuleId[]).filter((id) => s.unlockedRules.includes(id));
+  const full = r.cards.length >= r.slots;
+  const presets = (Object.keys(PRESETS) as RuleId[]).filter((id) => r.unlockedRules.includes(id));
   return (
     <>
       <h3>
         Rule cards{' '}
         <span className="hint">
-          {s.cards.length} / {slots}
+          {r.cards.length} / {r.slots}
         </span>
       </h3>
       <p className="hint">
@@ -240,7 +252,7 @@ export function RuleCards() {
         specific scope wins (hangar, then ship type, then fleet), then the higher card.
         {presets.length < Object.keys(PRESETS).length && ' More actions unlock further out.'}
       </p>
-      {s.cards.map((card, i) =>
+      {r.cards.map((card, i) =>
         editing === card.id ? (
           <Editor
             key={card.id}
@@ -251,7 +263,7 @@ export function RuleCards() {
         ) : (
           <div
             key={card.id}
-            className={`rule ${!s.unlockedRules.includes(ACTION_DEFS[card.then.kind].unlock) ? 'locked' : !card.enabled ? 'off' : ''}`}
+            className={`rule ${!r.unlockedRules.includes(ACTION_DEFS[card.then.kind].unlock) ? 'locked' : !card.enabled ? 'off' : ''}`}
             data-card={card.id}
           >
             <input
@@ -280,7 +292,7 @@ export function RuleCards() {
               </button>
               <button
                 title="Move down"
-                disabled={i === s.cards.length - 1}
+                disabled={i === r.cards.length - 1}
                 onClick={() => engine.dispatch({ type: 'moveCard', id: card.id, to: i + 1 })}
               >
                 ▼
@@ -300,7 +312,7 @@ export function RuleCards() {
       )}
       {editing === 'new' ? (
         <Editor
-          initial={newDraft(s)}
+          initial={newDraft(r.unlockedRules)}
           onDone={() => setEditing(null)}
           submit={(d) => engine.dispatch({ type: 'addCard', card: d })}
         />

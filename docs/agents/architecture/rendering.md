@@ -1,16 +1,19 @@
 # Rendering (`src/render/`)
 
-Source of truth: `Scene.tsx`, `Environment.tsx`, `Tactical.tsx`, `frameState.ts`, `Fleet.tsx`, `AsteroidField.tsx`, `models.ts`, `constants.ts`, `public/models/README.md`.
+Source of truth: `Scene.tsx`, `Environment.tsx`, `Effects.tsx`, `RenderLoop.tsx`, `Tactical.tsx`, `frameState.ts`, `Fleet.tsx`, `AsteroidField.tsx`, `models.ts`, `constants.ts`, `public/models/README.md`.
 
 ## Shape of the scene
 
 - React Three Fiber. `Scene` is lazily loaded from `ui/App.tsx`, so three.js stays out of the initial bundle.
-- `ViewOptions` carries `tactical`, `quality` (`high` | `low`), `bloom` and `fpsCap`. Low quality shortens LOD distances (`ASTEROID_LOD`, `FLEET_LOD` in `constants.ts`) and can cap the frame rate (`FrameCap`). Bloom is unmounted when it is off, not just disabled.
+- `ViewOptions` carries `tactical`, `quality` (`high` | `low`), `bloom` and `fpsCap`. Low quality shortens LOD distances (`ASTEROID_LOD`, `FLEET_LOD` in `constants.ts`) and can cap the frame rate (`FrameCap`). HQ caps `dpr` at `[1, 1.5]` and `Effects.tsx` scales `EffectComposer` `multisampling` down as DPR rises (#239). Bloom is unmounted when it is off, not just disabled.
+- `FrameCap` (`RenderLoop.tsx`) also throttles to `PAUSED_FPS` when `engine.paused` is true (unless LQ already caps lower), waking temporarily on pointer/wheel input so orbit and zoom stay smooth (#239).
+- `Sky` (`Environment.tsx`) bakes the static per-tier nebula into an equirectangular `WebGLRenderTarget` on mount and tier changes rather than running 3D fBm every frame (#238).
 - Tactical view draws shape-coded icons (`ICON_SHAPE`, `SHAPES` from `ui/palette.ts`) and turns on automatically when you zoom far out.
 
 ## Per-frame data
 
 - `fleetFrame` (`frameState.ts`) is one shared, preallocated set of typed arrays (`MAX_ENTITIES = 2048`) holding every live ship and pirate, interpolated **once per frame** by `FleetPass`. Docked ships and drones riding in a barge are omitted (#181). Ship layers, trails and beams all read from it. Entities are bucketed by render class (`CLASSES`: ship classes, then pirate).
+- `AsteroidField` skips spin, matrix recomputation, and `instanceMatrix` uploads while `engine.paused` is true unless the camera moves, LOD changes, or the asteroid list/system changes (#239).
 - Don't allocate in `useFrame`. Reuse module-level scratch vectors, colors and buffers, as the existing components do (`BEAM_COLORS`, `MAX_SEG` line buffers).
 - Read the engine directly in `useFrame` (`engine.view`, `lerpPos`, `lerpCarrier`). Don't route positions through React state.
 - R3F mutates three.js objects inside `useFrame` by design, which is why the `react/immutability` lint rule is off.

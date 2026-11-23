@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { engine, useGame } from '../game/engine';
 import { TIER_NAMES } from '../sim/config';
 import { MAX_ROUTES, ROUTE_RATES, routeChance } from '../sim/routeinfo';
 import { ROUTE_RESOURCES, type RouteResource } from '../sim/types';
+import { deepEqual } from './equal';
 import { carrierChoices } from './inbox';
 import { fmt } from './format';
 import { Modal } from './Modal';
@@ -14,30 +15,56 @@ const RESOURCE_LABEL: Record<RouteResource, string> = { ore: 'Ore', h2: 'H2', en
 
 /** Strategic star map (#80): switch carriers, warp the focused one, and run supply routes. */
 export function StarMap({ onClose }: { onClose: () => void }) {
-  const s = useGame();
-  const carriers = engine.carriers;
-  const labels = carrierChoices(carriers, s.systems);
-  const label = (id: number) => labels.find((l) => l.id === id)?.label ?? `Carrier ${id}`;
-  const nodes = useMemo(() => layoutSystems(s.systems), [s.systems]);
-  const at = (systemId: number) => nodes[systemId] ?? { id: systemId, x: 0, y: 0 };
-  const focusedId = engine.focusedCarrierId;
-  const focusedSystem = carriers.find((c) => c.id === focusedId)?.systemId ?? s.systemId;
+  const m = useGame((s) => {
+    const carriers = engine.carriers.map((c) => ({ id: c.id, systemId: c.systemId }));
+    const labels = carrierChoices(carriers, s.systems);
+    const focusedId = engine.focusedCarrierId;
+    return {
+      carriers,
+      labels,
+      focusedId,
+      focusedSystem: carriers.find((c) => c.id === focusedId)?.systemId ?? s.systemId,
+      nodes: layoutSystems(s.systems),
+      systems: s.systems.map((sys) => ({
+        id: sys.id,
+        name: sys.name,
+        tier: sys.tier,
+        discovered: sys.discovered,
+        distance: sys.distance,
+        oreMult: sys.oreMult.toFixed(2),
+        brightness: sys.brightness.toFixed(2),
+        gasGiant: sys.gasGiant,
+      })),
+      routes: s.routes.map((r) => ({
+        id: r.id,
+        from: r.from,
+        to: r.to,
+        resource: r.resource,
+        rate: r.rate,
+        moved: fmt(r.moved),
+        lost: fmt(r.lost),
+        chancePct: Math.round(routeChance(s, engine.carriers, r) * 100),
+      })),
+    };
+  }, deepEqual);
+  const label = (id: number) => m.labels.find((l) => l.id === id)?.label ?? `Carrier ${id}`;
+  const at = (systemId: number) => m.nodes[systemId] ?? { id: systemId, x: 0, y: 0 };
   const [picked, setPicked] = useState<number | null>(null);
-  const [from, setFrom] = useState(focusedId);
+  const [from, setFrom] = useState(m.focusedId);
   const [to, setTo] = useState<number | null>(null);
   const [resource, setResource] = useState<RouteResource>('ore');
   const [rate, setRate] = useState(ROUTE_RATES[1]);
 
   const dest =
-    to !== null && to !== from && carriers.some((c) => c.id === to)
+    to !== null && to !== from && m.carriers.some((c) => c.id === to)
       ? to
-      : (carriers.find((c) => c.id !== from)?.id ?? null);
-  const pick = picked !== null ? s.systems[picked] : null;
+      : (m.carriers.find((c) => c.id !== from)?.id ?? null);
+  const pick = picked !== null ? m.systems[picked] : null;
   // Carriers per system, so markers in a shared system sit side by side.
   const slots = new Map<number, number[]>();
-  for (const c of carriers) slots.set(c.systemId, [...(slots.get(c.systemId) ?? []), c.id]);
+  for (const c of m.carriers) slots.set(c.systemId, [...(slots.get(c.systemId) ?? []), c.id]);
   const marker = (id: number) => {
-    const c = carriers.find((x) => x.id === id);
+    const c = m.carriers.find((x) => x.id === id);
     if (!c) return { x: 0, y: 0 };
     const group = slots.get(c.systemId) ?? [id];
     const p = at(c.systemId);
@@ -52,10 +79,9 @@ export function StarMap({ onClose }: { onClose: () => void }) {
         role="group"
         aria-label="Systems"
       >
-        {s.routes.map((r) => {
+        {m.routes.map((r) => {
           const a = marker(r.from);
           const b = marker(r.to);
-          const chance = routeChance(s, carriers, r);
           return (
             <line
               key={r.id}
@@ -64,13 +90,13 @@ export function StarMap({ onClose }: { onClose: () => void }) {
               y1={a.y}
               x2={b.x}
               y2={b.y}
-              strokeDasharray={chance > 0 ? '6 4' : undefined}
+              strokeDasharray={r.chancePct > 0 ? '6 4' : undefined}
             />
           );
         })}
-        {s.systems.map((sys) => {
+        {m.systems.map((sys) => {
           const p = at(sys.id);
-          const here = sys.id === focusedSystem;
+          const here = sys.id === m.focusedSystem;
           return (
             <g
               key={sys.id}
@@ -91,9 +117,9 @@ export function StarMap({ onClose }: { onClose: () => void }) {
             </g>
           );
         })}
-        {carriers.map((c, i) => {
-          const m = marker(c.id);
-          const on = c.id === focusedId;
+        {m.carriers.map((c, i) => {
+          const mk = marker(c.id);
+          const on = c.id === m.focusedId;
           return (
             <g
               key={c.id}
@@ -107,8 +133,8 @@ export function StarMap({ onClose }: { onClose: () => void }) {
                 if (e.key === 'Enter' || e.key === ' ') engine.focusCarrier(c.id);
               }}
             >
-              <rect x={m.x - 9} y={m.y - 9} width={18} height={18} rx={4} />
-              <text x={m.x} y={m.y + 4} textAnchor="middle">
+              <rect x={mk.x - 9} y={mk.y - 9} width={18} height={18} rx={4} />
+              <text x={mk.x} y={mk.y + 4} textAnchor="middle">
                 {i + 1}
               </text>
             </g>
@@ -121,11 +147,11 @@ export function StarMap({ onClose }: { onClose: () => void }) {
           pick.discovered ? (
             <>
               <b>{pick.name}</b> · {TIER_NAMES[pick.tier]} · {pick.distance} jumps out · ore ×
-              {pick.oreMult.toFixed(2)} · ☀ {pick.brightness.toFixed(2)}
+              {pick.oreMult} · ☀ {pick.brightness}
               {pick.gasGiant ? ' · gas giant' : ''}{' '}
-              {pick.id !== focusedSystem && (
+              {pick.id !== m.focusedSystem && (
                 <button onClick={() => engine.dispatch({ type: 'warp', systemId: pick.id })}>
-                  Warp {label(focusedId)} here
+                  Warp {label(m.focusedId)} here
                 </button>
               )}
             </>
@@ -140,7 +166,7 @@ export function StarMap({ onClose }: { onClose: () => void }) {
       </div>
 
       <h3>Supply routes</h3>
-      {carriers.length < 2 ? (
+      {m.carriers.length < 2 ? (
         <p className="hint">Buy a second carrier to move ore, H2 and energy between carriers.</p>
       ) : (
         <>
@@ -148,14 +174,14 @@ export function StarMap({ onClose }: { onClose: () => void }) {
             Credits and research are shared; ore, H2 and energy are per carrier. A route ships its
             rate every second. Across systems, pirates may intercept a shipment and take it.
           </p>
-          {s.routes.length === 0 && <p className="hint">No routes yet.</p>}
+          {m.routes.length === 0 && <p className="hint">No routes yet.</p>}
           <ul className="routes">
-            {s.routes.map((r) => (
+            {m.routes.map((r) => (
               <li key={r.id}>
                 <b>{label(r.from)}</b> → <b>{label(r.to)}</b> · {RESOURCE_LABEL[r.resource]}{' '}
-                {r.rate}/s · {Math.round(routeChance(s, carriers, r) * 100)}% intercept ·{' '}
+                {r.rate}/s · {r.chancePct}% intercept ·{' '}
                 <span className="sub">
-                  {fmt(r.moved)} delivered, {fmt(r.lost)} lost
+                  {r.moved} delivered, {r.lost} lost
                 </span>{' '}
                 <button
                   onClick={() => engine.dispatchFor(r.from, { type: 'removeRoute', routeId: r.id })}
@@ -172,7 +198,7 @@ export function StarMap({ onClose }: { onClose: () => void }) {
               value={from}
               onChange={(e) => setFrom(Number(e.target.value))}
             >
-              {carriers.map((c) => (
+              {m.carriers.map((c) => (
                 <option key={c.id} value={c.id}>
                   {label(c.id)}
                 </option>
@@ -184,7 +210,7 @@ export function StarMap({ onClose }: { onClose: () => void }) {
               value={dest ?? ''}
               onChange={(e) => setTo(Number(e.target.value))}
             >
-              {carriers
+              {m.carriers
                 .filter((c) => c.id !== from)
                 .map((c) => (
                   <option key={c.id} value={c.id}>
@@ -215,7 +241,7 @@ export function StarMap({ onClose }: { onClose: () => void }) {
               ))}
             </select>
             <button
-              disabled={dest === null || s.routes.length >= MAX_ROUTES}
+              disabled={dest === null || m.routes.length >= MAX_ROUTES}
               onClick={() =>
                 dest !== null &&
                 engine.dispatchFor(from, { type: 'addRoute', to: dest, resource, rate })

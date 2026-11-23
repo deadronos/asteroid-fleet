@@ -22,8 +22,8 @@ const legacy = vi.hoisted(() => ({ spec: null as Partial<Record<string, number |
 
 vi.mock('./cards', async (importOriginal) => {
   const mod = await importOriginal<typeof import('./cards')>();
-  const firing: typeof realFiring = (s, list, ship) =>
-    legacy.spec ? oldRule(s, list, ship) : mod.firing(s, list, ship);
+  const firing: typeof realFiring = (s, list, ship, ctx) =>
+    legacy.spec ? oldRule(s, list, ship) : mod.firing(s, list, ship, ctx);
   return { ...mod, firing };
 });
 

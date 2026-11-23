@@ -15,7 +15,7 @@ import {
 import { SHIELD_HP, card, damageShip, inHazard, type Ctx } from './ctx';
 import { oreNear } from './mining';
 import { dist, dist2, moveToward, rand } from './math';
-import { lvl, reserveDefs } from './research';
+import { lvl, reserveDefsView } from './research';
 import {
   clusterCenters,
   createShip,
@@ -107,13 +107,14 @@ export function hazards(s: Sim, dt: number) {
 
 // ---------- field, reserves, carrier ----------
 
-export function field(s: Sim, dt: number) {
+export function field(s: Sim, dt: number, ctx?: Ctx) {
   // Carriers sharing a field (#176) must not each tick it: the first one holding it does.
   const first = stateOf(s).ops.find((op) => op.asteroids === s.asteroids);
   if (first && first.id !== s.id) return;
   const sys = s.systems[s.systemId];
   let scouts = -1;
   let centers: Vec3[] | null = null;
+  let respawned = false;
   for (let i = 0; i < s.asteroids.length; i++) {
     const a = s.asteroids[i];
     if (a.ore > 0 || a.respawn <= 0) continue;
@@ -133,12 +134,14 @@ export function field(s: Sim, dt: number) {
         Math.min(0.3, scouts * 0.06 * (1 + 0.5 * lvl(s, 'scoutSurvey'))),
       );
       s.asteroids[i] = fresh;
+      respawned = true;
     }
   }
+  if (respawned && ctx) ctx.asteroidGrid.build(s.asteroids);
 }
 
 export function reserves(s: Sim, dt: number, ctx: Ctx) {
-  const defs = reserveDefs(s);
+  const defs = reserveDefsView(s);
   for (const [cls, min, cooldown] of defs) {
     if (min <= 0 || !s.unlocked.includes(cls)) continue;
     const n = ctx.byClass[cls].length;
@@ -161,7 +164,7 @@ export function reserves(s: Sim, dt: number, ctx: Ctx) {
   }
 }
 
-export function drift(s: Sim, dt: number) {
+export function drift(s: Sim, dt: number, ctx?: Ctx) {
   // Hold still while the warp charges, so recalled ships aren't chasing the carrier.
   if (s.warp) return;
   const c = s.carrier;
@@ -170,7 +173,7 @@ export function drift(s: Sim, dt: number) {
     let bv = 0;
     for (const cc of clusterCenters(s.systems[s.systemId])) {
       if (inHazard(s, cc)) continue;
-      const v = oreNear(s, cc, 14) / (dist(cc, c.pos) + 30);
+      const v = oreNear(s, cc, 14, ctx) / (dist(cc, c.pos) + 30);
       if (v > bv) {
         bv = v;
         best = cc;

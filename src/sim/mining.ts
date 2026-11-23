@@ -289,9 +289,20 @@ export function drone(s: Sim, ship: Ship, dt: number, ctx: Ctx, mining: 'greedy'
   ship.mode = 'idle';
 }
 
-export function oreNear(s: Sim, p: Vec3, r: number): number {
+export function oreNear(s: Sim, p: Vec3, r: number, ctx?: Ctx): number {
   let v = 0;
   const r2 = r * r;
+  if (ctx) {
+    ctx.asteroidGrid.rings(
+      p,
+      (d) => d < r,
+      (i) => {
+        const a = s.asteroids[i];
+        if (dist2(a.pos, p) < r2) v += a.ore * a.value;
+      },
+    );
+    return v;
+  }
   for (const a of s.asteroids) if (dist2(a.pos, p) < r2) v += a.ore * a.value;
   return v;
 }
@@ -313,7 +324,7 @@ export function barge(s: Sim, ship: Ship, dt: number, ctx: Ctx, mining: 'greedy'
     !ship.station ||
     (ship.mode === 'station' &&
       Math.floor(s.time * 10) % 50 === ship.id % 50 &&
-      oreNear(s, ship.station, 14) < 200)
+      oreNear(s, ship.station, 14, ctx) < 200)
   ) {
     ship.station = pickStation(s, ship, ctx, mining);
     ship.mode = 'idle';
@@ -338,7 +349,7 @@ function pickStation(s: Sim, ship: Ship, ctx: Ctx, mining: 'greedy' | 'safe'): V
     if (mining === 'safe' && d > 55) continue;
     if (inHazard(s, c)) continue;
     if (others.some((o) => dist(o.station!, c) < 12)) continue;
-    const value = oreNear(s, c, 14);
+    const value = oreNear(s, c, 14, ctx);
     if (value < 100) continue;
     const score = (mining === 'greedy' ? value : value / (d + 20)) * (covered(s, c, ctx) ? 1.2 : 1);
     if (score > bs) {
@@ -358,7 +369,7 @@ export function haulerJob(s: Sim, ship: Ship, ctx: Ctx): Ship | null {
     if (ctx.haulerClaims.has(b.id) && ship.targetId !== b.id) continue;
     const fill = b.cargo / cargoCap(s, 'barge', b);
     // A firing call-a-hauler card brings one early; otherwise haulers come at 98 %.
-    if (fill > bf && (fill >= 0.98 || (calls.length > 0 && firing(s, calls, b)))) {
+    if (fill > bf && (fill >= 0.98 || (calls.length > 0 && firing(s, calls, b, ctx)))) {
       bf = fill;
       best = b;
     }

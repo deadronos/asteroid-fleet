@@ -60,6 +60,9 @@ export interface Ctx {
   byClass: Record<ShipClass, Ship[]>;
   /** Escort candidates (barges, haulers, harvesters), in `s.ships` order. */
   wards: Ship[];
+  /** Ships with `hull < maxHull` this tick, populated lazily by repair drones (#241). */
+  damaged: Ship[];
+  damagedBuilt: boolean;
   hangarOf: Map<number, Hangar>;
   hangarInfo: Map<Hangar, HangarInfo>;
   stances: Map<number, Stance>;
@@ -104,6 +107,8 @@ const ctx: Ctx = {
   haulerClaims: new Set(),
   byClass: emptyByClass(),
   wards: [],
+  damaged: [],
+  damagedBuilt: false,
   hangarOf: new Map(),
   hangarInfo: new Map(),
   stances: new Map(),
@@ -128,6 +133,8 @@ export function buildCtx(s: Sim): Ctx {
   ctx.haulerClaims.clear();
   for (const k in ctx.byClass) ctx.byClass[k as ShipClass].length = 0;
   ctx.wards.length = 0;
+  ctx.damaged.length = 0;
+  ctx.damagedBuilt = false;
   ctx.hangarOf.clear();
   ctx.hangarInfo.clear();
   ctx.stances.clear();
@@ -166,10 +173,10 @@ export function buildCtx(s: Sim): Ctx {
   compileCards(s, ctx.cards);
   // Recall is decided once, at the start of the tick.
   const recall = ctx.cards.recall;
-  ctx.recall = !!s.warp || !!firing(s, recall, null);
+  ctx.recall = !!s.warp || !!firing(s, recall, null, ctx);
   ctx.recalled.clear();
   if (!ctx.recall && recall.length > 0)
-    for (const sh of s.ships) if (firing(s, recall, sh)) ctx.recalled.add(sh.id);
+    for (const sh of s.ships) if (firing(s, recall, sh, ctx)) ctx.recalled.add(sh.id);
   return ctx;
 }
 
@@ -223,14 +230,14 @@ export function recalled(c: Ctx, ship: Ship): boolean {
 /** The first `action` card that fires for `ship` (or for the carrier when null). */
 export function card(s: Sim, c: Ctx, action: ActionKind, ship: Ship | null) {
   const list = c.cards[action];
-  return list.length > 0 ? firing(s, list, ship) : null;
+  return list.length > 0 ? firing(s, list, ship, c) : null;
 }
 
 /** The stance card in force for `ship`; a timed card stays in force through `ship.hold`. */
 function stanceCardOf(s: Sim, c: Ctx, ship: Ship): RuleCard | null {
   const list = c.cards.stance;
   if (list.length === 0) return null;
-  const hit = firing(s, list, ship);
+  const hit = firing(s, list, ship, c);
   if (hit) {
     if (hit.then.seconds) ship.hold = { card: hit.id, until: s.time + hit.then.seconds };
     return hit;

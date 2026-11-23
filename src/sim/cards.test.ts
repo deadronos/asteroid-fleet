@@ -4,6 +4,7 @@ import { conditionHolds, firing } from './cards';
 import { CARD_SLOTS, PRESETS } from './config';
 import { buildCtx, stanceOf } from './ctx';
 import { effectiveStance, stanceSource } from './doctrine';
+import { oreNear } from './mining';
 import { bind, createShip, enterSystem, newGame, unlockRule, stateOf } from './state';
 import { stepSim } from './tick';
 import type { Sim, RuleCard, RuleId, Ship } from './types';
@@ -323,5 +324,20 @@ describe('hangar-scoped cards across carriers (#178)', () => {
     expect(firing(s0, [card], mine)).toBeNull();
     s1.ships.push({ ...mine, hangarId: theirs });
     expect(firing(s1, [card], s1.ships.at(-1)!)).toBe(card);
+  });
+
+  it('asteroidFarther and oreNear match linear scans when given ctx (#241)', () => {
+    const s = game();
+    const rock = s.asteroids.find((a) => a.ore > 0)!;
+    const ship = s.ships[0];
+    ship.pos = { x: rock.pos.x + 5, y: rock.pos.y, z: rock.pos.z };
+    const ctx = buildCtx(s);
+    expect(conditionHolds(s, { kind: 'asteroidFarther', value: 10 }, ship, ctx)).toBe(
+      conditionHolds(s, { kind: 'asteroidFarther', value: 10 }, ship),
+    );
+    expect(conditionHolds(s, { kind: 'asteroidFarther', value: 1 }, ship, ctx)).toBe(
+      conditionHolds(s, { kind: 'asteroidFarther', value: 1 }, ship),
+    );
+    expect(oreNear(s, rock.pos, 25, ctx)).toBeCloseTo(oreNear(s, rock.pos, 25), 10);
   });
 });
