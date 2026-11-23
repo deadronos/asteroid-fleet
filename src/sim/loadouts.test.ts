@@ -13,6 +13,7 @@ describe('module loadout templates (#244)', () => {
     expect(setLoadout(s, 'drone', ['laser', 'laser'])).toBe('Too many module slots');
     expect(setLoadout(s, 'dreadnought' as 'drone', ['laser'])).toBe('No such class');
     expect(setLoadout(s, 'barge', ['quantum' as 'laser'])).toBe('Unknown module');
+    expect(setLoadout(s, 'barge', ['drill'])).toBe('Module does not fit this class');
     expect(setLoadout(s, 'barge', ['tractor', null])).toBeNull();
   });
 

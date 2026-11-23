@@ -96,7 +96,9 @@ export function ShipDetail({ id }: { id: number }) {
       srcMining: stanceSource(s, ship, 'mining'),
       modules: [...ship.modules],
       synergy: syn.map((k) => SYNERGY_LABEL[k]).join(' · '),
-      loadout: template ? template.map((m) => m ?? '—').join(' / ') || 'empty' : null,
+      loadout: template
+        ? template.map((m) => (m ? MODULES[m].short : '—')).join(' / ') || 'empty'
+        : null,
       furthestTier: s.stats.furthestTier,
       affordable: fits.map((m) => s.credits >= MODULES[m].cost),
     };
@@ -137,7 +139,11 @@ export function ShipDetail({ id }: { id: number }) {
         <span className="blurb grow">Class loadout: {d.loadout ?? 'none'}</span>
         <button
           onClick={() =>
-            engine.dispatch({ type: 'setLoadout', cls: d.cls, modules: [...d.modules] })
+            engine.dispatch({
+              type: 'setLoadout',
+              cls: d.cls,
+              modules: Array.from({ length: MODULE_SLOTS[d.cls] }, (_, i) => d.modules[i] ?? null),
+            })
           }
           title="Save this ship's modules as the template for every ship of this class"
         >

@@ -165,7 +165,7 @@ describe('FleetPanel', () => {
     )!;
     expect(save).toBeDefined();
     await click(save);
-    expect(dispatch).toHaveBeenCalledWith({ type: 'setLoadout', cls: 'drone', modules: [] });
+    expect(dispatch).toHaveBeenCalledWith({ type: 'setLoadout', cls: 'drone', modules: [null] });
 
     s.loadouts = { drone: ['laser'] };
     await act(async () => engine.emit());
@@ -383,7 +383,9 @@ describe('progressive research disclosure (#247)', () => {
     const m = await mount(<ResearchPanel />, s);
     cleanup = m.cleanup;
     expect(m.el.textContent).toContain('RP per hour');
-    expect(m.el.textContent).toContain('Next +1 RP');
+    // At tier 2 and ore = RP_DIVISOR (rp = 2), next step is k=2 -> +2 RP requiring 1.5M more ore.
+    expect(m.el.textContent).toContain('Next +2 RP');
+    expect(m.el.textContent).toContain('1.5M ore');
     expect(m.el.textContent).toContain('Lifetime');
     expect(m.el.textContent).toContain('Forward Charter');
     expect(m.el.textContent).toContain('max');

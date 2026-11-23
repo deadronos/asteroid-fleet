@@ -85,14 +85,19 @@ export function ResearchPanel() {
     const rp = researchPayout(s);
     const mult = researchMult(s);
     const seconds = Math.floor(s.time);
-    const nextTarget = (rp + 1) / (s.stats.furthestTier * mult);
-    const needOre = Math.max(0, nextTarget * nextTarget * RP_DIVISOR - s.stats.oreValueDelivered);
+    // `researchPayout` floors sqrt(ore / RP_DIVISOR) to an integer `k` before scaling by tier * mult.
+    const factor = s.stats.furthestTier * mult;
+    let nextK = Math.ceil((rp + 1) / factor);
+    while (Math.floor(nextK * factor) <= rp) nextK++;
+    const nextRpGain = Math.floor(nextK * factor) - rp;
+    const needOre = Math.max(0, nextK * nextK * RP_DIVISOR - s.stats.oreValueDelivered);
     const eta = s.incomeAvg > 0 ? needOre / s.incomeAvg : Infinity;
     return {
       research: s.research,
       rp,
       // A rough lifetime rate, bucketed to whole seconds so a tick does not re-render the panel.
       rpPerHour: rp > 0 && seconds > 0 ? (rp * 3600) / seconds : 0,
+      nextRpGain,
       nextRpOre: fmt(needOre),
       nextRpEta: Number.isFinite(eta) ? formatSimTime(eta) : '—',
       runTime: formatSimTime(s.time),
@@ -259,7 +264,7 @@ export function ResearchPanel() {
         <Pair
           a="RP per hour"
           av={r.rpPerHour > 0 ? `${r.rpPerHour.toFixed(1)} /h` : '—'}
-          b="Next +1 RP"
+          b={`Next +${r.nextRpGain} RP`}
           bv={`${r.nextRpOre} ore · ${r.nextRpEta}`}
         />
         <p className="hint" style={{ margin: 0 }}>

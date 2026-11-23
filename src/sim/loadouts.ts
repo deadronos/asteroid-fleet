@@ -12,9 +12,11 @@ import { SHIP_CLASSES, type ModuleId, type Ship, type ShipClass, type Sim } from
 export function setLoadout(s: Sim, cls: ShipClass, list: (ModuleId | null)[]): string | null {
   if (!SHIP_CLASSES.includes(cls)) return 'No such class';
   if (!Array.isArray(list) || list.length > MODULE_SLOTS[cls]) return 'Too many module slots';
-  for (const m of list)
-    if (m !== null && (typeof m !== 'string' || !Object.hasOwn(MODULES, m)))
-      return 'Unknown module';
+  for (const m of list) {
+    if (m === null) continue;
+    if (typeof m !== 'string' || !Object.hasOwn(MODULES, m)) return 'Unknown module';
+    if (!MODULES[m].fits.includes(cls)) return 'Module does not fit this class';
+  }
   s.loadouts[cls] = [...list];
   return null;
 }

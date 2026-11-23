@@ -18,6 +18,7 @@ import {
   SHIP_CLASSES,
   type GameState,
   type HullId,
+  type ModuleId,
   type RuleCard,
   type RuleId,
   type Severity,
@@ -359,8 +360,11 @@ export function validLoadouts(value: unknown): boolean {
   for (const [cls, list] of Object.entries(value)) {
     if (!SHIP_CLASSES.includes(cls as ShipClass) || !Array.isArray(list)) return false;
     if (list.length > MODULE_SLOTS[cls as ShipClass]) return false;
-    for (const m of list)
-      if (m !== null && (typeof m !== 'string' || !Object.hasOwn(MODULES, m))) return false;
+    for (const m of list) {
+      if (m === null) continue;
+      if (typeof m !== 'string' || !Object.hasOwn(MODULES, m)) return false;
+      if (!MODULES[m as ModuleId].fits.includes(cls as ShipClass)) return false;
+    }
   }
   return true;
 }
