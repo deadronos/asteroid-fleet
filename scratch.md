@@ -2,7 +2,7 @@
 
 The v0.0.14 review is grouped under five umbrellas:
 
-- **#219** — Bugs and spec drift (#224–#230)
+- **#219** — Bugs and spec drift (#224–#230) — _done_
 - **#220** — Visuals, FX and game feel (#231–#237)
 - **#221** — Performance and render hygiene (#238–#241)
 - **#222** — Gameplay, balance and progression (#242–#245)
@@ -15,14 +15,7 @@ Also open from earlier: **#161** (Combat fidelity: firing arcs, hit chance, evas
 ## Done
 
 - #224, #225, #226, #227, #228: Batch 1 quick bug fixes (#251)
-
-## Batch 2 — Design decisions & save hardening (#219, #223)
-
-Short design calls first, then small high-value correctness & durability PRs.
-
-- #229 _(design decision)_: decide whether shield hits drain energy (`SHIELD_ENERGY_PER_DMG`) or only regen does; clean up unused constants and docs
-- #230 _(design decision)_: decide whether live Tier B carriers count toward `oreValueDelivered` (RP/challenges) and burn H2 for Fusion
-- #249: tighten multi-carrier tab-close save durability and deep-validate imported saves
+- #229, #230, #249: Batch 2 shield constants, Tier B RP/Fusion, save durability & deep validation (#252) — completes umbrella #219
 
 ## Batch 3 — GPU & UI performance foundation (#221)
 
