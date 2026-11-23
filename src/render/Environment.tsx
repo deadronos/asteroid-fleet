@@ -1,5 +1,5 @@
-import { useFrame } from '@react-three/fiber';
-import { memo, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
+import { useFrame, useThree } from '@react-three/fiber';
+import { memo, useLayoutEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import * as THREE from 'three';
 import { engine } from '../game/engine';
 import { H2_STORM_RADIUS } from '../sim/config';
@@ -152,24 +152,82 @@ const TIER_SKY: Record<number, [string, string]> = {
 const SUN_POS: [number, number, number] = [400, 150, -500];
 const RIM_POS: [number, number, number] = [-450, 90, -200];
 
+const NEBULA_W = 1024;
+const NEBULA_H = 512;
+
 export const Sky = memo(function Sky() {
   const sys = engine.view.systems[useSystemId()];
   const tier = sys.tier;
-  const mat = useMemo(
+  const gl = useThree((s) => s.gl);
+  const skyMat = useMemo(
     () =>
-      new THREE.ShaderMaterial({
-        uniforms: { uA: { value: new THREE.Color() }, uB: { value: new THREE.Color() } },
-        vertexShader: NEBULA_VERT,
-        fragmentShader: NEBULA_FRAG,
+      new THREE.MeshBasicMaterial({
         side: THREE.BackSide,
         depthWrite: false,
+        toneMapped: false,
       }),
     [],
   );
-  useEffect(() => {
-    mat.uniforms.uA.value.set(TIER_SKY[tier][0]);
-    mat.uniforms.uB.value.set(TIER_SKY[tier][1]);
-  }, [tier, mat]);
+  const bakerRef = useRef<{
+    rt: THREE.WebGLRenderTarget;
+    geo: THREE.PlaneGeometry;
+    mat: THREE.ShaderMaterial;
+    scene: THREE.Scene;
+    cam: THREE.OrthographicCamera;
+  } | null>(null);
+
+  // Bake the static 5-octave fBm nebula once per tier into an equirectangular target (#238).
+  useLayoutEffect(() => {
+    const halfFloat =
+      gl.extensions.has('EXT_color_buffer_half_float') ||
+      gl.extensions.has('EXT_color_buffer_float');
+    const rt = new THREE.WebGLRenderTarget(NEBULA_W, NEBULA_H, {
+      type: halfFloat ? THREE.HalfFloatType : THREE.UnsignedByteType,
+      depthBuffer: false,
+      stencilBuffer: false,
+      generateMipmaps: false,
+      minFilter: THREE.LinearFilter,
+      magFilter: THREE.LinearFilter,
+      wrapS: THREE.RepeatWrapping,
+      wrapT: THREE.ClampToEdgeWrapping,
+    });
+    const geo = new THREE.PlaneGeometry(2, 2);
+    const mat = new THREE.ShaderMaterial({
+      uniforms: { uA: { value: new THREE.Color() }, uB: { value: new THREE.Color() } },
+      vertexShader: NEBULA_VERT,
+      fragmentShader: NEBULA_FRAG,
+      depthTest: false,
+      depthWrite: false,
+    });
+    const scene = new THREE.Scene();
+    scene.add(new THREE.Mesh(geo, mat));
+    const cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    bakerRef.current = { rt, geo, mat, scene, cam };
+    skyMat.map = rt.texture;
+    skyMat.needsUpdate = true;
+    return () => {
+      bakerRef.current = null;
+      rt.dispose();
+      geo.dispose();
+      mat.dispose();
+      skyMat.dispose();
+    };
+  }, [gl, skyMat]);
+
+  useLayoutEffect(() => {
+    const baker = bakerRef.current;
+    if (!baker) return;
+    baker.mat.uniforms.uA.value.set(TIER_SKY[tier][0]);
+    baker.mat.uniforms.uB.value.set(TIER_SKY[tier][1]);
+    const prevTarget = gl.getRenderTarget();
+    const prevXr = gl.xr.enabled;
+    gl.xr.enabled = false;
+    gl.setRenderTarget(baker.rt);
+    gl.render(baker.scene, baker.cam);
+    gl.setRenderTarget(prevTarget);
+    gl.xr.enabled = prevXr;
+  }, [gl, tier]);
+
   const bright = sys.brightness;
   const sunColor = useMemo(
     () => new THREE.Color('#fff2c8').multiplyScalar(2 + bright * 2),
@@ -177,7 +235,7 @@ export const Sky = memo(function Sky() {
   );
   return (
     <>
-      <mesh material={mat}>
+      <mesh material={skyMat}>
         <sphereGeometry args={[900, 32, 16]} />
       </mesh>
       <Starfield />

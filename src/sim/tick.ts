@@ -93,11 +93,11 @@ export function stepOp(s: Sim, dt = DT) {
   pirateStep(s, dt, ctx);
   hazards(s, dt);
   refine(s, dt, ctx);
-  field(s, dt);
+  field(s, dt, ctx);
   decayContainers(s, dt);
   reserves(s, dt, ctx);
   automation(s, dt);
-  drift(s, dt);
+  drift(s, dt, ctx);
 
   // cleanup: compact in place, keeping order
   let alive = 0;
@@ -157,6 +157,13 @@ function checkChallenge(s: Sim) {
 
 // ---------- launching ----------
 
+function hasHurtShip(s: Sim): boolean {
+  for (const x of s.ships) {
+    if (!isStowed(x) && x.hull < maxHull(s, x.cls) * 0.85) return true;
+  }
+  return false;
+}
+
 function wantsLaunch(s: Sim, ship: Ship, ctx: Ctx): boolean {
   if (recalled(ctx, ship)) return false;
   const mh = maxHull(s, ship.cls);
@@ -173,12 +180,17 @@ function wantsLaunch(s: Sim, ship: Ship, ctx: Ctx): boolean {
     case 'harvester':
       return sys.gasGiant && lvl(s, 'fusion') > 0 && s.pirates.length === 0;
     case 'repair':
-      return s.ships.some((x) => !isStowed(x) && x.hull < maxHull(s, x.cls) * 0.85);
+      return hasHurtShip(s);
     case 'drone':
       return !ship.idleUntil || s.time >= ship.idleUntil;
     default:
       return true;
   }
+}
+
+function launchRank(order: readonly ShipClass[], cls: ShipClass): number {
+  const i = order.indexOf(cls);
+  return i < 0 ? 99 : i;
 }
 
 function launch(s: Sim, dt: number, ctx: Ctx) {
@@ -187,16 +199,19 @@ function launch(s: Sim, dt: number, ctx: Ctx) {
   for (const h of s.hangars) {
     h.launchTimer -= dt;
     if (h.launchTimer > 0 || hold) continue;
-    const docked = h.items
-      .map((it) => ctx.ships.get(it.shipId))
-      .filter((x): x is Ship => !!x && x.mode === 'docked');
-    if (!docked.length) continue;
-    const rank = (c: ShipClass) => {
-      const i = h.launchOrder.indexOf(c);
-      return i < 0 ? 99 : i;
-    };
-    docked.sort((a, b) => rank(a.cls) - rank(b.cls));
-    const next = docked.find((x) => wantsLaunch(s, x, ctx));
+    let next: Ship | null = null;
+    let bestRank = Infinity;
+    for (const it of h.items) {
+      const sh = ctx.ships.get(it.shipId);
+      if (!sh || sh.mode !== 'docked') continue;
+      const r = launchRank(h.launchOrder, sh.cls);
+      if (r >= bestRank) continue;
+      if (wantsLaunch(s, sh, ctx)) {
+        next = sh;
+        bestRank = r;
+        if (bestRank === 0) break;
+      }
+    }
     if (!next) continue;
     next.mode = 'idle';
     const off = onSphere(() => rand(s), 3, 0.5);

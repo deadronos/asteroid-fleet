@@ -81,9 +81,10 @@ export class PointGrid {
   /**
    * Visit cells ring by ring around `p`. Before each ring `k`, `bound` receives
    * a lower bound on the distance of any point in that ring and may return
-   * false to stop. `visit` gets every point index in the ring.
+   * false to stop. `visit` gets every point index in the ring and may return
+   * false to stop immediately.
    */
-  rings(p: Vec3, bound: (minDist: number) => boolean, visit: (i: number) => void) {
+  rings(p: Vec3, bound: (minDist: number) => boolean, visit: (i: number) => unknown) {
     const x0 = this.cx(p.x);
     const z0 = this.cz(p.z);
     const kMax = Math.max(x0, this.nx - 1 - x0, z0, this.nz - 1 - z0);
@@ -97,7 +98,9 @@ export class PointGrid {
         for (let x = x0 - k; x <= x0 + k; x += step) {
           if (x < 0 || x >= this.nx) continue;
           const c = x + z * this.nx;
-          for (let j = this.start[c]; j < this.start[c + 1]; j++) visit(this.items[j]);
+          for (let j = this.start[c]; j < this.start[c + 1]; j++) {
+            if (visit(this.items[j]) === false) return;
+          }
         }
       }
     }

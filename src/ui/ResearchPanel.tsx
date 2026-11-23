@@ -28,27 +28,26 @@ import {
   admiraltyLevel,
   canBuyAdmiralty,
 } from '../sim/admiralty';
+import { deepEqual } from './equal';
 import { fmt } from './format';
 
 const GLOBAL: Branch[] = ['Logistics', 'Mining', 'Combat', 'Carrier', 'Reserves', 'Automation'];
 
-function BuyCarrier(p: { credits: number; slots: number }) {
-  const owned = engine.carriers.length;
-  const cost = CARRIER_COST(owned);
-  const free = owned < p.slots;
+function BuyCarrier(p: { owned: number; cost: number; canAfford: boolean; slots: number }) {
+  const free = p.owned < p.slots;
   return (
     <div className="row">
       <button
-        disabled={!free || p.credits < cost}
+        disabled={!free || !p.canAfford}
         onClick={() => engine.dispatch({ type: 'buyCarrier' })}
         title={
           free ? 'A new carrier starts in the home system' : 'Reach the next Admiralty milestone'
         }
       >
-        Buy carrier · {fmt(cost)} cr
+        Buy carrier · {fmt(p.cost)} cr
       </button>
       <span className="hint">
-        {owned} of {p.slots} carrier slots in use
+        {p.owned} of {p.slots} carrier slots in use
       </span>
     </div>
   );
@@ -76,17 +75,57 @@ function Pair(p: { a: string; av: string; b: string; bv: string }) {
 }
 
 export function ResearchPanel() {
-  const s = useGame();
+  const r = useGame((s) => {
+    const tier = s.stats.furthestTier as 1 | 2 | 3;
+    const progress = challengeProgress(s);
+    const owned = engine.carriers.length;
+    const carrierCost = CARRIER_COST(owned);
+    return {
+      research: s.research,
+      rp: researchPayout(s),
+      marks: s.marks,
+      marksGain: marksPayout(s),
+      tier,
+      oreDelivered: fmt(s.stats.oreValueDelivered),
+      researchMult: researchMult(s).toFixed(2),
+      hullClass: s.carrier.hullClass,
+      hulls: [...s.hulls],
+      modifiers: [...s.modifiers],
+      challenge: s.challenge,
+      progressPct: progress !== null ? Math.floor(progress * 100) : null,
+      challengesDone: [...s.challengesDone],
+      admiralties: s.lifetime.admiralties,
+      carrierSlots: carrierSlots(s),
+      ownedCarriers: owned,
+      carrierCost,
+      canBuyCarrier: s.credits >= carrierCost,
+      admiraltyUpgrades: ADMIRALTY_UPGRADES.map((u) => ({
+        id: u.id,
+        level: fmt(admiraltyLevel(s, u.id)),
+        label: u.label(admiraltyEffect(s, u.id)),
+        canBuy: canBuyAdmiralty(s, u.id),
+        cost: fmt(admiraltyCost(s, u.id)),
+      })),
+      nodes: RESEARCH.map((n) => {
+        const l = lvl(s, n.id);
+        return {
+          id: n.id,
+          level: l,
+          maxed: l >= n.maxLevel,
+          locked: !!(researchLocked(s, n) || (n.tier && tier < n.tier)),
+          canBuy: canBuyResearch(s, n.id),
+          cost: fmt(n.cost(l)),
+          repeatLabel: n.repeat && l > 0 ? n.repeat.label(repeatEffect(s, n.id)) : null,
+        };
+      }),
+    };
+  }, deepEqual);
   const [confirm, setConfirm] = useState(false);
   const [confirmAdm, setConfirmAdm] = useState(false);
   const [confirmChallenge, setConfirmChallenge] = useState<ChallengeId | null>(null);
-  const progress = challengeProgress(s);
-  const marks = marksPayout(s);
-  const current = s.carrier.hullClass;
   const [hull, setHull] = useState<HullId | null>(null);
-  const pick = hull && s.hulls.includes(hull) ? hull : current;
-  const rp = researchPayout(s);
-  const tier = s.stats.furthestTier as 1 | 2 | 3;
+  const pick = hull && r.hulls.includes(hull) ? hull : r.hullClass;
+  const nodeById = new Map(r.nodes.map((n) => [n.id, n]));
   const branch = (b: Branch) => {
     const nodes = RESEARCH.filter((n) => n.branch === b);
     if (!nodes.length) return null;
@@ -96,38 +135,36 @@ export function ResearchPanel() {
         <h3>
           {label}{' '}
           <span className="hint">
-            {nodes.filter((n) => lvl(s, n.id) >= n.maxLevel).length}/
+            {nodes.filter((n) => nodeById.get(n.id)!.maxed).length}/
             {nodes.filter((n) => !n.repeat).length} maxed
           </span>
         </h3>
         <div className="nodes">
           {nodes.map((n) => {
-            const l = lvl(s, n.id);
-            const maxed = l >= n.maxLevel;
-            const locked = researchLocked(s, n) || (n.tier && tier < n.tier);
+            const st = nodeById.get(n.id)!;
             return (
-              <div key={n.id} className={`node ${maxed ? 'maxed' : ''}`}>
+              <div key={n.id} className={`node ${st.maxed ? 'maxed' : ''}`}>
                 <span className="nname">{n.name}</span>
                 <span className="ndesc">
                   {n.desc}
-                  {n.tier && tier < n.tier && ` · needs ${TIER_NAMES[n.tier].toLowerCase()}`}
+                  {n.tier && r.tier < n.tier && ` · needs ${TIER_NAMES[n.tier].toLowerCase()}`}
                   {n.repeat &&
-                    (l > 0
-                      ? ` · level ${fmt(l)}: ${n.repeat.label(repeatEffect(s, n.id))}`
-                      : ` · after ${RESEARCH.find((r) => r.id === n.repeat?.base)?.name} is maxed`)}
+                    (st.level > 0
+                      ? ` · level ${fmt(st.level)}: ${st.repeatLabel}`
+                      : ` · after ${RESEARCH.find((x) => x.id === n.repeat?.base)?.name} is maxed`)}
                 </span>
                 <div className="row">
                   <div className="pips grow">
                     {!n.repeat &&
                       Array.from({ length: n.maxLevel }, (_, i) => (
-                        <i key={i} className={i < l ? 'f' : ''} />
+                        <i key={i} className={i < st.level ? 'f' : ''} />
                       ))}
                   </div>
                   <button
-                    disabled={!canBuyResearch(s, n.id)}
+                    disabled={!st.canBuy}
                     onClick={() => engine.dispatch({ type: 'buyResearch', id: n.id })}
                   >
-                    {maxed ? 'max' : locked ? 'locked' : `${fmt(n.cost(l))} RP`}
+                    {st.maxed ? 'max' : st.locked ? 'locked' : `${st.cost} RP`}
                   </button>
                 </div>
               </div>
@@ -142,34 +179,34 @@ export function ResearchPanel() {
       <div className="prestige-box">
         <Pair
           a="Research points available"
-          av={`${s.research} RP`}
+          av={`${r.research} RP`}
           b="Prestige now pays"
-          bv={`+${rp} RP`}
+          bv={`+${r.rp} RP`}
         />
         <details>
           <summary className="hint">How RP works</summary>
           <p className="hint">
             RP = ⌊√(ore value delivered ÷ {fmt(RP_DIVISOR)})⌋ × furthest zone tier × (1 +{' '}
-            {Math.round(RP_PER_MARK * 100)} % per Admiralty Mark earned). This run:{' '}
-            {fmt(s.stats.oreValueDelivered)} delivered, furthest {TIER_NAMES[tier]} (×{tier}), Marks
-            ×{researchMult(s).toFixed(2)}. Prestige resets credits, ships, slots and position;
-            research, unlocked ships and rules, doctrine and discovered systems persist.
+            {Math.round(RP_PER_MARK * 100)} % per Admiralty Mark earned). This run: {r.oreDelivered}{' '}
+            delivered, furthest {TIER_NAMES[r.tier]} (×{r.tier}), Marks ×{r.researchMult}. Prestige
+            resets credits, ships, slots and position; research, unlocked ships and rules, doctrine
+            and discovered systems persist.
           </p>
         </details>
         {!confirm ? (
-          <button disabled={rp <= 0} onClick={() => setConfirm(true)}>
+          <button disabled={r.rp <= 0} onClick={() => setConfirm(true)}>
             Prestige…
           </button>
         ) : (
           <div className="row">
-            <span>Reset this operation for +{rp} RP?</span>
-            {s.hulls.length > 1 && (
+            <span>Reset this operation for +{r.rp} RP?</span>
+            {r.hulls.length > 1 && (
               <select
                 aria-label="Hull class for the next run"
                 value={pick}
                 onChange={(e) => setHull(e.target.value as HullId)}
               >
-                {s.hulls.map((id) => (
+                {r.hulls.map((id) => (
                   <option key={id} value={id} title={HULLS[id].blurb}>
                     {HULLS[id].name}
                   </option>
@@ -189,7 +226,12 @@ export function ResearchPanel() {
         )}
       </div>
       <div className="prestige-box">
-        <Pair a="Admiralty Marks" av={fmt(s.marks)} b="Admiralty now pays" bv={`+${fmt(marks)}`} />
+        <Pair
+          a="Admiralty Marks"
+          av={fmt(r.marks)}
+          b="Admiralty now pays"
+          bv={`+${fmt(r.marksGain)}`}
+        />
         <details>
           <summary className="hint">How Marks work</summary>
           <p className="hint">
@@ -198,12 +240,12 @@ export function ResearchPanel() {
           </p>
         </details>
         {!confirmAdm ? (
-          <button disabled={marks <= 0} onClick={() => setConfirmAdm(true)}>
+          <button disabled={r.marksGain <= 0} onClick={() => setConfirmAdm(true)}>
             Admiralty reset…
           </button>
         ) : (
           <div className="row">
-            <span>Reset for +{fmt(marks)} Marks?</span>
+            <span>Reset for +{fmt(r.marksGain)} Marks?</span>
             <button
               onClick={() => {
                 engine.doAdmiralty();
@@ -220,15 +262,15 @@ export function ResearchPanel() {
         <div className="hint" style={{ margin: 0 }}>
           Challenge runs
         </div>
-        {s.modifiers.length > 0 && (
+        {r.modifiers.length > 0 && (
           <p className="hint">
-            Active modifiers: {s.modifiers.map((m) => MODIFIERS[m].name).join(', ')}.
-            {s.challenge && progress !== null && ` Goal ${Math.floor(progress * 100)}% delivered.`}
+            Active modifiers: {r.modifiers.map((m) => MODIFIERS[m].name).join(', ')}.
+            {r.challenge && r.progressPct !== null && ` Goal ${r.progressPct}% delivered.`}
           </p>
         )}
         {CHALLENGE_IDS.map((id) => {
           const def = CHALLENGES[id];
-          const done = s.challengesDone.includes(id);
+          const done = r.challengesDone.includes(id);
           return (
             <div className="row" key={id}>
               <div className="grow">
@@ -254,7 +296,7 @@ export function ResearchPanel() {
                 </>
               ) : (
                 <button disabled={done} onClick={() => setConfirmChallenge(id)}>
-                  {s.challenge === id ? 'Restart…' : 'Start…'}
+                  {r.challenge === id ? 'Restart…' : 'Start…'}
                 </button>
               )}
             </div>
@@ -264,38 +306,46 @@ export function ResearchPanel() {
       </div>
       <div className="branch">
         <h3>
-          Admiralty shop <span className="hint">{fmt(s.marks)} Marks</span>
+          Admiralty shop <span className="hint">{fmt(r.marks)} Marks</span>
         </h3>
-        {ADMIRALTY_UPGRADES.map((u) => (
-          <div className="row" key={u.id}>
-            <div className="grow">
-              <b>{u.name}</b>
-              <div className="hint" style={{ margin: 0 }}>
-                {u.desc} · level {fmt(admiraltyLevel(s, u.id))}: {u.label(admiraltyEffect(s, u.id))}
+        {ADMIRALTY_UPGRADES.map((u, idx) => {
+          const st = r.admiraltyUpgrades[idx];
+          return (
+            <div className="row" key={u.id}>
+              <div className="grow">
+                <b>{u.name}</b>
+                <div className="hint" style={{ margin: 0 }}>
+                  {u.desc} · level {st.level}: {st.label}
+                </div>
               </div>
+              <button
+                disabled={!st.canBuy}
+                onClick={() => engine.dispatch({ type: 'buyAdmiralty', id: u.id })}
+              >
+                {st.cost} Marks
+              </button>
             </div>
-            <button
-              disabled={!canBuyAdmiralty(s, u.id)}
-              onClick={() => engine.dispatch({ type: 'buyAdmiralty', id: u.id })}
-            >
-              {fmt(admiraltyCost(s, u.id))} Marks
-            </button>
-          </div>
-        ))}
+          );
+        })}
       </div>
       <div className="prestige-box">
         <Pair
           a="Admiralty resets"
-          av={String(s.lifetime.admiralties)}
+          av={String(r.admiralties)}
           b="Carrier slots"
-          bv={String(carrierSlots(s))}
+          bv={String(r.carrierSlots)}
         />
         {MILESTONES.map((m) => (
           <div key={m.at} className="hint">
-            {s.lifetime.admiralties >= m.at ? '✓' : '○'} {m.at}: {m.label}
+            {r.admiralties >= m.at ? '✓' : '○'} {m.at}: {m.label}
           </div>
         ))}
-        <BuyCarrier credits={s.credits} slots={carrierSlots(s)} />
+        <BuyCarrier
+          owned={r.ownedCarriers}
+          cost={r.carrierCost}
+          canAfford={r.canBuyCarrier}
+          slots={r.carrierSlots}
+        />
       </div>
       {GLOBAL.map(branch)}
       {SHIP_CLASSES.map((c) => branch(c))}

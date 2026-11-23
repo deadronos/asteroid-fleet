@@ -258,13 +258,22 @@ export function surveyCluster(s: Sim, i: number, ctx: Ctx) {
   if (found > 0) emit(s, 'VeinFound', { veins: found });
 }
 
+function damagedShips(s: Sim, ctx: Ctx): readonly Ship[] {
+  if (!ctx.damagedBuilt) {
+    ctx.damagedBuilt = true;
+    for (const o of s.ships) if (o.hull < maxHull(s, o.cls)) ctx.damaged.push(o);
+  }
+  return ctx.damaged;
+}
+
 export function repairDrone(s: Sim, ship: Ship, dt: number, ctx: Ctx) {
   const v = speed(s, ship) * dt;
+  const damaged = damagedShips(s, ctx);
   let patient = ctx.ships.get(ship.targetId);
   if (!patient || isStowed(patient) || patient.hull >= maxHull(s, patient.cls) * 0.98) {
     patient = undefined;
     let worst = 0.85;
-    for (const o of ctx.ships.values()) {
+    for (const o of damaged) {
       if (o.id === ship.id || isStowed(o)) continue;
       let frac = o.hull / maxHull(s, o.cls);
       if (o.cls === 'barge' || o.cls === 'fighter') frac -= 0.1;
@@ -285,7 +294,7 @@ export function repairDrone(s: Sim, ship: Ship, dt: number, ctx: Ctx) {
   const heal = 7 * (1 + 0.3 * lvl(s, 'repair')) * (1 + 0.25 * lvl(s, 'repairBeam')) * dt;
   const nano = lvl(s, 'repairNano') > 0;
   if (nano) {
-    for (const o of ctx.ships.values()) {
+    for (const o of damaged) {
       if (isStowed(o) || dist(o.pos, ship.pos) > range) continue;
       o.hull = Math.min(maxHull(s, o.cls), o.hull + heal);
     }

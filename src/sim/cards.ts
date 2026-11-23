@@ -11,7 +11,7 @@ import {
   PRESETS,
   STANCE_SWITCHES,
 } from './config';
-import { cargoCap } from './ctx';
+import { cargoCap, type Ctx } from './ctx';
 import { dist, dist2 } from './math';
 import { maxEnergy, maxHull, stateOf } from './state';
 import {
@@ -59,7 +59,24 @@ function near<T extends { pos: { x: number; y: number; z: number } }>(
   return false;
 }
 
-export function conditionHolds(s: Sim, c: Condition, ship: Ship | null): boolean {
+function anyOreWithin(s: Sim, ctx: Ctx, p: Ship['pos'], r: number): boolean {
+  let found = false;
+  const r2 = r * r;
+  ctx.asteroidGrid.rings(
+    p,
+    (d) => !found && d < r,
+    (i) => {
+      const a = s.asteroids[i];
+      if (a.ore > 0 && dist2(a.pos, p) < r2) {
+        found = true;
+        return false;
+      }
+    },
+  );
+  return found;
+}
+
+export function conditionHolds(s: Sim, c: Condition, ship: Ship | null, ctx?: Ctx): boolean {
   const v = c.value ?? 0;
   switch (c.kind) {
     case 'always':
@@ -85,14 +102,21 @@ export function conditionHolds(s: Sim, c: Condition, ship: Ship | null): boolean
     case 'carrierFarther':
       return dist(ship.pos, s.carrier.pos) > v;
     case 'asteroidFarther':
-      return !near(s.asteroids, ship.pos, v, (a) => a.ore > 0);
+      return ctx
+        ? !anyOreWithin(s, ctx, ship.pos, v)
+        : !near(s.asteroids, ship.pos, v, (a) => a.ore > 0);
   }
 }
 
 /** The first card in `list` that covers `ship` (the carrier when null) and whose conditions all hold. */
-export function firing(s: Sim, list: readonly RuleCard[], ship: Ship | null): RuleCard | null {
+export function firing(
+  s: Sim,
+  list: readonly RuleCard[],
+  ship: Ship | null,
+  ctx?: Ctx,
+): RuleCard | null {
   for (const card of list)
-    if (inScope(card.scope, ship) && card.when.every((c) => conditionHolds(s, c, ship)))
+    if (inScope(card.scope, ship) && card.when.every((c) => conditionHolds(s, c, ship, ctx)))
       return card;
   return null;
 }

@@ -4,7 +4,7 @@ import { H2_STORM_RADIUS, ZONE_RULE_UNLOCKS } from './config';
 import { buildCtx } from './ctx';
 import { pirateStep, pirateTargetScore } from './combat';
 import { harvester } from './mining';
-import { buyResearch, canBuyResearch, reserveDefs, RESEARCH } from './research';
+import { buyResearch, canBuyResearch, reserveDefs, reserveDefsView, RESEARCH } from './research';
 import { createShip, enterSystem, gasGiantPos, h2Storm } from './state';
 import { hazards } from './world';
 import type { Sim, Ship } from './types';
@@ -40,6 +40,7 @@ describe('deep space unlocks', () => {
     expect(reserveDefs(s)[0][2]).toBeCloseTo(base * 0.6);
     s.hangars[1].type = 'fabricator';
     expect(reserveDefs(s)[0][2]).toBeCloseTo(base * 0.6);
+    expect(reserveDefsView(s)).toEqual(reserveDefs(s));
   });
 
   it('unlocks the storm-shelter rule card in deep space', () => {

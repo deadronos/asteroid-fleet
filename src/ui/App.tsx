@@ -6,6 +6,7 @@ import { setActiveSlot } from '../game/slots';
 import { SHIP_STATS } from '../sim/config';
 import { SHIP_CLASSES } from '../sim/types';
 import { downloadFile } from './download';
+import { deepEqual, shallowEqual } from './equal';
 import { formatEvent } from './events';
 import { type CarrierFilter, type SeverityFilter } from './inbox';
 import { LogPanel } from './LogPanel';
@@ -136,8 +137,7 @@ function Help({ onClose }: { onClose: () => void }) {
 }
 
 function Offline() {
-  useGame();
-  const r = engine.offline;
+  const r = useGame(() => engine.offline, shallowEqual);
   if (!r) return null;
   const h = Math.floor(r.seconds / 3600);
   const m = Math.floor((r.seconds % 3600) / 60);
@@ -181,13 +181,17 @@ async function downloadUnreadable() {
 }
 
 export function SaveNotice() {
-  useGame();
-  if (!engine.saveNotice) return null;
+  const notice = useGame(
+    () =>
+      engine.saveNotice ? { text: engine.saveNotice, backupFailed: engine.saveBackupFailed } : null,
+    shallowEqual,
+  );
+  if (!notice) return null;
   return (
     <div className="save-notice" role="alert">
-      <p>{engine.saveNotice} Automatic saving is paused so that data is left untouched.</p>
+      <p>{notice.text} Automatic saving is paused so that data is left untouched.</p>
       <div className="row">
-        {engine.saveBackupFailed ? (
+        {notice.backupFailed ? (
           <button onClick={() => void downloadUnreadable()}>Download unreadable save</button>
         ) : (
           <>
@@ -213,51 +217,56 @@ function Toasts({
 }: {
   onOpenInbox: (dest: { carrier: 'all'; severity: 'critical' }) => void;
 }) {
-  useGame();
   // Expiry is a timestamp on the wall clock, so a toast still expires while the game is paused.
-  // The queue's single timer asks for another render when one is due; reading the clock here
-  // drops a toast on the next tick without a timer per toast.
+  // The queue's single timer asks for another render when one is due; reading the clock in the
+  // selector drops a toast on the next tick without a timer per toast.
   // The live region stays mounted so announcements are not lost on the empty-to-first transition.
-  // oxlint-disable-next-line react/purity
-  const items = engine.toasts.shown(Date.now());
+  const items = useGame(
+    (s) =>
+      engine.toasts.shown(Date.now()).map((t) => ({
+        key: t.key,
+        severity: t.severity,
+        text: t.event ? formatEvent(t.event) : t.text,
+        openInbox: t.action?.type === 'open-inbox',
+        carrierId: t.carrierId,
+        system: t.systemId != null ? s.systems[t.systemId]?.name : undefined,
+      })),
+    deepEqual,
+  );
   return (
     <div className="toasts" aria-live="polite">
-      {items.map((t) => {
-        const system = t.systemId != null ? engine.state.systems[t.systemId]?.name : undefined;
-        const openInbox = t.action?.type === 'open-inbox';
-        return (
-          <div
-            key={t.key}
-            className={`toast sev-${t.severity}`}
-            role={t.severity === 'critical' ? 'alert' : undefined}
-          >
-            <span className="toast-text">{t.event ? formatEvent(t.event) : t.text}</span>
-            {openInbox && (
-              <button
-                type="button"
-                onClick={() => {
-                  const dest = engine.openToastInbox(t.key);
-                  if (dest) onOpenInbox(dest);
-                }}
-              >
-                Open inbox
-              </button>
-            )}
-            {t.carrierId !== null && (
-              <button
-                type="button"
-                aria-label={system ? `Go to ${system}` : 'Go to'}
-                onClick={() => engine.goToToast(t.key)}
-              >
-                Go to
-              </button>
-            )}
-            <button type="button" aria-label="Dismiss" onClick={() => engine.dismissToast(t.key)}>
-              ×
+      {items.map((t) => (
+        <div
+          key={t.key}
+          className={`toast sev-${t.severity}`}
+          role={t.severity === 'critical' ? 'alert' : undefined}
+        >
+          <span className="toast-text">{t.text}</span>
+          {t.openInbox && (
+            <button
+              type="button"
+              onClick={() => {
+                const dest = engine.openToastInbox(t.key);
+                if (dest) onOpenInbox(dest);
+              }}
+            >
+              Open inbox
             </button>
-          </div>
-        );
-      })}
+          )}
+          {t.carrierId !== null && (
+            <button
+              type="button"
+              aria-label={t.system ? `Go to ${t.system}` : 'Go to'}
+              onClick={() => engine.goToToast(t.key)}
+            >
+              Go to
+            </button>
+          )}
+          <button type="button" aria-label="Dismiss" onClick={() => engine.dismissToast(t.key)}>
+            ×
+          </button>
+        </div>
+      ))}
     </div>
   );
 }

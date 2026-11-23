@@ -339,6 +339,8 @@ export const Scene = memo(function Scene({
   onAutoTactical,
 }: ViewOptions) {
   const [auto, setAuto] = useState(false);
+  const paused = useSyncExternalStore(engine.subscribe, () => engine.paused);
+  const lqFps = quality === 'low' ? fpsCap : 0;
   const onAuto = (on: boolean) => {
     setAuto(on);
     onAutoTactical(on);
@@ -346,7 +348,7 @@ export const Scene = memo(function Scene({
   return (
     <Canvas
       camera={{ position: CAMERA_OFFSET, fov: 55, near: 0.5, far: 3000 }}
-      dpr={quality === 'high' ? [1, 2] : 1}
+      dpr={quality === 'high' ? [1, 1.5] : 1}
       gl={{ antialias: quality === 'high', powerPreference: 'high-performance' }}
       frameloop="always"
       onPointerMissed={() => isDoubleMiss(performance.now()) && focus.set(null)}
@@ -365,7 +367,7 @@ export const Scene = memo(function Scene({
       <Explosions />
       <Tactical on={tactical || auto} />
       <RenderStats />
-      {quality === 'low' && <FrameCap fps={fpsCap} />}
+      {(paused || lqFps > 0) && <FrameCap fps={lqFps} paused={paused} />}
       <CameraRig tactical={tactical} onAutoTactical={onAuto} />
       <PanelViewOffset />
       {quality === 'high' && bloom && (

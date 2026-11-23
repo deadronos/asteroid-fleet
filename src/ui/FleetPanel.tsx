@@ -32,7 +32,7 @@ import {
   type ShipClass,
 } from '../sim/types';
 import { fmt } from './format';
-import { deepEqual } from './equal';
+import { deepEqual, shallowEqual } from './equal';
 
 const MODE_LABEL: Record<string, string> = {
   docked: 'docked',
@@ -114,24 +114,72 @@ function HangarBoard({
   selShip: number;
   onShip: (id: number) => void;
 }) {
-  const s = useGame();
-  // Look the hangar up on every render: snapshots replace hangar objects, and the parent only
-  // re-renders when the hangar list changes, so a hangar passed as a prop goes stale (#152).
-  const h = s.hangars.find((x) => x.id === hangarId);
+  const board = useGame((s) => {
+    const h = s.hangars.find((x) => x.id === hangarId);
+    if (!h) return null;
+    const byId = shipIndex(s);
+    const occ = boardOccupancy(byId, h);
+    const ships: {
+      id: number;
+      start: number;
+      cls: ShipClass;
+      out: boolean;
+      mode: string;
+      syn: string | null;
+      modules: ModuleId[];
+      hpPct: number;
+    }[] = [];
+    let used = 0;
+    for (let i = 0; i < h.slots; i++) {
+      const id = occ[i];
+      if (id === null) continue;
+      used++;
+      if (i > 0 && occ[i - 1] === id) continue;
+      const ship = byId.get(id)!;
+      const mh = maxHull(s, ship.cls);
+      ships.push({
+        id,
+        start: i,
+        cls: ship.cls,
+        out: ship.mode !== 'docked',
+        mode: modeLabel(ship),
+        syn: synergy(byId, occ, i, ship),
+        modules: [...ship.modules],
+        hpPct: Math.round((ship.hull / mh) * 1000) / 10,
+      });
+    }
+    const slotCost = HANGAR_SLOT_COST(h.slots);
+    const autoBuy = autoBuyUnlocked(s);
+    const unlocked = SHIP_CLASSES.filter((c) => s.unlocked.includes(c));
+    return {
+      id: h.id,
+      type: h.type,
+      slots: h.slots,
+      used,
+      ships,
+      furthestTier: s.stats.furthestTier,
+      noCover: s.noCoverAt !== undefined && s.time - s.noCoverAt < COVER_BACKOFF + 5,
+      slotCost,
+      slotShort: creditsShort(s, slotCost),
+      autoBuy,
+      unlocked,
+      targets: autoBuy ? unlocked.map((c) => h.target[c] ?? 0) : null,
+      launchOrder: [...h.launchOrder],
+    };
+  }, deepEqual);
   const [over, setOver] = useState(-1);
-  if (!h) return null;
-  const byId = shipIndex(s);
-  const occ = boardOccupancy(byId, h);
+  if (!board) return null;
+  const byStart = new Map(board.ships.map((sh) => [sh.start, sh]));
   const cells: React.ReactNode[] = [];
   const drop = (e: React.DragEvent, start: number) => {
     e.preventDefault();
     setOver(-1);
     const id = Number(e.dataTransfer.getData('text/ship'));
-    if (id) engine.dispatch({ type: 'moveShip', shipId: id, hangarId: h.id, start });
+    if (id) engine.dispatch({ type: 'moveShip', shipId: id, hangarId: board.id, start });
   };
-  for (let i = 0; i < h.slots; i++) {
-    const id = occ[i];
-    if (id === null) {
+  for (let i = 0; i < board.slots; i++) {
+    const ship = byStart.get(i);
+    if (!ship) {
       cells.push(
         <div
           key={'e' + i}
@@ -148,17 +196,14 @@ function HangarBoard({
       );
       continue;
     }
-    if (i > 0 && occ[i - 1] === id) continue;
-    const ship = byId.get(id)!;
     const st = SHIP_STATS[ship.cls];
-    const syn = synergy(byId, occ, i, ship);
     cells.push(
       <div
-        key={'s' + id}
-        className={`ship-tile ${ship.mode !== 'docked' ? 'out' : ''} ${selShip === id ? 'sel' : ''}`}
+        key={'s' + ship.id}
+        className={`ship-tile ${ship.out ? 'out' : ''} ${selShip === ship.id ? 'sel' : ''}`}
         style={{ gridColumn: `${i + 1} / span ${st.slots}`, background: st.color }}
         draggable
-        onDragStart={(e) => e.dataTransfer.setData('text/ship', String(id))}
+        onDragStart={(e) => e.dataTransfer.setData('text/ship', String(ship.id))}
         onDragOver={(e) => {
           e.preventDefault();
           setOver(i);
@@ -166,62 +211,62 @@ function HangarBoard({
         onDrop={(e) => drop(e, i)}
         role="button"
         tabIndex={0}
-        aria-pressed={selShip === id}
-        onClick={() => onShip(id)}
+        aria-pressed={selShip === ship.id}
+        onClick={() => onShip(ship.id)}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
             e.stopPropagation();
-            onShip(id);
+            onShip(ship.id);
           }
         }}
-        title={`${st.name}${syn ? ' · ' + syn : ''}${ship.modules.length ? ' · ' + ship.modules.map((m) => MODULES[m].name).join(', ') : ''}`}
+        title={`${st.name}${ship.syn ? ' · ' + ship.syn : ''}${ship.modules.length ? ' · ' + ship.modules.map((m) => MODULES[m].name).join(', ') : ''}`}
       >
         <span className="nm">{st.slots >= 4 ? st.name : st.short}</span>
-        <span className="md">{modeLabel(ship)}</span>
-        {syn && <span className="synergy">✚</span>}
+        <span className="md">{ship.mode}</span>
+        {ship.syn && <span className="synergy">✚</span>}
         {ship.modules.length > 0 && (
           <span className="mods">{ship.modules.map((m) => MODULES[m].short[0]).join('')}</span>
         )}
-        <span className="hp" style={{ width: `${(ship.hull / maxHull(s, ship.cls)) * 100}%` }} />
+        <span className="hp" style={{ width: `${ship.hpPct}%` }} />
       </div>,
     );
+    i += st.slots - 1;
   }
-  const def = HANGAR_TYPES[h.type];
-  const order = h.launchOrder;
+  const def = HANGAR_TYPES[board.type];
+  const order = board.launchOrder;
   const swap = (i: number, j: number) => {
     if (j < 0 || j >= order.length) return;
     const next = [...order];
     [next[i], next[j]] = [next[j], next[i]];
-    engine.dispatch({ type: 'setLaunchOrder', hangarId: h.id, order: next });
+    engine.dispatch({ type: 'setLaunchOrder', hangarId: board.id, order: next });
   };
-  const used = occ.filter((x) => x !== null).length;
   return (
     <div
       className={`hangar ${selected ? 'selected' : ''}`}
       onClick={(e) => e.target === e.currentTarget && onSelect()}
     >
       <div className="hangar-head">
-        <span className="title">Hangar {h.id}</span>
+        <span className="title">Hangar {board.id}</span>
         <select
-          value={h.type}
+          value={board.type}
           onChange={(e) =>
             engine.dispatch({
               type: 'retrofitHangar',
-              hangarId: h.id,
+              hangarId: board.id,
               hangarType: e.target.value as HangarType,
             })
           }
           title={`Retrofit for ${RETROFIT_COST} credits`}
         >
           {(Object.keys(HANGAR_TYPES) as HangarType[]).map((t) => (
-            <option key={t} value={t} disabled={!!hangarLocked(t, s.stats.furthestTier)}>
+            <option key={t} value={t} disabled={!!hangarLocked(t, board.furthestTier)}>
               {HANGAR_TYPES[t].name}
             </option>
           ))}
         </select>
         <span className="blurb grow">{def.blurb}</span>
-        {s.noCoverAt !== undefined && s.time - s.noCoverAt < COVER_BACKOFF + 5 && (
+        {board.noCover && (
           <span
             className="blurb warn"
             title="Safe-stance drones only mine ore near the carrier, a stationed barge or a fighter while pirates are about"
@@ -230,22 +275,22 @@ function HangarBoard({
           </span>
         )}
         <span className="blurb">
-          {used}/{h.slots}
+          {board.used}/{board.slots}
         </span>
         <button
-          disabled={!!creditsShort(s, HANGAR_SLOT_COST(h.slots))}
-          onClick={() => engine.dispatch({ type: 'buySlot', hangarId: h.id })}
-          title={creditsShort(s, HANGAR_SLOT_COST(h.slots)) ?? 'Buy one more slot'}
+          disabled={!!board.slotShort}
+          onClick={() => engine.dispatch({ type: 'buySlot', hangarId: board.id })}
+          title={board.slotShort ?? 'Buy one more slot'}
         >
-          +slot {fmt(HANGAR_SLOT_COST(h.slots))}
+          +slot {fmt(board.slotCost)}
         </button>
       </div>
       <div
         className="board"
-        style={{ ['--slots' as string]: h.slots }}
+        style={{ ['--slots' as string]: board.slots }}
         role="group"
         tabIndex={0}
-        aria-label={`Hangar ${h.id} board${selected ? ' (selected)' : ''}`}
+        aria-label={`Hangar ${board.id} board${selected ? ' (selected)' : ''}`}
         onClick={onSelect}
         onKeyDown={(e) => {
           if (e.target !== e.currentTarget) return;
@@ -257,25 +302,25 @@ function HangarBoard({
       >
         {cells}
       </div>
-      {autoBuyUnlocked(s) && (
+      {board.autoBuy && board.targets && (
         <div className="row" style={{ marginTop: 6 }}>
           <span className="blurb">Auto-buy target</span>
           <div className="order">
-            {SHIP_CLASSES.filter((c) => s.unlocked.includes(c)).map((c) => (
+            {board.unlocked.map((c, idx) => (
               <label key={c} title={`Keep this many ${SHIP_STATS[c].name.toLowerCase()}s here`}>
                 <i className="swatch" style={{ background: SHIP_STATS[c].color }} />
                 {SHIP_STATS[c].short}
                 <input
                   type="number"
                   min={0}
-                  max={h.slots}
-                  value={h.target[c] ?? 0}
-                  aria-label={`Hangar ${h.id} ${SHIP_STATS[c].name} target`}
+                  max={board.slots}
+                  value={board.targets![idx]}
+                  aria-label={`Hangar ${board.id} ${SHIP_STATS[c].name} target`}
                   style={{ width: '3.2em' }}
                   onChange={(e) =>
                     engine.dispatch({
                       type: 'setHangarTarget',
-                      hangarId: h.id,
+                      hangarId: board.id,
                       cls: c,
                       count: Number(e.target.value),
                     })
@@ -290,7 +335,7 @@ function HangarBoard({
         <span className="blurb">Launch order</span>
         <div className="order">
           {order
-            .filter((c) => s.unlocked.includes(c))
+            .filter((c) => board.unlocked.includes(c))
             .map((c) => {
               const i = order.indexOf(c);
               return (
@@ -309,22 +354,44 @@ function HangarBoard({
 }
 
 function ShipDetail({ id }: { id: number }) {
-  const s = useGame();
-  const ship = s.ships.find((x) => x.id === id);
-  if (!ship) return null;
-  const st = effectiveStance(s, ship);
-  const src = (k: 'engagement' | 'underFire' | 'mining') => stanceSource(s, ship, k);
-  const cap = cargoCap(s, ship.cls, ship);
+  const d = useGame((s) => {
+    const ship = s.ships.find((x) => x.id === id);
+    if (!ship) return null;
+    const st = effectiveStance(s, ship);
+    const fits = MODULE_IDS.filter((m) => MODULES[m].fits.includes(ship.cls));
+    return {
+      id: ship.id,
+      cls: ship.cls,
+      mode: modeLabel(ship),
+      docked: ship.mode === 'docked',
+      carried: ship.mode === 'carried',
+      hull: Math.round(ship.hull),
+      maxHull: Math.round(maxHull(s, ship.cls)),
+      cap: Math.round(cargoCap(s, ship.cls, ship)),
+      cargo: Math.round(ship.cls === 'harvester' ? ship.h2 : ship.cargo),
+      engagement: st.engagement,
+      underFire: st.underFire,
+      retreatAt: Math.round(st.retreatAt * 100),
+      mining: st.mining,
+      srcEngagement: stanceSource(s, ship, 'engagement'),
+      srcUnderFire: stanceSource(s, ship, 'underFire'),
+      srcMining: stanceSource(s, ship, 'mining'),
+      modules: [...ship.modules],
+      furthestTier: s.stats.furthestTier,
+      affordable: fits.map((m) => s.credits >= MODULES[m].cost),
+    };
+  }, deepEqual);
+  if (!d) return null;
   return (
-    <div className="hangar" style={{ borderColor: SHIP_STATS[ship.cls].color }}>
+    <div className="hangar" style={{ borderColor: SHIP_STATS[d.cls].color }}>
       <div className="hangar-head">
         <span className="title">
-          {SHIP_STATS[ship.cls].name} #{ship.id}
+          {SHIP_STATS[d.cls].name} #{d.id}
         </span>
-        <span className="blurb grow">{SHIP_STATS[ship.cls].role}</span>
-        {ship.mode !== 'carried' && (
+        <span className="blurb grow">{SHIP_STATS[d.cls].role}</span>
+        {!d.carried && (
           <button
-            disabled={ship.mode !== 'docked'}
+            disabled={!d.docked}
             onClick={() => engine.dispatch({ type: 'scrapShip', shipId: id })}
             title="Scrap for 50 % of base cost (docked only)"
           >
@@ -333,33 +400,52 @@ function ShipDetail({ id }: { id: number }) {
         )}
       </div>
       <div className="hint">
-        {modeLabel(ship)} · hull {Math.round(ship.hull)}/{Math.round(maxHull(s, ship.cls))}
-        {cap > 0 && (
+        {d.mode} · hull {d.hull}/{d.maxHull}
+        {d.cap > 0 && (
           <>
             {' '}
-            · cargo {Math.round(ship.cls === 'harvester' ? ship.h2 : ship.cargo)}/{Math.round(cap)}
+            · cargo {d.cargo}/{d.cap}
           </>
         )}
         <br />
-        Stance: {st.engagement} <small>({src('engagement')})</small> ·{' '}
-        {st.underFire === 'retreatHull'
-          ? `retreat at ${Math.round(st.retreatAt * 100)} %`
-          : st.underFire}{' '}
-        <small>({src('underFire')})</small> · {st.mining} <small>({src('mining')})</small>
+        Stance: {d.engagement} <small>({d.srcEngagement})</small> ·{' '}
+        {d.underFire === 'retreatHull' ? `retreat at ${d.retreatAt} %` : d.underFire}{' '}
+        <small>({d.srcUnderFire})</small> · {d.mining} <small>({d.srcMining})</small>
       </div>
-      <ModuleSlots ship={ship} s={s} />
+      <ModuleSlots
+        id={d.id}
+        cls={d.cls}
+        docked={d.docked}
+        modules={d.modules}
+        furthestTier={d.furthestTier}
+        affordable={d.affordable}
+      />
     </div>
   );
 }
 
-function ModuleSlots({ ship, s }: { ship: Ship; s: Sim }) {
-  const slots = MODULE_SLOTS[ship.cls];
-  const docked = ship.mode === 'docked';
+function ModuleSlots({
+  id,
+  cls,
+  docked,
+  modules,
+  furthestTier,
+  affordable,
+}: {
+  id: number;
+  cls: ShipClass;
+  docked: boolean;
+  modules: ModuleId[];
+  furthestTier: number;
+  affordable: boolean[];
+}) {
+  const slots = MODULE_SLOTS[cls];
+  const fits = MODULE_IDS.filter((m) => MODULES[m].fits.includes(cls));
   return (
     <div className="row modules">
       <span className="blurb">Modules</span>
       {Array.from({ length: slots }, (_, slot) => {
-        const cur = ship.modules[slot] ?? '';
+        const cur = modules[slot] ?? '';
         return (
           <select
             key={slot}
@@ -370,16 +456,16 @@ function ModuleSlots({ ship, s }: { ship: Ship; s: Sim }) {
             onChange={(e) =>
               engine.dispatch({
                 type: 'fitModule',
-                shipId: ship.id,
+                shipId: id,
                 slot,
                 module: (e.target.value || null) as ModuleId | null,
               })
             }
           >
             <option value="">— empty —</option>
-            {MODULE_IDS.filter((m) => MODULES[m].fits.includes(ship.cls)).map((m) => {
-              const locked = moduleLocked(m, ship.cls, s.stats.furthestTier);
-              const poor = m !== cur && s.credits < MODULES[m].cost;
+            {fits.map((m, idx) => {
+              const locked = moduleLocked(m, cls, furthestTier);
+              const poor = m !== cur && !affordable[idx];
               return (
                 <option key={m} value={m} disabled={!!locked || poor}>
                   {MODULES[m].name} · {MODULES[m].desc}
@@ -399,28 +485,37 @@ const setAutomation = (
 ) => engine.dispatch({ type: 'setAutomation', patch });
 
 function AutomationBar() {
-  const s = useGame();
-  const a = s.automation;
-  const rebuild = autoRebuildUnlocked(s);
-  const buy = autoBuyUnlocked(s);
-  if (!rebuild && !buy) return null;
+  const v = useGame((s) => {
+    const rebuild = autoRebuildUnlocked(s);
+    const buy = autoBuyUnlocked(s);
+    if (!rebuild && !buy) return null;
+    return {
+      rebuild,
+      buy,
+      autoRebuild: s.automation.autoRebuild,
+      autoBuy: s.automation.autoBuy,
+      creditFloor: s.automation.creditFloor,
+      queued: s.rebuildQueue.length,
+    };
+  }, shallowEqual);
+  if (!v) return null;
   return (
     <div className="row automation">
-      {rebuild && (
+      {v.rebuild && (
         <label title="Pay to rebuild lost ships into their hangar">
           <input
             type="checkbox"
-            checked={a.autoRebuild}
+            checked={v.autoRebuild}
             onChange={(e) => setAutomation({ autoRebuild: e.target.checked })}
           />
-          Auto-rebuild{s.rebuildQueue.length > 0 ? ` (${s.rebuildQueue.length} queued)` : ''}
+          Auto-rebuild{v.queued > 0 ? ` (${v.queued} queued)` : ''}
         </label>
       )}
-      {buy && (
+      {v.buy && (
         <label title="Buy toward each hangar's target with spare credits">
           <input
             type="checkbox"
-            checked={a.autoBuy}
+            checked={v.autoBuy}
             onChange={(e) => setAutomation({ autoBuy: e.target.checked })}
           />
           Auto-buy
@@ -432,7 +527,7 @@ function AutomationBar() {
           type="number"
           min={0}
           step={100}
-          value={a.creditFloor}
+          value={v.creditFloor}
           aria-label="Credit floor"
           style={{ width: '6em' }}
           onChange={(e) => setAutomation({ creditFloor: Number(e.target.value) })}
@@ -529,12 +624,12 @@ export function FleetPanel() {
         barges and they repair 3× faster when docked. Click a hangar to build into it, click a
         docked ship to fit modules.
       </p>
-      {engine.view.hangars.map((h, i) => (
-        <div key={h.id}>
+      {f.ids.map((id, i) => (
+        <div key={id}>
           <HangarBoard
-            hangarId={h.id}
-            selected={sel === h.id}
-            onSelect={() => setPicked(h.id)}
+            hangarId={id}
+            selected={sel === id}
+            onSelect={() => setPicked(id)}
             selShip={selShip}
             onShip={(id) => {
               setSelShip(id === selShip ? -1 : id);
