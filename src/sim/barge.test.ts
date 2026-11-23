@@ -225,4 +225,29 @@ describe('carried drone protection (#225)', () => {
     expect(barge.hull).toBeGreaterThan(bargeBefore);
     expect(drone.hull).toBe(hullBeforeRepair);
   });
+
+  it('does not launch a docked repair drone for a damaged carried drone', () => {
+    const s = bargeGame(42, true);
+    s.unlocked.push('repair');
+    expect(order(s, { type: 'buyShip', cls: 'repair', hangarId: 2 })).toBeNull();
+    const barge = s.ships.find((x) => x.cls === 'barge')!;
+    const drone = s.ships.find((x) => x.cls === 'drone')!;
+    const repair = s.ships.find((x) => x.cls === 'repair')!;
+    for (const x of s.ships) {
+      x.mode = 'docked';
+      x.hull = maxHull(s, x.cls);
+    }
+    barge.mode = 'station';
+    barge.pos = { x: 40, y: 0, z: 0 };
+    drone.mode = 'carried';
+    drone.bargeId = barge.id;
+    drone.pos = { ...barge.pos };
+    drone.hull = maxHull(s, 'drone') * 0.25;
+    // Keep only the repair drone in its hangar so launch priority is unambiguous.
+    s.hangars[1].launchTimer = 0;
+    s.hangars[1].items = s.hangars[1].items.filter((it) => it.shipId === repair.id);
+
+    stepSim(s);
+    expect(repair.mode).toBe('docked');
+  });
 });
