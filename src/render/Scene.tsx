@@ -21,15 +21,15 @@ import { Containers } from './Containers';
 import { GasGiant, Hazards, Sky } from './Environment';
 import { Fleet } from './Fleet';
 import { easeFactor, focus, isDoubleMiss, shortestArc } from './focus';
-import { FleetPass, MAX_ENTITIES, asteroidById, fleetFrame } from './frameState';
+import { FleetPass } from './frameState';
+import { Beams, Explosions } from './Fx';
+import { FRESNEL_VERT, SHIELD_FRAG } from './geometry';
 import { CARRIER_MODEL, carrierModel, disposeCarrierModel, modelUrl } from './models';
 import { FrameCap, RenderStats } from './RenderLoop';
 import { ICON_COLORS, Tactical } from './Tactical';
 import { PanelViewOffset } from './viewOffset';
 
 const Effects = lazy(() => import('./Effects'));
-
-const dummy = new THREE.Object3D();
 
 export interface ViewOptions {
   tactical: boolean;
@@ -40,112 +40,12 @@ export interface ViewOptions {
   onAutoTactical: (on: boolean) => void;
 }
 
-const MAX_SEG = 1024;
-const MAX_EXPLOSIONS = 128;
-const BEAM_COLORS: Record<string, THREE.Color> = {
-  mine: new THREE.Color('#7fe7ff').multiplyScalar(2.2),
-  laser: new THREE.Color('#ff8fa0').multiplyScalar(3),
-  pirateLaser: new THREE.Color('#ff3020').multiplyScalar(3),
-  turretLaser: new THREE.Color('#ffd27a').multiplyScalar(3),
-  repair: new THREE.Color('#5affb4').multiplyScalar(2.5),
-};
-
-const EXPLOSION_COLOR = new THREE.Color('#ffaa55').multiplyScalar(3);
 const BAY_COLOR = new THREE.Color('#ffd27a').multiplyScalar(3);
 const ENGINE_COLOR = new THREE.Color('#58b8ff').multiplyScalar(5);
 const WARP_RING_COLOR = new THREE.Color('#9b7bff').multiplyScalar(4);
 /** How fast the hull turns toward its heading, per second (see `easeFactor`). */
 const TURN_RATE = 0.8;
-
-function pushSeg(
-  pos: THREE.BufferAttribute,
-  col: THREE.BufferAttribute,
-  n: number,
-  px: number,
-  py: number,
-  pz: number,
-  q: Vec3,
-  c: THREE.Color,
-) {
-  pos.setXYZ(n * 2, px, py, pz);
-  pos.setXYZ(n * 2 + 1, q.x, q.y, q.z);
-  col.setXYZ(n * 2, c.r, c.g, c.b);
-  col.setXYZ(n * 2 + 1, c.r * 0.3, c.g * 0.3, c.b * 0.3);
-}
-
-function Beams() {
-  const geo = useMemo(() => {
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(MAX_SEG * 6), 3));
-    g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(MAX_SEG * 6), 3));
-    return g;
-  }, []);
-  useFrame(() => {
-    const s = engine.view;
-    const f = fleetFrame;
-    const pos = geo.getAttribute('position') as THREE.BufferAttribute;
-    const col = geo.getAttribute('color') as THREE.BufferAttribute;
-    let n = 0;
-    const rocks = asteroidById(s.asteroids);
-    for (let k = 0; k < s.ships.length && k < MAX_ENTITIES && n < MAX_SEG; k++) {
-      const sh = s.ships[k];
-      if (sh.mode !== 'mining') continue;
-      const r = rocks.get(sh.targetId);
-      const i = f.shipEntity[k];
-      if (!r || i < 0) continue;
-      pushSeg(
-        pos,
-        col,
-        n++,
-        f.pos[i * 3],
-        f.pos[i * 3 + 1],
-        f.pos[i * 3 + 2],
-        r.pos,
-        BEAM_COLORS.mine,
-      );
-    }
-    for (const fx of s.fx) {
-      if (n >= MAX_SEG) break;
-      const c = BEAM_COLORS[fx.kind];
-      if (c) pushSeg(pos, col, n++, fx.a.x, fx.a.y, fx.a.z, fx.b, c);
-    }
-    geo.setDrawRange(0, n * 2);
-    pos.needsUpdate = true;
-    col.needsUpdate = true;
-  });
-  return (
-    <lineSegments geometry={geo} frustumCulled={false}>
-      <lineBasicMaterial vertexColors toneMapped={false} transparent opacity={0.9} />
-    </lineSegments>
-  );
-}
-
-function Explosions() {
-  const mesh = useRef<THREE.InstancedMesh>(null);
-  useFrame(() => {
-    const m = mesh.current;
-    if (!m) return;
-    let n = 0;
-    for (const f of engine.view.fx) {
-      if (f.kind !== 'explosion' && f.kind !== 'warp') continue;
-      if (n >= MAX_EXPLOSIONS) break;
-      const life = f.kind === 'warp' ? 1.5 : 0.8;
-      const k = 1 - f.ttl / life;
-      dummy.position.set(f.a.x, f.a.y, f.a.z);
-      dummy.scale.setScalar((f.kind === 'warp' ? 18 : 3) * Math.sin(k * Math.PI) + 0.01);
-      dummy.updateMatrix();
-      m.setMatrixAt(n++, dummy.matrix);
-    }
-    m.count = n;
-    m.instanceMatrix.needsUpdate = true;
-  });
-  return (
-    <instancedMesh ref={mesh} args={[undefined, undefined, MAX_EXPLOSIONS]} frustumCulled={false}>
-      <icosahedronGeometry args={[1, 1]} />
-      <meshBasicMaterial color={EXPLOSION_COLOR} toneMapped={false} transparent opacity={0.8} />
-    </instancedMesh>
-  );
-}
+const SHIELD_FLASH_DECAY = 0.35;
 
 const HULL_COLOR = '#9aa7b8';
 const OTHER_HULL_COLOR = '#b8a08f';
@@ -211,6 +111,27 @@ function Carrier() {
   const group = useRef<THREE.Group>(null);
   const shield = useRef<THREE.Mesh>(null);
   const warpRing = useRef<THREE.Mesh>(null);
+  const shieldState = useRef({ opId: -1, systemId: -1, prev: -1, flash: 0 });
+  const shieldMat = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        uniforms: {
+          uTime: { value: 0 },
+          uShield: { value: 1 },
+          uHitFlash: { value: 0 },
+          uColor: { value: new THREE.Color('#5ab4ff') },
+        },
+        vertexShader: FRESNEL_VERT,
+        fragmentShader: SHIELD_FRAG,
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        toneMapped: false,
+      }),
+    [],
+  );
+  useEffect(() => () => shieldMat.dispose(), [shieldMat]);
+
   useFrame((st, dt) => {
     const s = engine.view;
     const c = s.carrier.pos;
@@ -226,10 +147,24 @@ function Carrier() {
       }
     }
     if (shield.current) {
-      const mat = shield.current.material as THREE.MeshBasicMaterial;
+      const shState = shieldState.current;
+      if (shState.opId !== s.id || shState.systemId !== s.systemId) {
+        shState.opId = s.id;
+        shState.systemId = s.systemId;
+        shState.prev = s.carrier.shield;
+        shState.flash = 0;
+      } else {
+        if (s.carrier.shield < shState.prev - 1e-4) shState.flash = 1;
+        shState.prev = s.carrier.shield;
+        shState.flash = Math.max(0, shState.flash - Math.min(dt, 0.1) / SHIELD_FLASH_DECAY);
+      }
       const threatened = s.pirates.length > 0;
-      shield.current.visible = threatened && s.carrier.shield > 0;
-      mat.opacity = s.carrier.shield * 0.07;
+      shield.current.visible = (threatened && s.carrier.shield > 0) || shState.flash > 0.01;
+      if (shield.current.visible) {
+        shieldMat.uniforms.uTime.value = st.clock.elapsedTime;
+        shieldMat.uniforms.uShield.value = s.carrier.shield;
+        shieldMat.uniforms.uHitFlash.value = shState.flash;
+      }
     }
     if (warpRing.current) {
       warpRing.current.visible = !!s.warp;
@@ -242,15 +177,8 @@ function Carrier() {
   return (
     <group ref={group}>
       <CarrierHull />
-      <mesh ref={shield}>
+      <mesh ref={shield} material={shieldMat} visible={false} raycast={() => null}>
         <sphereGeometry args={[14, 32, 16]} />
-        <meshBasicMaterial
-          color="#5ab4ff"
-          transparent
-          opacity={0.04}
-          depthWrite={false}
-          blending={THREE.AdditiveBlending}
-        />
       </mesh>
       <mesh ref={warpRing} rotation={[Math.PI / 2, 0, 0]}>
         <torusGeometry args={[12, 0.25, 8, 64]} />
@@ -273,6 +201,7 @@ function OtherCarriers() {
     g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(1024 * 3), 3));
     return g;
   }, []);
+  useEffect(() => () => geo.dispose(), [geo]);
   useFrame((_, dt) => {
     const a = engine.othersAlpha();
     const pos = geo.getAttribute('position') as THREE.BufferAttribute;

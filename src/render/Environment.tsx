@@ -1,10 +1,20 @@
 import { useFrame, useThree } from '@react-three/fiber';
-import { memo, useLayoutEffect, useMemo, useRef, useSyncExternalStore } from 'react';
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import * as THREE from 'three';
 import { engine } from '../game/engine';
 import { H2_STORM_RADIUS } from '../sim/config';
 import { gasGiantPos } from '../sim/state';
-import { GAS_FRAG, GAS_VERT, NEBULA_FRAG, NEBULA_VERT } from './geometry';
+import {
+  asteroidGeometry,
+  DEBRIS_SHELL_FRAG,
+  FRESNEL_VERT,
+  GAS_FRAG,
+  GAS_VERT,
+  NEBULA_FRAG,
+  NEBULA_VERT,
+  RADIATION_FRAG,
+  STORM_FRAG,
+} from './geometry';
 
 /** Re-renders only when the system changes, not on every 5 Hz UI tick. */
 export function useSystemId(): number {
@@ -44,6 +54,7 @@ function Starfield() {
     g.setAttribute('color', new THREE.BufferAttribute(col, 3));
     return g;
   }, []);
+  useEffect(() => () => geo.dispose(), [geo]);
   useFrame((st) => {
     if (points.current) points.current.rotation.y = st.clock.elapsedTime * 0.005;
   });
@@ -61,32 +72,177 @@ function Starfield() {
   );
 }
 
+const CHUNKS_PER_DEBRIS = 32;
+const MAX_DEBRIS_CHUNKS = 512;
+const DEBRIS_COLORS = ['#8c6d4e', '#6e7680', '#b88248', '#525862'];
+const chunkDummy = new THREE.Object3D();
+const chunkCol = new THREE.Color();
+
 export const Hazards = memo(function Hazards() {
   const systemId = useSystemId();
+  const chunksRef = useRef<THREE.InstancedMesh>(null);
+  const unitSphere = useMemo(() => new THREE.SphereGeometry(1, 24, 16), []);
+  const chunkGeo = useMemo(() => asteroidGeometry(0), []);
+  const chunkMat = useMemo(
+    () =>
+      new THREE.MeshStandardMaterial({
+        roughness: 0.75,
+        metalness: 0.45,
+        flatShading: true,
+      }),
+    [],
+  );
+  const debrisMat = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        uniforms: { uColor: { value: new THREE.Color('#ffb347') } },
+        vertexShader: FRESNEL_VERT,
+        fragmentShader: DEBRIS_SHELL_FRAG,
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        toneMapped: false,
+      }),
+    [],
+  );
+  const radMat = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        uniforms: {
+          uTime: { value: 0 },
+          uColor: { value: new THREE.Color('#b6ff4a') },
+        },
+        vertexShader: FRESNEL_VERT,
+        fragmentShader: RADIATION_FRAG,
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        toneMapped: false,
+      }),
+    [],
+  );
+  useEffect(
+    () => () => {
+      unitSphere.dispose();
+      chunkGeo.dispose();
+      chunkMat.dispose();
+      debrisMat.dispose();
+      radMat.dispose();
+    },
+    [unitSphere, chunkGeo, chunkMat, debrisMat, radMat],
+  );
+
+  // Preallocated chunk descriptors so tumbling needs zero per-frame allocations.
+  const chunkBuf = useMemo(
+    () => ({
+      pos: new Float32Array(MAX_DEBRIS_CHUNKS * 3),
+      scale: new Float32Array(MAX_DEBRIS_CHUNKS * 3),
+      rot: new Float32Array(MAX_DEBRIS_CHUNKS * 3),
+      spin: new Float32Array(MAX_DEBRIS_CHUNKS * 2),
+      count: 0,
+      hazards: null as typeof engine.view.hazards | null,
+      systemId: -1,
+      ready: false,
+      spinTime: 0,
+    }),
+    [],
+  );
+
+  useFrame((st, dt) => {
+    radMat.uniforms.uTime.value = st.clock.elapsedTime;
+    const m = chunksRef.current;
+    if (!m) return;
+    const s = engine.view;
+    if (s.hazards !== chunkBuf.hazards || s.systemId !== chunkBuf.systemId) {
+      chunkBuf.hazards = s.hazards;
+      chunkBuf.systemId = s.systemId;
+      chunkBuf.ready = false;
+      let debrisCount = 0;
+      for (const h of s.hazards) if (h.kind === 'debris') debrisCount++;
+      const perHazard =
+        debrisCount > 0
+          ? Math.min(CHUNKS_PER_DEBRIS, Math.floor(MAX_DEBRIS_CHUNKS / debrisCount))
+          : 0;
+      let n = 0;
+      for (let hi = 0; hi < s.hazards.length && n < MAX_DEBRIS_CHUNKS; hi++) {
+        const h = s.hazards[hi];
+        if (h.kind !== 'debris') continue;
+        let seed = (Math.imul(s.systemId + 1, 2654435761) ^ Math.imul(hi + 1, 374761393)) >>> 0;
+        const next = () => {
+          seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+          return seed / 0x100000000;
+        };
+        for (let j = 0; j < perHazard && n < MAX_DEBRIS_CHUNKS; j++) {
+          const r = h.radius * Math.cbrt(next()) * 0.9;
+          const theta = next() * Math.PI * 2;
+          const cz = next() * 2 - 1;
+          const sz = Math.sqrt(Math.max(0, 1 - cz * cz));
+          const o = n * 3;
+          chunkBuf.pos[o] = h.pos.x + r * sz * Math.cos(theta);
+          chunkBuf.pos[o + 1] = h.pos.y + r * cz;
+          chunkBuf.pos[o + 2] = h.pos.z + r * sz * Math.sin(theta);
+          const base = 0.45 + next() * 0.95;
+          chunkBuf.scale[o] = base * (0.65 + next() * 0.75);
+          chunkBuf.scale[o + 1] = base * (0.45 + next() * 0.6);
+          chunkBuf.scale[o + 2] = base * (0.65 + next() * 0.75);
+          chunkBuf.rot[o] = next() * Math.PI * 2;
+          chunkBuf.rot[o + 1] = next() * Math.PI * 2;
+          chunkBuf.rot[o + 2] = next() * Math.PI * 2;
+          chunkBuf.spin[n * 2] = (next() - 0.5) * 0.4;
+          chunkBuf.spin[n * 2 + 1] = (next() - 0.5) * 0.4;
+          m.setColorAt(n, chunkCol.set(DEBRIS_COLORS[n % DEBRIS_COLORS.length]));
+          n++;
+        }
+      }
+      chunkBuf.count = n;
+      if (n > 0 && m.instanceColor) m.instanceColor.needsUpdate = true;
+    }
+
+    if (chunkBuf.count === 0) {
+      m.visible = false;
+      return;
+    }
+    if (engine.paused && chunkBuf.ready) return;
+    if (!engine.paused) chunkBuf.spinTime += Math.min(dt, 0.1);
+    const t = chunkBuf.spinTime;
+    for (let i = 0; i < chunkBuf.count; i++) {
+      const o = i * 3;
+      chunkDummy.position.set(chunkBuf.pos[o], chunkBuf.pos[o + 1], chunkBuf.pos[o + 2]);
+      chunkDummy.rotation.set(
+        chunkBuf.rot[o] + t * chunkBuf.spin[i * 2],
+        chunkBuf.rot[o + 1] + t * chunkBuf.spin[i * 2 + 1],
+        chunkBuf.rot[o + 2],
+      );
+      chunkDummy.scale.set(chunkBuf.scale[o], chunkBuf.scale[o + 1], chunkBuf.scale[o + 2]);
+      chunkDummy.updateMatrix();
+      m.setMatrixAt(i, chunkDummy.matrix);
+    }
+    chunkDummy.scale.setScalar(1);
+    m.count = chunkBuf.count;
+    m.visible = true;
+    m.instanceMatrix.needsUpdate = true;
+    chunkBuf.ready = true;
+  });
+
   return (
     <>
       {engine.view.hazards.map((h, i) => (
-        <group key={`${systemId}-${i}`} position={[h.pos.x, h.pos.y, h.pos.z]}>
-          <mesh>
-            <sphereGeometry args={[h.radius, 24, 16]} />
-            <meshBasicMaterial
-              color={h.kind === 'debris' ? '#ffb347' : '#b6ff4a'}
-              transparent
-              opacity={0.06}
-              depthWrite={false}
-            />
-          </mesh>
-          <mesh>
-            <sphereGeometry args={[h.radius, 12, 8]} />
-            <meshBasicMaterial
-              color={h.kind === 'debris' ? '#ffb347' : '#b6ff4a'}
-              wireframe
-              transparent
-              opacity={0.15}
-            />
-          </mesh>
-        </group>
+        <mesh
+          key={`${systemId}-${i}`}
+          position={[h.pos.x, h.pos.y, h.pos.z]}
+          scale={h.radius}
+          geometry={unitSphere}
+          material={h.kind === 'debris' ? debrisMat : radMat}
+          raycast={() => null}
+        />
       ))}
+      <instancedMesh
+        ref={chunksRef}
+        args={[chunkGeo, chunkMat, MAX_DEBRIS_CHUNKS]}
+        frustumCulled={false}
+        raycast={() => null}
+        visible={false}
+      />
     </>
   );
 });
@@ -102,14 +258,37 @@ export const GasGiant = memo(function GasGiant() {
       }),
     [],
   );
+  const stormMat = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        uniforms: { uTime: { value: 0 } },
+        vertexShader: FRESNEL_VERT,
+        fragmentShader: STORM_FRAG,
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        toneMapped: false,
+      }),
+    [],
+  );
+  useEffect(
+    () => () => {
+      mat.dispose();
+      stormMat.dispose();
+    },
+    [mat, stormMat],
+  );
   const storm = useRef<THREE.Mesh>(null);
   useFrame((st) => {
     mat.uniforms.uTime.value = st.clock.elapsedTime;
-    // H2 storm: one translucent shell, hidden (no draw call) when calm.
+    // H2 storm: one swirling Fresnel plasma shell, hidden (no draw call) when calm.
     const m = storm.current;
     if (m) {
       m.visible = engine.view.storm.active > 0;
-      if (m.visible) m.rotation.y = st.clock.elapsedTime * 0.4;
+      if (m.visible) {
+        stormMat.uniforms.uTime.value = st.clock.elapsedTime;
+        m.rotation.y = st.clock.elapsedTime * 0.25;
+      }
     }
   });
   if (!sys.gasGiant) return null;
@@ -119,15 +298,8 @@ export const GasGiant = memo(function GasGiant() {
       <mesh material={mat}>
         <sphereGeometry args={[25, 48, 32]} />
       </mesh>
-      <mesh ref={storm} visible={false}>
-        <icosahedronGeometry args={[H2_STORM_RADIUS, 2]} />
-        <meshBasicMaterial
-          color="#ffb070"
-          wireframe
-          transparent
-          opacity={0.18}
-          depthWrite={false}
-        />
+      <mesh ref={storm} material={stormMat} visible={false} raycast={() => null}>
+        <sphereGeometry args={[H2_STORM_RADIUS, 36, 24]} />
       </mesh>
       <mesh rotation={[Math.PI / 2.3, 0, 0]}>
         <ringGeometry args={[32, 44, 64]} />

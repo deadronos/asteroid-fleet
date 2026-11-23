@@ -38,18 +38,21 @@ export function modelUrl(name: string): string {
 
 /** The kit's accent material; recoloured per class so classes stay readable. */
 const ACCENT = 'metalRed';
+const GLOW_SLOT = 'glow';
+const GLOW_INTENSITY = 3;
 
-/**
- * Bakes a glTF scene into one geometry with vertex colours, so each class is a
- * single instanced draw call. Centred, nose on +Z, scaled to `length` along Z
- * (or to a unit radius when `length` is omitted).
- */
-export function bakeModel(
+export interface BakedShip {
+  hull: THREE.BufferGeometry;
+  glow: THREE.BufferGeometry | null;
+}
+
+function collectParts(
   scene: THREE.Object3D,
   accent?: THREE.ColorRepresentation,
-  length?: number,
-): THREE.BufferGeometry {
-  const parts: THREE.BufferGeometry[] = [];
+  splitGlow = false,
+): { hullParts: THREE.BufferGeometry[]; glowParts: THREE.BufferGeometry[] } {
+  const hullParts: THREE.BufferGeometry[] = [];
+  const glowParts: THREE.BufferGeometry[] = [];
   const accentColor = accent === undefined ? null : new THREE.Color(accent);
   scene.traverse((o) => {
     const mesh = o as THREE.Mesh;
@@ -63,31 +66,89 @@ export function bakeModel(
     const total = flat.getAttribute('position').count;
     for (const grp of groups) {
       const mat = mats[grp.materialIndex ?? 0] as THREE.MeshStandardMaterial;
+      const isGlow = splitGlow && mat.name === GLOW_SLOT;
       const c = accentColor && mat.name === ACCENT ? accentColor : mat.color;
+      const mul = isGlow ? GLOW_INTENSITY : 1;
       const end = Math.min(total, grp.start + grp.count);
+      const count = end - grp.start;
+      if (count <= 0) continue;
       const g = new THREE.BufferGeometry();
       for (const name of ['position', 'normal'] as const) {
-        const a = flat.getAttribute(name) as THREE.BufferAttribute;
-        g.setAttribute(name, new THREE.BufferAttribute(a.array.slice(grp.start * 3, end * 3), 3));
+        const a = flat.getAttribute(name) as THREE.BufferAttribute | undefined;
+        if (a)
+          g.setAttribute(name, new THREE.BufferAttribute(a.array.slice(grp.start * 3, end * 3), 3));
       }
-      const col = new Float32Array((end - grp.start) * 3);
-      for (let i = 0; i < col.length; i += 3) col.set([c.r, c.g, c.b], i);
+      const col = new Float32Array(count * 3);
+      for (let i = 0; i < col.length; i += 3) {
+        col[i] = c.r * mul;
+        col[i + 1] = c.g * mul;
+        col[i + 2] = c.b * mul;
+      }
       g.setAttribute('color', new THREE.BufferAttribute(col, 3));
-      parts.push(g);
+      (isGlow ? glowParts : hullParts).push(g);
     }
     flat.dispose();
   });
+  return { hullParts, glowParts };
+}
+
+function mergeParts(parts: THREE.BufferGeometry[]): THREE.BufferGeometry {
+  if (parts.length === 0) return new THREE.BufferGeometry();
   const g = mergeGeometries(parts) ?? new THREE.BufferGeometry();
   for (const p of parts) p.dispose();
-  g.computeBoundingBox();
-  const box = g.boundingBox!;
-  const center = box.getCenter(new THREE.Vector3());
-  g.translate(-center.x, -center.y, -center.z);
-  const size = box.getSize(new THREE.Vector3());
-  const k = length ? length / size.z : 2 / Math.max(size.x, size.y, size.z);
-  g.scale(k, k, k);
-  g.computeBoundingSphere();
   return g;
+}
+
+function normalizeGeometries(geometries: (THREE.BufferGeometry | null)[], length?: number): void {
+  const box = new THREE.Box3();
+  for (const g of geometries) {
+    if (!g || !g.getAttribute('position')?.count) continue;
+    g.computeBoundingBox();
+    box.union(g.boundingBox!);
+  }
+  if (box.isEmpty()) return;
+  const center = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z);
+  const k = length ? (size.z > 0 ? length / size.z : 1) : maxDim > 0 ? 2 / maxDim : 1;
+  for (const g of geometries) {
+    if (!g || !g.getAttribute('position')?.count) continue;
+    g.translate(-center.x, -center.y, -center.z);
+    g.scale(k, k, k);
+    g.computeBoundingSphere();
+  }
+}
+
+/**
+ * Bakes a glTF scene into one geometry with vertex colours, so each class is a
+ * single instanced draw call. Centred, nose on +Z, scaled to `length` along Z
+ * (or to a unit radius when `length` is omitted).
+ */
+export function bakeModel(
+  scene: THREE.Object3D,
+  accent?: THREE.ColorRepresentation,
+  length?: number,
+): THREE.BufferGeometry {
+  const { hullParts } = collectParts(scene, accent, false);
+  const g = mergeParts(hullParts);
+  normalizeGeometries([g], length);
+  return g;
+}
+
+/**
+ * Bakes a Foundry ship glTF into lit `hull` and unlit HDR `glow` geometries (#233).
+ * Both receive the exact same centring and scaling transform so `glow` aligns with the hull.
+ */
+export function bakeShipModel(
+  scene: THREE.Object3D,
+  accent?: THREE.ColorRepresentation,
+  length?: number,
+): BakedShip {
+  const { hullParts, glowParts } = collectParts(scene, accent, true);
+  const hull = mergeParts(hullParts);
+  const glow = glowParts.length ? mergeParts(glowParts) : null;
+  normalizeGeometries([hull, glow], length);
+  return { hull, glow };
 }
 
 /** Carrier hull length in world units, matching the old box hull. */
