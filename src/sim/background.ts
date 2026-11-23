@@ -8,12 +8,20 @@
 // dropped (#177). `settleOffline` plays the same model over the time away (Tier C): that
 // wave is reported; no new wave rolls offline (#179).
 
-import { STORM_DURATION, STORM_GAP, WAVE_INTERVAL, WAVE_INTERVAL_JITTER } from './config';
+import {
+  FUSION_H2,
+  FUSION_RATE,
+  SHIELD_REGEN,
+  STORM_DURATION,
+  STORM_GAP,
+  WAVE_INTERVAL,
+  WAVE_INTERVAL_JITTER,
+} from './config';
 import { queueRebuild } from './automation';
 import { waveSize, waveWarning } from './combat';
 import { removeFromHangars } from './hangar';
 import { onSphere, rand, randRange } from './math';
-import { reserveDefs } from './research';
+import { lvl, reserveDefs } from './research';
 import {
   createShip,
   emit,
@@ -39,6 +47,10 @@ export interface BackgroundOpts {
   events?: boolean;
   /** Roll pirate waves. Off for offline settlement, where no new wave comes (#179). */
   waves?: boolean;
+  /** Count earned credits toward `stats.oreValueDelivered` (RP and challenges). Off offline (#230). */
+  countsForRp?: boolean;
+  /** Burn stored H2 for Fusion when energy is below capacity. Off offline (#230). */
+  fusion?: boolean;
 }
 
 export interface BackgroundReport {
@@ -69,25 +81,33 @@ export function lossBuffer(s: Sim): number {
   return n;
 }
 
+function fusionActive(s: Sim, fusion: boolean): boolean {
+  const c = s.carrier;
+  return fusion && lvl(s, 'fusion') > 0 && c.h2 > 0 && c.energy < maxEnergy(s);
+}
+
 /**
  * Credits/s the operation earns in the background: the slowest of what the fleet was
  * mining when it left Tier A, what the refinery can turn into credits, and what the
  * energy pool can pay for.
  */
-export function bottleneckYield(s: Sim): number {
+export function bottleneckYield(s: Sim, fusion = true): number {
   const mined = Math.max(0, s.miningIncomeAvg || 0);
   const c = s.carrier;
   const perOre = c.ore > 0 ? c.oreValue / c.ore : Infinity;
   const refined = refineThroughput(s) * perOre;
-  // Refining stalls once the pool is empty and solar cannot cover upkeep.
-  const powered = c.energy > 0 || energyNet(s) > 0 ? Infinity : 0;
+  // Refining stalls once the pool is empty and solar + active Fusion cannot cover upkeep.
+  const powered = c.energy > 0 || energyNet(s, fusion) > 0 ? Infinity : 0;
   return Math.min(mined, refined, powered);
 }
 
-/** Energy/s in the background: solar (boosted in a solar storm) minus upkeep. */
-export function energyNet(s: Sim): number {
+/**
+ * Energy/s in the background: solar (boosted in a solar storm) plus Fusion when active,
+ * minus upkeep.
+ */
+export function energyNet(s: Sim, fusion = true): number {
   const boost = s.storm.active > 0 && !h2Storm(s) ? 1.6 : 1;
-  return solarRate(s) * boost - upkeepRate(s);
+  return solarRate(s) * boost + (fusionActive(s, fusion) ? FUSION_RATE : 0) - upkeepRate(s);
 }
 
 /**
@@ -132,16 +152,28 @@ export function materialise(s: Sim) {
 /** One background step of `dt` seconds (at most `BG_DT`). The run clock is not moved. */
 export function stepBackground(s: Sim, dt = BG_DT, opts: BackgroundOpts = {}): BackgroundReport {
   const ev = opts.events ?? true;
+  const countsForRp = opts.countsForRp ?? true;
+  const fusion = opts.fusion ?? true;
   const rep: BackgroundReport = { credits: 0, rebuilt: 0, lost: 0 };
 
-  const credits = bottleneckYield(s) * dt * (opts.efficiency ?? 1);
+  const credits = bottleneckYield(s, fusion) * dt * (opts.efficiency ?? 1);
   s.credits += credits;
   s.stats.creditsEarned += credits;
+  if (countsForRp) s.stats.oreValueDelivered += credits;
   rep.credits = credits;
 
   const c = s.carrier;
-  c.energy = Math.min(maxEnergy(s), Math.max(0, c.energy + energyNet(s) * dt));
-  if (c.energy > 0) c.shield = Math.min(1, c.shield + 0.03 * dt);
+  const max = maxEnergy(s);
+  const boost = s.storm.active > 0 && !h2Storm(s) ? 1.6 : 1;
+  let fusionGain = 0;
+  if (dt > 0 && fusionActive(s, fusion)) {
+    const burn = Math.min(c.h2, FUSION_H2 * dt);
+    c.h2 -= burn;
+    fusionGain = FUSION_RATE * (burn / (FUSION_H2 * dt)) * dt;
+  }
+  const net = (solarRate(s) * boost - upkeepRate(s)) * dt + fusionGain;
+  c.energy = Math.min(max, Math.max(0, c.energy + net));
+  if (c.energy > 0) c.shield = Math.min(1, c.shield + SHIELD_REGEN * dt);
 
   rep.lost = timers(s, dt, ev, opts.waves ?? true);
   rep.rebuilt = rebuild(s, dt, ev);

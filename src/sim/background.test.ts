@@ -3,14 +3,18 @@ import {
   RETURN_GRACE_S,
   bottleneckYield,
   dematerialise,
+  energyNet,
   lossBuffer,
   materialise,
   runBackground,
   stepBackground,
 } from './background';
 import { order, settleOffline } from './actions';
+import { FUSION_H2, FUSION_RATE, OFFLINE_EFFICIENCY } from './config';
+import { researchPayout } from './costs';
 import { mulberry } from './math';
-import { newGame, bind, stateOf } from './state';
+import { challengeProgress } from './modifiers';
+import { maxEnergy, newGame, bind, solarRate, stateOf, upkeepRate } from './state';
 import { stepOp, stepSim } from './tick';
 import { game } from './testing';
 import type { Sim } from './types';
@@ -369,5 +373,92 @@ describe('Tier C', () => {
     expect(g.events.some((e) => e.kind === 'ShipLost')).toBe(false);
     expect(s.wave.timer).toBeGreaterThanOrEqual(RETURN_GRACE_S);
     expect(s.wave.warning).toBe(false);
+  });
+
+  it('does not count offline credits toward RP and does not drain H2 for Fusion (#230)', () => {
+    const s = frontier(8);
+    s.researchLevels.fusion = 1;
+    s.carrier.h2 = 50;
+    s.carrier.energy = 100;
+    const g = stateOf(s);
+    const oreBefore = g.stats.oreValueDelivered;
+    const creditsBefore = g.credits;
+    const rep = settleOffline(g, 120);
+    expect(rep).not.toBeNull();
+    expect(rep!.credits).toBeGreaterThan(0);
+    expect(g.credits).toBeCloseTo(creditsBefore + rep!.credits);
+    expect(g.stats.oreValueDelivered).toBe(oreBefore);
+    expect(s.carrier.h2).toBe(50);
+  });
+});
+
+describe('Tier B RP, challenge progress and Fusion (#230)', () => {
+  it('counts live Tier B credits toward oreValueDelivered, RP and challenge progress', () => {
+    const s = game(10);
+    s.miningIncomeAvg = 2500;
+    s.challenge = 'pacifist';
+    const rpBefore = researchPayout(s);
+    const progBefore = challengeProgress(s)!;
+    const rep = runBackground(s, 10);
+    expect(rep.credits).toBeCloseTo(25_000);
+    expect(s.stats.oreValueDelivered).toBeCloseTo(25_000);
+    expect(researchPayout(s)).toBeGreaterThan(rpBefore);
+    expect(challengeProgress(s)!).toBeGreaterThan(progBefore);
+  });
+
+  it('respects countsForRp: false without altering creditsEarned', () => {
+    const s = game(10);
+    s.miningIncomeAvg = 100;
+    const rep = runBackground(s, 10, { efficiency: OFFLINE_EFFICIENCY, countsForRp: false });
+    expect(rep.credits).toBeCloseTo(500);
+    expect(s.stats.creditsEarned).toBeCloseTo(500);
+    expect(s.stats.oreValueDelivered).toBe(0);
+  });
+
+  it('burns H2 for Fusion when energy < maxEnergy and prevents false stall when solar < upkeep', () => {
+    const s = game(12);
+    s.miningIncomeAvg = 10;
+    s.researchLevels.fusion = 1;
+    s.carrier.energy = 0;
+    s.carrier.h2 = 5;
+    // Push upkeep above solarRate while staying below solarRate + FUSION_RATE.
+    while (upkeepRate(s) <= solarRate(s)) {
+      s.hangars.push({
+        ...s.hangars[0],
+        id: s.hangars.length + 1,
+        items: [],
+      });
+    }
+    expect(solarRate(s)).toBeLessThan(upkeepRate(s));
+    expect(energyNet(s, false)).toBeLessThan(0);
+    expect(bottleneckYield(s, false)).toBe(0);
+    expect(energyNet(s, true)).toBeGreaterThan(0);
+    expect(bottleneckYield(s, true)).toBe(10);
+
+    const expectedEnergy = energyNet(s, true);
+    const rep = stepBackground(s, 1);
+    expect(rep.credits).toBeCloseTo(10);
+    expect(s.carrier.h2).toBeCloseTo(5 - FUSION_H2);
+    expect(s.carrier.energy).toBeCloseTo(expectedEnergy);
+  });
+
+  it('scales Fusion gain when H2 runs out mid-step', () => {
+    const s = game(14);
+    s.researchLevels.fusion = 1;
+    s.carrier.energy = 100;
+    s.carrier.h2 = FUSION_H2 * 0.4;
+    const netSolar = solarRate(s) - upkeepRate(s);
+    stepBackground(s, 1);
+    expect(s.carrier.h2).toBe(0);
+    expect(s.carrier.energy).toBeCloseTo(100 + netSolar + FUSION_RATE * 0.4);
+  });
+
+  it('does not burn H2 when energy is already at maxEnergy', () => {
+    const s = game(13);
+    s.researchLevels.fusion = 1;
+    s.carrier.energy = maxEnergy(s);
+    s.carrier.h2 = 10;
+    stepBackground(s, 1);
+    expect(s.carrier.h2).toBe(10);
   });
 });

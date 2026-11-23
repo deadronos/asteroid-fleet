@@ -8,10 +8,10 @@ A browser idle game with an autobattler setup, in 3D. The player is the admiral,
 
 ## Decided behaviour worth knowing before changing code
 
-- When energy hits zero, shields stop regenerating and refining stops, but solar keeps trickling in, so the carrier is never stranded.
+- When energy hits zero, shields stop regenerating and refining stops, but solar keeps trickling in, so the carrier is never stranded. Shield hits deplete shield strength only; carrier energy is spent only on shield regeneration (#229).
 - H2 is fusion fuel only, never direct warp fuel.
 - Reserves keep rebuilding on their cooldown while offline.
-- Offline time is settled at 50 % of recent mining income (salvage excluded). Offline, no new pirate waves roll; a wave already on the map at departure is resolved with events. Offline credits do not count toward RP.
+- Offline time is settled at 50 % of recent mining income (salvage excluded). Offline, no new pirate waves roll; a wave already on the map at departure is resolved with events. Offline credits do not count toward RP and offline H2 tanks are not burned for Fusion, while live off-screen carriers (Tier B) count credits toward RP and challenge progress and burn stored H2 for Fusion (#230).
 - RP = ⌊√(ore value delivered ÷ 10,000)⌋ × furthest tier × (1 + 15 % per Admiralty Mark ever earned).
 - Solar grows with the square root of the energy pool's capacity (hull and capacity upgrades, not challenge modifiers). Refining runs on solar once the pool settles, so this is what makes capacity upgrades raise income.
 - Each refinery level cuts energy per ore refined by 7 % (`REFINE_ENERGY_STEP`). Refining is usually energy-bound, so this is what makes refinery levels pay off.

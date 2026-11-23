@@ -438,9 +438,10 @@ export const SHIP_UPKEEP: Record<ShipClass, number> = {
   repair: 0.02,
   harvester: 0.03,
 };
-export const SHIELD_ENERGY_PER_DMG = 1.2;
-export const SHIELD_REGEN = 0.03; // per second
-export const SHIELD_REGEN_ENERGY = 4; // energy/s while regenerating
+/** Fraction of carrier shield regenerated per second at 1x multiplier (#229). */
+export const SHIELD_REGEN = 0.03;
+/** Energy spent per shield HP regenerated; shield hits deplete shield only (#229). */
+export const SHIELD_REGEN_ENERGY_PER_HP = 0.4;
 export const WARP_CHARGE = 15;
 export const warpCost = (from: number, to: number, mult = 1) =>
   Math.round((250 + 150 * Math.abs(from - to)) * mult);

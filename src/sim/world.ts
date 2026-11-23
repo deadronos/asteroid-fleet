@@ -9,6 +9,8 @@ import {
   FUSION_H2,
   FUSION_RATE,
   HULLS,
+  SHIELD_REGEN,
+  SHIELD_REGEN_ENERGY_PER_HP,
 } from './config';
 import { SHIELD_HP, card, damageShip, inHazard, type Ctx } from './ctx';
 import { oreNear } from './mining';
@@ -52,9 +54,9 @@ export function power(s: Sim, dt: number, ctx: Ctx) {
     const mult = s.powerMode === 'defense' ? 2 : s.powerMode === 'income' ? 0.5 : 1;
     const regen = Math.min(
       1 - c.shield,
-      0.03 * HULLS[c.hullClass].shield * (1 + 0.1 * lvl(s, 'reactor')) * mult * dt,
+      SHIELD_REGEN * HULLS[c.hullClass].shield * (1 + 0.1 * lvl(s, 'reactor')) * mult * dt,
     );
-    const cost = regen * SHIELD_HP * 0.4;
+    const cost = regen * SHIELD_HP * SHIELD_REGEN_ENERGY_PER_HP;
     if (c.energy >= cost) {
       c.energy -= cost;
       c.shield += regen;
