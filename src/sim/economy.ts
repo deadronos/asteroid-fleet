@@ -31,6 +31,7 @@ import {
   SCALE_ENERGY_SOLAR,
   SCALE_ENERGY_VOIDREFINING,
   SCALE_HULL_FRAME,
+  SCALE_HULL_REGEN,
 } from './research';
 import type { Hangar, Ship, ShipClass, Sim } from './types';
 
@@ -47,6 +48,11 @@ export function maxHull(s: Sim, cls: ShipClass): number {
 /** Carrier hull points: hull class times Reinforced frame. */
 export function carrierMaxHull(s: Sim): number {
   return HULLS[s.carrier.hullClass].hull * (1 + SCALE_HULL_FRAME * lvl(s, 'frame'));
+}
+
+/** Hull HP restored per second by Self-healing plating (#245). */
+export function carrierHullRegen(s: Sim): number {
+  return carrierMaxHull(s) * SCALE_HULL_REGEN * lvl(s, 'hullRegen');
 }
 
 export function maxEnergy(s: Sim): number {

@@ -42,6 +42,7 @@ export const GAME_KEYS = [
   'challenge',
   'challengesDone',
   'admiralty',
+  'loadouts',
   'researchLevels',
   'unlocked',
   'hulls',

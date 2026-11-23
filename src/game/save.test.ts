@@ -22,6 +22,7 @@ import saveV15 from './fixtures/save-v15.json';
 import saveV16 from './fixtures/save-v16.json';
 import saveV17 from './fixtures/save-v17.json';
 import saveV18 from './fixtures/save-v18.json';
+import saveV19 from './fixtures/save-v19.json';
 import { set } from 'idb-keyval';
 import { applyMigrationSteps, migrate, type SaveBlob } from './migrate';
 import {
@@ -371,6 +372,7 @@ describe('migrate', () => {
     ['v16', saveV16],
     ['v17', saveV17],
     ['v18', saveV18],
+    ['v19', saveV19],
   ])('a migrated %s fixture keeps running through step()', (_, fixture) => {
     const r = migrate(fixture);
     expect(r.ok).toBe(true);
@@ -875,6 +877,50 @@ describe('decodeSave', () => {
     expect(error(JSON.stringify({ version: 'x' }))).toMatch(/does not recognise/);
     expect(error(encodeRaw({ version: SAVE_VERSION, ships: [] }))).toMatch(/damaged/);
     expect(error(encodeRaw([1, 2]))).toMatch(/damaged/);
+  });
+});
+
+describe('v19 -> v20 module loadout templates (#244)', () => {
+  it('fills default loadouts on a v19 save', () => {
+    expect(saveV19.version).toBe(19);
+    expect(saveV19).not.toHaveProperty('loadouts');
+    const r = migrate(saveV19);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.state.version).toBe(SAVE_VERSION);
+    expect(r.state.loadouts).toEqual({});
+  });
+
+  it('repairs malformed loadouts deeply instead of rejecting the save', () => {
+    const bad = [
+      null,
+      { drone: ['quantum'] },
+      { drone: ['laser', 'laser'] }, // drones have one slot
+      { dreadnought: ['laser'] },
+      { drone: 'laser' },
+      { drone: [7] },
+    ];
+    for (const loadouts of bad) {
+      const raw = JSON.parse(JSON.stringify(newGame(3))) as Record<string, unknown>;
+      raw.version = SAVE_VERSION;
+      raw.loadouts = loadouts;
+      const r = migrate(raw);
+      expect(r.ok && r.state.loadouts).toEqual({});
+    }
+    const good = JSON.parse(JSON.stringify(newGame(3))) as Record<string, unknown>;
+    good.version = SAVE_VERSION;
+    good.loadouts = { drone: ['laser'], barge: ['tractor', null] };
+    expect(migrate(good).ok).toBe(true);
+    const kept = migrate(good);
+    expect(kept.ok && kept.state.loadouts).toEqual({ drone: ['laser'], barge: ['tractor', null] });
+  });
+
+  it('round-trips a saved template through export and import', () => {
+    const state = newGame(42);
+    state.loadouts = { drone: ['laser'], hauler: ['tractor'] };
+    const copy = importSave(exportSaveFile(state));
+    expect(copy).not.toBeNull();
+    expect(copy!.loadouts).toEqual(state.loadouts);
   });
 });
 

@@ -23,6 +23,7 @@ import {
   type Ctx,
 } from './ctx';
 import { firing } from './cards';
+import { boardEffects } from './hangar';
 import { dist, dist2, moveToward, rand } from './math';
 import { lvl } from './research';
 import { clusterCenters, emit, gasGiantPos, h2Storm, maxHull } from './state';
@@ -467,7 +468,12 @@ export function harvester(s: Sim, ship: Ship, dt: number, ctx: Ctx) {
     ship.mode = 'station';
     ship.h2 = Math.min(
       cap,
-      ship.h2 + 1.2 * (storm ? H2_STORM_YIELD : 1) * LASER_RATE ** modCount(ship, 'laser') * dt,
+      ship.h2 +
+        1.2 *
+          (storm ? H2_STORM_YIELD : 1) *
+          LASER_RATE ** modCount(ship, 'laser') *
+          boardEffects(ship).mining *
+          dt,
     );
   } else ship.mode = 'toAsteroid';
 }

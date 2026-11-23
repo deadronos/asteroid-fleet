@@ -73,6 +73,12 @@ export class SimView {
   set admiralty(v: GameState['admiralty']) {
     this.g.admiralty = v;
   }
+  get loadouts(): GameState['loadouts'] {
+    return this.g.loadouts;
+  }
+  set loadouts(v: GameState['loadouts']) {
+    this.g.loadouts = v;
+  }
   get researchLevels(): GameState['researchLevels'] {
     return this.g.researchLevels;
   }

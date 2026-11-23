@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { admiralty, apply, marksPayout, prestige, researchPayout } from './actions';
-import { admiraltyCost, admiraltyEffect, buyAdmiralty } from './admiralty';
+import {
+  admiraltyCost,
+  admiraltyEffect,
+  admiraltyMaxed,
+  buyAdmiralty,
+  canBuyAdmiralty,
+} from './admiralty';
+import { cardSlots } from './cards';
+import { focused } from './state';
 import { RP_DIVISOR } from './config';
 import { newGame, spawnAsteroid } from './state';
 import { game } from './testing';
@@ -67,6 +75,47 @@ describe('Admiralty shop (#69)', () => {
     save.version = 13;
     const r = migrate(save);
     expect(r.ok && r.state.admiralty).toEqual({});
+  });
+});
+
+describe('finite transformative Admiralty unlocks (#245)', () => {
+  it('finite upgrades cap, report maxed and refuse further purchases', () => {
+    const g = newGame(1);
+    g.marks = 100;
+    expect(admiraltyMaxed(g, 'admCharter')).toBe(false);
+    expect(buyAdmiralty(g, 'admCharter')).toBe(true);
+    expect(admiraltyMaxed(g, 'admCharter')).toBe(true);
+    expect(admiraltyCost(g, 'admCharter')).toBe(Infinity);
+    expect(canBuyAdmiralty(g, 'admCharter')).toBe(false);
+
+    for (let i = 0; i < 3; i++) expect(buyAdmiralty(g, 'admDoctrine')).toBe(true);
+    expect(admiraltyMaxed(g, 'admDoctrine')).toBe(true);
+    expect(admiraltyEffect(g, 'admDoctrine')).toBe(6);
+  });
+
+  it('Doctrine Expansion raises the card capacity', () => {
+    const g = newGame(1);
+    const base = cardSlots(focused(g));
+    g.admiralty.admDoctrine = 3;
+    expect(cardSlots(focused(g))).toBe(base + 6);
+  });
+
+  it('Forward Charter charts the Frontier from the next run launch', () => {
+    const g = richGame();
+    g.admiralty.admCharter = 1;
+    const next = prestige(g);
+    const frontier = next.systems.filter((x) => x.tier === 2);
+    expect(frontier.length).toBeGreaterThan(0);
+    expect(frontier.every((x) => x.discovered)).toBe(true);
+    expect(next.stats.furthestTier).toBe(2);
+    expect(next.unlocked).toEqual(expect.arrayContaining(['fighter', 'repair']));
+  });
+
+  it('Fleet Logistics scales linearly to its cap', () => {
+    const g = newGame(1);
+    expect(admiraltyEffect(g, 'admLogistics')).toBe(0);
+    g.admiralty.admLogistics = 3;
+    expect(admiraltyEffect(g, 'admLogistics')).toBeCloseTo(0.6);
   });
 });
 

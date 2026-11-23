@@ -41,6 +41,7 @@ export function prestige(
     alerts: structuredClone(s.alerts),
     cards: structuredClone(s.cards),
     automation: structuredClone(s.automation),
+    loadouts: structuredClone(s.loadouts),
   });
   refillCarriers(next, s.ops.length);
   emit(focused(next), 'Prestiged', { research: rp });
@@ -91,6 +92,7 @@ export function admiralty(s: GameState): GameState {
     doctrine: structuredClone(s.doctrine),
     cards: structuredClone(s.cards),
     automation: structuredClone(s.automation),
+    loadouts: structuredClone(s.loadouts),
   });
   refillCarriers(next, s.ops.length);
   emit(focused(next), 'Admiralty', { marks });

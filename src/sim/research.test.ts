@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { cardSlots } from './cards';
+import { surveyRadius, veinScanRadius } from './combat';
 import { SHIP_STATS } from './config';
-import { cargoCap, damageShip, speed } from './ctx';
+import { cargoCap, damageCarrier, damageShip, shieldHp, speed } from './ctx';
 import { RESEARCH, canBuyResearch, buyResearch, repeatEffect, softcap } from './research';
 import { SHIP_CLASSES } from './types';
-import { createShip, maxEnergy, maxHull, spawnAsteroid } from './state';
+import { carrierHullRegen, createShip, maxEnergy, maxHull, spawnAsteroid } from './state';
 import { stepSim } from './tick';
 import type { Sim } from './types';
 import { game } from './testing';
@@ -102,6 +104,52 @@ describe('research tree', () => {
       run(s, 600);
       expect(s.ships.some((x) => x.cls === cls)).toBe(true);
     }
+  });
+});
+
+describe('transformative research nodes (#245)', () => {
+  it('doctrine slots raise card capacity', () => {
+    const s = game(5);
+    const base = cardSlots(s);
+    s.researchLevels.doctrineSlots = 2;
+    expect(cardSlots(s)).toBe(base + 4);
+    s.admiralty.admDoctrine = 3;
+    expect(cardSlots(s)).toBe(base + 10);
+  });
+
+  it('emergency shields deepen the pool before hull damage', () => {
+    const s = game(5);
+    const base = shieldHp(s);
+    s.researchLevels.emergencyShield = 2;
+    expect(shieldHp(s)).toBeCloseTo(base * 1.5);
+    // 700 damage is more than a plain 600 HP shield can absorb.
+    const plain = game(5);
+    plain.carrier.shield = 1;
+    damageCarrier(plain, 700);
+    expect(plain.carrier.maxHull - plain.carrier.hull).toBeCloseTo(100);
+    const buffed = game(5);
+    buffed.carrier.shield = 1;
+    buffed.researchLevels.emergencyShield = 2;
+    damageCarrier(buffed, 700);
+    expect(buffed.carrier.maxHull - buffed.carrier.hull).toBeCloseTo(0);
+  });
+
+  it('self-healing plating regenerates hull over a tick', () => {
+    const s = game(5);
+    s.researchLevels.hullRegen = 1;
+    s.carrier.hull = 100;
+    expect(carrierHullRegen(s)).toBeGreaterThan(0);
+    stepSim(s);
+    expect(s.carrier.hull).toBeGreaterThan(100);
+  });
+
+  it('deep scan widens scouting reach', () => {
+    const s = game(5);
+    const survey = surveyRadius(s);
+    const scan = veinScanRadius(s);
+    s.researchLevels.deepScan = 2;
+    expect(surveyRadius(s)).toBeCloseTo(survey * 1.5);
+    expect(veinScanRadius(s)).toBeCloseTo(scan * 1.5);
   });
 });
 

@@ -13,6 +13,8 @@ export interface AdmiraltyUpgrade {
   /** Effect approached as the level grows (see `softcap`). */
   cap: number;
   label: (effect: number) => string;
+  /** Finite upgrades stop here and scale linearly to `cap`; omit for repeatable shops (#245). */
+  maxLevel?: number;
 }
 
 const pct = (e: number) => Math.round(e * 100);
@@ -46,6 +48,38 @@ export const ADMIRALTY_UPGRADES: AdmiraltyUpgrade[] = [
     cap: 5000,
     label: (e) => `+${Math.round(e)} starting credits`,
   },
+  // Finite, transformative unlocks (#245). They keep their ids in the existing `admiralty` record,
+  // so no new save field is needed; finite ones scale linearly instead of soft-capping.
+  {
+    id: 'admDoctrine',
+    name: 'Doctrine Expansion',
+    desc: 'Two more rule card slots per level, up to six',
+    base: 2,
+    ratio: 2,
+    cap: 6,
+    maxLevel: 3,
+    label: (e) => `+${Math.round(e)} card slots`,
+  },
+  {
+    id: 'admCharter',
+    name: 'Forward Charter',
+    desc: 'Start every run with the Frontier charted and Tier 2 unlocked',
+    base: 3,
+    ratio: 2,
+    cap: 1,
+    maxLevel: 1,
+    label: () => 'Frontier charted from launch',
+  },
+  {
+    id: 'admLogistics',
+    name: 'Fleet Logistics',
+    desc: 'Supply routes transfer faster and hangars start with more slots',
+    base: 2,
+    ratio: 2,
+    cap: 0.6,
+    maxLevel: 3,
+    label: (e) => `+${Math.round(e * 100)} % route transfer`,
+  },
 ];
 
 export const ADMIRALTY_BY_ID: Record<string, AdmiraltyUpgrade> = Object.fromEntries(
@@ -59,20 +93,36 @@ export function admiraltyLevel(s: Levels, id: string): number {
   return s.admiralty[id] ?? 0;
 }
 
-/** Marks for the next level of `id`; Infinity for an unknown upgrade. */
+/** Marks for the next level of `id`; Infinity for unknown or maxed finite upgrades. */
 export function admiraltyCost(s: Levels, id: string): number {
   const u = ADMIRALTY_BY_ID[id];
-  return u ? Math.ceil(u.base * u.ratio ** admiraltyLevel(s, id)) : Infinity;
+  if (!u) return Infinity;
+  const l = admiraltyLevel(s, id);
+  if (u.maxLevel !== undefined && l >= u.maxLevel) return Infinity;
+  return Math.ceil(u.base * u.ratio ** l);
 }
 
-/** Current soft-capped effect of `id` (0 at level 0). */
+/** True once a finite upgrade has reached its cap. */
+export function admiraltyMaxed(s: Levels, id: string): boolean {
+  const u = ADMIRALTY_BY_ID[id];
+  return !!u && u.maxLevel !== undefined && admiraltyLevel(s, id) >= u.maxLevel;
+}
+
+/**
+ * Current effect of `id` (0 at level 0). Repeatable shops soft-cap; finite unlocks
+ * scale linearly to their cap so a maxed Charter is exactly 1 and Doctrine gives +2/level.
+ */
 export function admiraltyEffect(s: Levels, id: string): number {
   const u = ADMIRALTY_BY_ID[id];
-  return u ? softcap(admiraltyLevel(s, id), u.cap) : 0;
+  if (!u) return 0;
+  const level = admiraltyLevel(s, id);
+  return u.maxLevel === undefined ? softcap(level, u.cap) : (u.cap * level) / u.maxLevel;
 }
 
 export function canBuyAdmiralty(s: Purse, id: string): boolean {
-  return !!ADMIRALTY_BY_ID[id] && s.marks >= admiraltyCost(s, id);
+  const u = ADMIRALTY_BY_ID[id];
+  if (!u || (u.maxLevel !== undefined && admiraltyLevel(s, id) >= u.maxLevel)) return false;
+  return s.marks >= admiraltyCost(s, id);
 }
 
 /** Spend Marks on one level. Returns false (changing nothing) when unknown or unaffordable. */

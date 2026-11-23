@@ -82,6 +82,20 @@ export const SCALE_WORLD_SCOUTSURVEY = 0.5;
 export const SCALE_WORLD_STARTCREDITS = 250;
 export const SCALE_WORLD_RESERVECD = 0.2;
 export const SCALE_WORLD_DEEPFABRICATION = 0.15;
+/** Speed bonus per Board mastery level for the slot-0 catapult (#244). */
+export const SCALE_BOARD_CATAPULT = 0.2;
+/** Mining/damage bonus per Board mastery level for a scout-linked ship (#244). */
+export const SCALE_BOARD_SENSOR = 0.25;
+/** Speed/cargo bonus per Board mastery level for a barge-dispatched hauler (#244). */
+export const SCALE_BOARD_DISPATCH = 0.3;
+/** Extra rule-card slots per Doctrine slots level (#245). */
+export const SCALE_CARD_SLOTS = 2;
+/** Survey and vein-scan radius bonus per Deep scan level (#245). */
+export const SCALE_DEEP_SCAN = 0.25;
+/** Shield strength bonus per Emergency shield level (#245). */
+export const SCALE_SHIELD_BUFFER = 0.25;
+/** Fraction of max carrier hull regenerated per second per Plating level (#245). */
+export const SCALE_HULL_REGEN = 0.02;
 
 /** Soft-capped effect of a repeatable node: cap × (1 − (1 − step)^level). */
 export function softcap(level: number, cap: number): number {
@@ -161,6 +175,14 @@ export const RESEARCH: ResearchNode[] = [
     cost: lin(1, 1),
   },
   {
+    // Emergency shield buffer (#245): a deeper pool before hull takes damage.
+    id: 'emergencyShield',
+    branch: 'Combat',
+    name: 'Emergency shields',
+    maxLevel: 3,
+    cost: lin(2, 2),
+  },
+  {
     id: 'repair',
     branch: 'Combat',
     name: 'Field repair',
@@ -201,6 +223,22 @@ export const RESEARCH: ResearchNode[] = [
     name: 'Hangar frames',
     maxLevel: 3,
     cost: lin(2, 2),
+  },
+  {
+    // More room for condition/action cards (#245); the Admiralty charter adds its own share.
+    id: 'doctrineSlots',
+    branch: 'Carrier',
+    name: 'Doctrine expansion',
+    maxLevel: 2,
+    cost: lin(3, 3),
+  },
+  {
+    // Unlocks and amplifies the positional hangar-board synergies (#244).
+    id: 'boardMastery',
+    branch: 'Carrier',
+    name: 'Board mastery',
+    maxLevel: 2,
+    cost: lin(3, 3),
   },
   {
     id: 'startCredits',
@@ -423,6 +461,14 @@ export const RESEARCH: ResearchNode[] = [
     cost: () => 3,
   },
   {
+    // Wider survey and vein scan radius for scouts (#245).
+    id: 'deepScan',
+    branch: 'scout',
+    name: 'Deep scan',
+    maxLevel: 2,
+    cost: lin(2, 2),
+  },
+  {
     id: 'repairBeam',
     branch: 'repair',
     name: 'Focused beams',
@@ -467,6 +513,14 @@ export const RESEARCH: ResearchNode[] = [
     name: 'Reinforced frame',
     maxLevel: 5,
     cost: lin(2, 1),
+  },
+  {
+    // Slow carrier hull regeneration between waves (#245).
+    id: 'hullRegen',
+    branch: 'Carrier',
+    name: 'Self-healing plating',
+    maxLevel: 3,
+    cost: lin(3, 2),
   },
   {
     id: 'reactor',

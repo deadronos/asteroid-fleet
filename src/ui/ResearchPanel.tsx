@@ -27,10 +27,11 @@ import {
   admiraltyCost,
   admiraltyEffect,
   admiraltyLevel,
+  admiraltyMaxed,
   canBuyAdmiralty,
 } from '../sim/admiralty';
 import { deepEqual } from './equal';
-import { fmt } from './format';
+import { fmt, formatSimTime } from './format';
 
 const GLOBAL: Branch[] = ['Logistics', 'Mining', 'Combat', 'Carrier', 'Reserves', 'Automation'];
 
@@ -81,14 +82,29 @@ export function ResearchPanel() {
     const progress = challengeProgress(s);
     const owned = engine.carriers.length;
     const carrierCost = CARRIER_COST(owned);
+    const rp = researchPayout(s);
+    const mult = researchMult(s);
+    const seconds = Math.floor(s.time);
+    const nextTarget = (rp + 1) / (s.stats.furthestTier * mult);
+    const needOre = Math.max(0, nextTarget * nextTarget * RP_DIVISOR - s.stats.oreValueDelivered);
+    const eta = s.incomeAvg > 0 ? needOre / s.incomeAvg : Infinity;
     return {
       research: s.research,
-      rp: researchPayout(s),
+      rp,
+      // A rough lifetime rate, bucketed to whole seconds so a tick does not re-render the panel.
+      rpPerHour: rp > 0 && seconds > 0 ? (rp * 3600) / seconds : 0,
+      nextRpOre: fmt(needOre),
+      nextRpEta: Number.isFinite(eta) ? formatSimTime(eta) : '—',
+      runTime: formatSimTime(s.time),
+      avgIncome: fmt(s.incomeAvg),
+      shipsLost: s.stats.shipsLost,
+      lifetimeRp: fmt(s.lifetime.researchEarned),
+      marksEarned: fmt(s.lifetime.marksEarned),
       marks: s.marks,
       marksGain: marksPayout(s),
       tier,
       oreDelivered: fmt(s.stats.oreValueDelivered),
-      researchMult: researchMult(s).toFixed(2),
+      researchMult: mult.toFixed(2),
       hullClass: s.carrier.hullClass,
       hulls: [...s.hulls],
       unlocked: [...s.unlocked],
@@ -106,6 +122,8 @@ export function ResearchPanel() {
         id: u.id,
         level: fmt(admiraltyLevel(s, u.id)),
         label: u.label(admiraltyEffect(s, u.id)),
+        finite: u.maxLevel !== undefined,
+        maxed: admiraltyMaxed(s, u.id),
         canBuy: canBuyAdmiralty(s, u.id),
         cost: fmt(admiraltyCost(s, u.id)),
       })),
@@ -237,6 +255,18 @@ export function ResearchPanel() {
           </div>
         )}
       </div>
+      <div className="prestige-box" aria-label="Research pace and run stats">
+        <Pair
+          a="RP per hour"
+          av={r.rpPerHour > 0 ? `${r.rpPerHour.toFixed(1)} /h` : '—'}
+          b="Next +1 RP"
+          bv={`${r.nextRpOre} ore · ${r.nextRpEta}`}
+        />
+        <p className="hint" style={{ margin: 0 }}>
+          Run {r.runTime} · avg {r.avgIncome} cr/s · {r.shipsLost} ships lost. Lifetime{' '}
+          {r.prestiges} prestiges · {r.lifetimeRp} RP · {r.marksEarned} Marks earned.
+        </p>
+      </div>
       {lateGame && (
         <>
           <div className="prestige-box">
@@ -335,8 +365,9 @@ export function ResearchPanel() {
                   <button
                     disabled={!st.canBuy}
                     onClick={() => engine.dispatch({ type: 'buyAdmiralty', id: u.id })}
+                    title={st.finite && !st.maxed ? `Max level ${u.maxLevel}` : undefined}
                   >
-                    {st.cost} Marks
+                    {st.maxed ? 'max' : `${st.cost} Marks`}
                   </button>
                 </div>
               );

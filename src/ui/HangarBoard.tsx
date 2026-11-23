@@ -10,7 +10,7 @@ import {
 } from '../sim/config';
 import { autoBuyUnlocked } from '../sim/automation';
 import { creditsShort, RETROFIT_COST } from '../sim/costs';
-import { occupancy, repairSynergy, type RepairSynergyKind } from '../sim/hangar';
+import { activeSynergies, occupancy, type BoardSynergyKind } from '../sim/hangar';
 import { maxHull } from '../sim/state';
 import { SHIP_CLASSES, type HangarType, type ModuleId, type ShipClass } from '../sim/types';
 import { deepEqual } from './equal';
@@ -42,7 +42,7 @@ export function HangarBoard({
       cls: ShipClass;
       out: boolean;
       mode: string;
-      syn: RepairSynergyKind | null;
+      syn: BoardSynergyKind[];
       modules: ModuleId[];
       hpPct: number;
     }[] = [];
@@ -60,7 +60,7 @@ export function HangarBoard({
         cls: ship.cls,
         out: ship.mode !== 'docked',
         mode: modeLabel(ship),
-        syn: repairSynergy(s, occ, ship, byId)?.kind ?? null,
+        syn: activeSynergies(s, occ, ship, byId).map((x) => x.kind),
         modules: [...ship.modules],
         hpPct: Math.round((ship.hull / mh) * 1000) / 10,
       });
@@ -149,6 +149,7 @@ export function HangarBoard({
       continue;
     }
     const st = SHIP_STATS[ship.cls];
+    const synText = [...new Set(ship.syn)].map((k) => SYNERGY_LABEL[k]).join(' · ');
     cells.push(
       <div
         key={'s' + ship.id}
@@ -173,11 +174,11 @@ export function HangarBoard({
             onShip(ship.id);
           } else cancel(e);
         }}
-        title={`${st.name}${ship.syn ? ' · ' + SYNERGY_LABEL[ship.syn] : ''}${ship.modules.length ? ' · ' + ship.modules.map((m) => MODULES[m].name).join(', ') : ''}`}
+        title={`${st.name}${synText ? ' · ' + synText : ''}${ship.modules.length ? ' · ' + ship.modules.map((m) => MODULES[m].name).join(', ') : ''}`}
       >
         <span className="nm">{st.slots >= 4 ? st.name : st.short}</span>
         <span className="md">{ship.mode}</span>
-        {ship.syn && <span className="synergy">✚</span>}
+        {ship.syn.length > 0 && <span className="synergy">✚</span>}
         {ship.modules.length > 0 && (
           <span className="mods">{ship.modules.map((m) => MODULES[m].short[0]).join('')}</span>
         )}

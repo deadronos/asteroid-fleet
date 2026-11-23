@@ -53,11 +53,19 @@ import {
   SCALE_COMBAT_FIGHTERRANGE,
   SCALE_COMBAT_WARNINGPERRELAY,
   SCALE_COMBAT_WARNINGPERSENSORS,
+  SCALE_DEEP_SCAN,
   SCALE_REPAIR_BEAM,
   SCALE_REPAIR_FIELD,
 } from './research';
 import { clusterCenters, emit, isStowed, maxHull } from './state';
 import type { Sim, Pirate, Ship, Vec3 } from './types';
+
+/** Scout survey reach, widened by Deep scan research (#245). */
+export const surveyRadius = (s: Sim) => SURVEY_RADIUS * (1 + SCALE_DEEP_SCAN * lvl(s, 'deepScan'));
+
+/** Radius in which a surveyed cluster marks rich rocks as veins (#245). */
+export const veinScanRadius = (s: Sim) =>
+  VEIN_SCAN_RADIUS * (1 + SCALE_DEEP_SCAN * lvl(s, 'deepScan'));
 
 export function cargoHeat(s: Sim): number {
   let v = s.carrier.oreValue;
@@ -249,7 +257,7 @@ export function scout(s: Sim, ship: Ship, dt: number, ctx: Ctx) {
   }
   ship.mode = 'toAsteroid';
   ship.targetId = target;
-  if (moveToward(ship.pos, centers[target], v, SURVEY_RADIUS)) surveyCluster(s, target, ctx);
+  if (moveToward(ship.pos, centers[target], v, surveyRadius(s))) surveyCluster(s, target, ctx);
 }
 
 /** Mark cluster `i` surveyed and its rich rocks as veins. */
@@ -260,7 +268,8 @@ export function surveyCluster(s: Sim, i: number, ctx: Ctx) {
   // Drop veins whose rock was mined out and replaced.
   r.veins = r.veins.filter((id) => ctx.asteroids.has(id));
   const rich = ctx.maxValue * VEIN_VALUE_SHARE;
-  const r2 = VEIN_SCAN_RADIUS * VEIN_SCAN_RADIUS;
+  const scanR = veinScanRadius(s);
+  const r2 = scanR * scanR;
   let found = 0;
   for (const a of s.asteroids) {
     if (a.ore <= 0 || a.value < rich || dist2(a.pos, c) > r2 || r.veins.includes(a.id)) continue;

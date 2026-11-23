@@ -3,6 +3,7 @@ import { Profiler, act } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { engine } from '../game/engine';
 import { apply, order } from '../sim/actions';
+import { RP_DIVISOR } from '../sim/config';
 import { createShip } from '../sim/economy';
 import { focused, newGame, unlockRule } from '../sim/state';
 import { SaveNotice } from './App';
@@ -127,6 +128,53 @@ describe('FleetPanel', () => {
       el.getAttribute('aria-label')?.includes(`#${drone.id}`),
     )!;
     expect(tile.title).toContain('2×');
+  });
+
+  it('names Board mastery synergies on the tile and in ship detail (#244)', async () => {
+    const s = game();
+    const op = focused(s);
+    op.ships = [];
+    for (const h of op.hangars) {
+      h.items = [];
+      h.slots = 12;
+    }
+    op.researchLevels.boardMastery = 1;
+    const h = op.hangars[0];
+    const drone = createShip(op, 'drone', h.id, 0)!;
+    createShip(op, 'scout', h.id, 1);
+    const m = await mount(<FleetPanel />, s);
+    cleanup = m.cleanup;
+    const tile = [...m.el.querySelectorAll<HTMLElement>('.ship-tile')].find((el) =>
+      el.getAttribute('aria-label')?.includes(`#${drone.id}`),
+    )!;
+    expect(tile.title).toContain('Lead slot');
+    expect(tile.title).toContain('Scout-linked');
+    expect(tile.querySelector('.synergy')).not.toBeNull();
+    await click(tile);
+    expect(m.el.textContent).toContain('Board synergy:');
+  });
+
+  it('saves and applies a class loadout from ship detail (#244)', async () => {
+    const s = game();
+    const dispatch = vi.spyOn(engine, 'dispatch').mockImplementation(() => {});
+    const m = await mount(<FleetPanel />, s);
+    cleanup = m.cleanup;
+    await click(m.el.querySelector<HTMLElement>('.ship-tile')!);
+    const save = [...m.el.querySelectorAll<HTMLButtonElement>('button')].find((b) =>
+      b.textContent?.includes('Save as class loadout'),
+    )!;
+    expect(save).toBeDefined();
+    await click(save);
+    expect(dispatch).toHaveBeenCalledWith({ type: 'setLoadout', cls: 'drone', modules: [] });
+
+    s.loadouts = { drone: ['laser'] };
+    await act(async () => engine.emit());
+    const apply = [...m.el.querySelectorAll<HTMLButtonElement>('button')].find((b) =>
+      b.textContent?.includes('Apply to docked'),
+    )!;
+    expect(apply.disabled).toBe(false);
+    await click(apply);
+    expect(dispatch).toHaveBeenCalledWith({ type: 'applyLoadout', cls: 'drone' });
   });
 
   it('hides Scrap for a drone carried in a barge (#181)', async () => {
@@ -322,6 +370,23 @@ describe('progressive research disclosure (#247)', () => {
       expect(m.el.textContent).toContain(label);
     const branches = [...m.el.querySelectorAll('.branch h3')].map((h) => h.textContent ?? '');
     expect(branches.some((b) => b.startsWith('Fighter'))).toBe(true);
+  });
+
+  it('shows RP pace, run stats and maxed finite Admiralty unlocks (#245)', async () => {
+    const s = game(3);
+    s.time = 3600;
+    s.stats.oreValueDelivered = RP_DIVISOR;
+    s.stats.furthestTier = 2;
+    focused(s).incomeAvg = 10;
+    s.lifetime.prestiges = 1;
+    s.admiralty.admCharter = 1;
+    const m = await mount(<ResearchPanel />, s);
+    cleanup = m.cleanup;
+    expect(m.el.textContent).toContain('RP per hour');
+    expect(m.el.textContent).toContain('Next +1 RP');
+    expect(m.el.textContent).toContain('Lifetime');
+    expect(m.el.textContent).toContain('Forward Charter');
+    expect(m.el.textContent).toContain('max');
   });
 
   it('reveals carrier buying for an imported multi-carrier save', async () => {

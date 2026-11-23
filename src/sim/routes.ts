@@ -5,6 +5,7 @@
 // carrier at Tier A, Tier B or settled offline. Each route has its own rng for the
 // interception roll, so the outcome depends on the route and the run clock alone.
 
+import { admiraltyEffect } from './admiralty';
 import { TICK_HZ } from './config';
 import { carrierStorage } from './hangar';
 import { mulberry } from './math';
@@ -70,6 +71,8 @@ export function stepRoutes(g: GameState) {
 
 /** One shipment round of `dt` seconds for every route, in route order. */
 export function routeTick(g: GameState, dt: number) {
+  // Fleet Logistics speeds every shipment; the boost lives in the existing Admiralty record (#245).
+  const transfer = dt * (1 + admiraltyEffect(g, 'admLogistics'));
   for (const r of g.routes) {
     const src = g.ops.find((o) => o.id === r.from);
     const dst = g.ops.find((o) => o.id === r.to);
@@ -91,7 +94,7 @@ export function routeTick(g: GameState, dt: number) {
       have = Math.max(0, from.energy - ENERGY_FLOOR * maxEnergy(a));
       room = maxEnergy(b) - to.energy;
     }
-    const amt = Math.min(r.rate * dt, have, room);
+    const amt = Math.min(r.rate * transfer, have, room);
     if (!(amt > 1e-9)) continue;
 
     const [roll, next] = mulberry(r.rng);

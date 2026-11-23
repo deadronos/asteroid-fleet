@@ -1,6 +1,6 @@
 # Simulation (`src/sim/`)
 
-Source of truth: `tick.ts`, `ctx.ts`, `hangar.ts`, `view.ts`, `state.ts`, `types.ts`, `config.ts`, `research.ts`, `actions.ts` (barrel over `orders.ts`, `reset.ts`, `offline.ts`), `background.ts`, `worldgen.ts`.
+Source of truth: `tick.ts`, `ctx.ts`, `hangar.ts`, `view.ts`, `state.ts`, `types.ts`, `config.ts`, `research.ts`, `admiralty.ts`, `cards.ts`, `loadouts.ts`, `goals.ts`, `actions.ts` (barrel over `orders.ts`, `reset.ts`, `offline.ts`), `background.ts`, `worldgen.ts`.
 
 ## State model
 
@@ -44,7 +44,10 @@ There is one field per system for the whole run. While any carrier is on the map
 
 - `config.ts` holds every gameplay constant and data table (`SHIP_STATS`, `HULLS`, `MODULES`, `PRESETS`, `HANGAR_TYPES`...). Magic numbers belong there (#133), with a doc comment saying what they are, and the issue number when one exists.
 - Research nodes are in `research.ts`. Repeatable nodes use a soft cap, `cap × (1 − (1 − step)^level)` (`softcap`), with geometric cost. Admiralty upgrades (`admiralty.ts`) follow the same shape. Every per-level multiplier lives in the `SCALE_*` exports in that file, so a node's number is defined once and the sim and panels read the same value (#250). Node descriptions are player-facing text and live in `ui/researchText.ts`, not in the worker bundle.
-- Hangar board occupancy, adjacency and dock-repair rules live in `hangar.ts` and accept an optional `byId` lookup so hot paths stay O(slots). `repairSynergy` names each rule and its multiplier; the tick context and `FleetPanel` both derive from it, so the panel cannot omit a bonus the sim applies (#250).
+- Hangar board occupancy, adjacency and dock-repair rules live in `hangar.ts` and accept an optional `byId` lookup so hot paths stay O(slots). `repairSynergy` names each repair rule and its multiplier; `boardBoosts` adds the positional rules (catapult, scout link, barge dispatch) and `activeSynergies` returns both for the UI. The tick context and `FleetPanel` both derive from these helpers, so the panel cannot omit a bonus the sim applies (#244, #250). `buildCtx` caches each ship's aggregated multipliers in a per-ship `WeakMap` once per tick, keeping `speed`/`cargoCap`/`miningRate`/`fighterDamage` O(1) in the hot loop.
+- Game-state loadout templates live in `loadouts.ts`: `setLoadout` validates, `fitLoadout` buys template modules for a new or refitted ship (respecting an optional credit floor) and `applyLoadout` refits docked ships of a class. `orders.ts` sends the player commands; `automation.ts` reuses the same fitter for auto-buy and auto-rebuild (#244).
+- Card capacity (`cardSlots` in `cards.ts`) is the base grid plus Doctrine slots research and the finite Doctrine Expansion Admiralty perk (#245). Finite Admiralty upgrades in `admiralty.ts` scale linearly to `cap` instead of soft-capping and report a maxed state; their levels still live in `GameState.admiralty`.
+- The six derived goal phases live in `goals.ts` and read only existing state, so they need no save fields (#245).
 - Run modifiers (`modifiers.ts`) are read through one small hook each, so every rule has one place that names it. Add a hook there rather than checking `s.modifiers` inline.
 - Stances resolve from most specific to least: active card > hangar > ship type > fleet doctrine (`doctrine.ts`, `cards.ts`). Cards are compiled once per tick into per-action lists that are already in priority order.
 - `SOLAR_RATE`, `RP_DIVISOR` and `HEAT_FACTOR_CAP` set the pre-Fusion income, prestige and wave-size curves (#242).
