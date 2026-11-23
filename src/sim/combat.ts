@@ -48,7 +48,7 @@ import {
 } from './ctx';
 import { copy, dist, dist2, moveToward, rand, randRange, seeded } from './math';
 import { lvl } from './research';
-import { clusterCenters, emit, maxHull } from './state';
+import { clusterCenters, emit, isStowed, maxHull } from './state';
 import type { Sim, Pirate, Ship, Vec3 } from './types';
 
 export function cargoHeat(s: Sim): number {
@@ -261,11 +261,11 @@ export function surveyCluster(s: Sim, i: number, ctx: Ctx) {
 export function repairDrone(s: Sim, ship: Ship, dt: number, ctx: Ctx) {
   const v = speed(s, ship) * dt;
   let patient = ctx.ships.get(ship.targetId);
-  if (!patient || patient.mode === 'docked' || patient.hull >= maxHull(s, patient.cls) * 0.98) {
+  if (!patient || isStowed(patient) || patient.hull >= maxHull(s, patient.cls) * 0.98) {
     patient = undefined;
     let worst = 0.85;
     for (const o of ctx.ships.values()) {
-      if (o.id === ship.id || o.mode === 'docked') continue;
+      if (o.id === ship.id || isStowed(o)) continue;
       let frac = o.hull / maxHull(s, o.cls);
       if (o.cls === 'barge' || o.cls === 'fighter') frac -= 0.1;
       if (frac < worst) {
@@ -286,7 +286,7 @@ export function repairDrone(s: Sim, ship: Ship, dt: number, ctx: Ctx) {
   const nano = lvl(s, 'repairNano') > 0;
   if (nano) {
     for (const o of ctx.ships.values()) {
-      if (o.mode === 'docked' || dist(o.pos, ship.pos) > range) continue;
+      if (isStowed(o) || dist(o.pos, ship.pos) > range) continue;
       o.hull = Math.min(maxHull(s, o.cls), o.hull + heal);
     }
   } else if (dist(patient.pos, ship.pos) <= range) {
@@ -369,7 +369,7 @@ function gasGiantTargetBias(s: Sim, sh: Ship): number {
 }
 
 export function pirateTargetScore(s: Sim, sh: Ship): number {
-  if (sh.mode === 'docked') return 0;
+  if (isStowed(sh)) return 0;
   return baseTargetScore(s, sh) * gasGiantTargetBias(s, sh);
 }
 
@@ -385,7 +385,7 @@ export function pirateStep(s: Sim, dt: number, ctx: Ctx) {
     let tgtPos: Vec3 | null =
       p.targetId === CARRIER ? s.carrier.pos : (ctx.ships.get(p.targetId)?.pos ?? null);
     const t = ctx.ships.get(p.targetId);
-    if (!tgtPos || (t && t.mode === 'docked') || rand(s) < dt / 3) {
+    if (!tgtPos || (t && isStowed(t)) || rand(s) < dt / 3) {
       let best = CARRIER;
       let bs = 0.6 / (dist(p.pos, s.carrier.pos) + 30);
       for (const sh of ctx.ships.values()) {

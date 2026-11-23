@@ -44,6 +44,7 @@ export function fillFleetFrame(
   pirates: readonly Pirate[],
   prev: ReadonlyMap<number, Vec3>,
   a: number,
+  dt: number,
   out: FleetFrame = fleetFrame,
 ): FleetFrame {
   out.bucketLen.fill(0);
@@ -56,7 +57,7 @@ export function fillFleetFrame(
     out.pos[o] = p.x + (e.pos.x - p.x) * a;
     out.pos[o + 1] = p.y + (e.pos.y - p.y) * a;
     out.pos[o + 2] = p.z + (e.pos.z - p.z) * a;
-    advanceHeading(e.id, e.pos, prev.get(e.id), out.hdg, o);
+    advanceHeading(e.id, e.pos, prev.get(e.id), out.hdg, o, dt);
     out.step[i] = prev.has(e.id) ? Math.hypot(e.pos.x - p.x, e.pos.y - p.y, e.pos.z - p.z) : 0;
     out.ids[i] = e.id;
     out.cls[i] = c;
@@ -91,10 +92,10 @@ export function asteroidById(list: readonly Asteroid[]): ReadonlyMap<number, Ast
 
 /** Runs before every other frame callback, so the layers just read `fleetFrame`. */
 export function FleetPass() {
-  useFrame(() => {
+  useFrame((_, dt) => {
     const s = engine.view;
     pruneHeadings();
-    fillFleetFrame(s.ships, s.pirates, engine.prev, engine.alpha());
+    fillFleetFrame(s.ships, s.pirates, engine.prev, engine.alpha(), dt);
   }, -10);
   return null;
 }

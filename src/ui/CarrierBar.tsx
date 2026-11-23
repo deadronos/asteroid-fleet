@@ -5,28 +5,26 @@ import { useHotkeys } from './hotkeys';
 import { fmt } from './format';
 import { deepEqual } from './equal';
 
-/** Carrier tabs, hotkeys 1–9 and the cut that hides a swap. Hidden with a single carrier. */
-export function CarrierBar() {
+/** Carrier switcher tabs and hotkeys 1–9; hidden with a single carrier. */
+function CarrierTabs() {
   // Rows hold only what is drawn, so an idle tick that changes nothing visible skips the render.
-  const bar = useGame((s) => {
+  const rows = useGame((s) => {
     const carriers = engine.carriers;
+    if (carriers.length < 2) return null;
     const labels = carrierChoices(carriers, s.systems);
-    return {
-      cuts: engine.cuts,
-      rows: carriers.map((c, i) => {
-        const badge = engine.unseen.get(c.id);
-        return {
-          id: c.id,
-          label: labels[i].label,
-          on: c.id === engine.focusedCarrierId,
-          hull: Math.round(c.hull * 100),
-          energy: Math.floor(c.energy),
-          income: fmt(c.income),
-          positive: c.income >= 0,
-          badge: badge ? { severity: badge.severity, count: badge.count } : null,
-        };
-      }),
-    };
+    return carriers.map((c, i) => {
+      const badge = engine.unseen.get(c.id);
+      return {
+        id: c.id,
+        label: labels[i].label,
+        on: c.id === engine.focusedCarrierId,
+        hull: Math.round(c.hull * 100),
+        energy: Math.floor(c.energy),
+        income: fmt(c.income),
+        positive: c.income >= 0,
+        badge: badge ? { severity: badge.severity, count: badge.count } : null,
+      };
+    });
   }, deepEqual);
 
   useHotkeys([
@@ -43,40 +41,50 @@ export function CarrierBar() {
     },
   ]);
 
-  if (bar.rows.length < 2) return null;
+  if (!rows) return null;
+  return (
+    <nav className="carrier-bar" aria-label="Carriers">
+      {rows.map((c, i) => {
+        const { on, badge } = c;
+        return (
+          <button
+            key={c.id}
+            type="button"
+            className={on ? 'on' : ''}
+            aria-pressed={on}
+            onClick={() => engine.focusCarrier(c.id)}
+          >
+            <span className="k">{i < 9 ? i + 1 : ''}</span> {c.label}
+            <span className="sub">
+              {' '}
+              hull {c.hull}% · energy {c.energy} · {c.positive ? '+' : ''}
+              {c.income}/s
+            </span>
+            {badge && (
+              <b className={`badge sev-${badge.severity}`} aria-label={`${badge.count} new events`}>
+                {badge.count}
+              </b>
+            )}
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
+/** Screen-flash cut on carrier switch or warp jump; renders regardless of carrier count (#224). */
+function WarpCut() {
+  const cuts = useGame(() => engine.cuts);
+  // Remounting restarts the animation on every cut.
+  return cuts > 0 ? <div key={cuts} className="warp-cut" aria-hidden="true" /> : null;
+}
+
+/** Carrier tabs, hotkeys 1–9 and the cut that hides a swap or warp jump. */
+export function CarrierBar() {
   return (
     <>
-      <nav className="carrier-bar" aria-label="Carriers">
-        {bar.rows.map((c, i) => {
-          const { on, badge } = c;
-          return (
-            <button
-              key={c.id}
-              type="button"
-              className={on ? 'on' : ''}
-              aria-pressed={on}
-              onClick={() => engine.focusCarrier(c.id)}
-            >
-              <span className="k">{i < 9 ? i + 1 : ''}</span> {c.label}
-              <span className="sub">
-                {' '}
-                hull {c.hull}% · energy {c.energy} · {c.positive ? '+' : ''}
-                {c.income}/s
-              </span>
-              {badge && (
-                <b
-                  className={`badge sev-${badge.severity}`}
-                  aria-label={`${badge.count} new events`}
-                >
-                  {badge.count}
-                </b>
-              )}
-            </button>
-          );
-        })}
-      </nav>
-      {/* Remounting restarts the animation on every switch. */}
-      {bar.cuts > 0 && <div key={bar.cuts} className="warp-cut" aria-hidden="true" />}
+      <CarrierTabs />
+      <WarpCut />
     </>
   );
 }

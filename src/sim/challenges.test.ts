@@ -75,10 +75,14 @@ describe('run modifiers (#71)', () => {
     expect(plain.ships.some((x) => x.cls === 'fighter')).toBe(true);
   });
 
-  it('deepSpace starts in a tier-2 system', () => {
+  it('deepSpace starts in a tier-2 system and logs it in CarrierOnline (#228)', () => {
     const s = focused(newGame(5, carry(['deepSpace'])));
+    expect(s.systemId).not.toBe(0);
     expect(s.systems[s.systemId].tier).toBe(2);
     expect(s.stats.furthestTier).toBe(2);
+    const online = s.log.find((e) => e.kind === 'CarrierOnline');
+    expect(online?.data.system).toBe(s.systems[s.systemId].name);
+    expect(online?.data.system).not.toBe(s.systems[0].name);
   });
 
   it('changes the run deterministically: same seed and modifier repeat, a modifier diverges', () => {

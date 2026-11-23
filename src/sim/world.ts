@@ -20,6 +20,7 @@ import {
   gasGiantPos,
   h2Storm,
   emit,
+  isStowed,
   jumpCost,
   maxEnergy,
   refineThroughput,
@@ -93,7 +94,7 @@ export function hazards(s: Sim, dt: number) {
   const solarStorm = s.storm.active > 0 && !h2;
   const gas = h2 ? gasGiantPos(s.systems[s.systemId]) : null;
   for (const sh of s.ships) {
-    if (sh.mode === 'docked') continue;
+    if (isStowed(sh)) continue;
     for (const h of s.hazards)
       if (dist2(h.pos, sh.pos) < h.radius * h.radius) damageShip(s, sh, h.dps * dt);
     if (solarStorm && dist(sh.pos, s.carrier.pos) > COVER_RADIUS)

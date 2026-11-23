@@ -31,7 +31,7 @@ import {
 import { copy, moveAway, onSphere, rand } from './math';
 import { lvl, repeatEffect } from './research';
 import { CHALLENGES, challengeProgress } from './modifiers';
-import { bind, emit, maxHull, stateOf } from './state';
+import { bind, emit, isStowed, maxHull, stateOf } from './state';
 import { stepRoutes } from './routes';
 import { carrierDisabled, executeJump, warpStep } from './warp';
 import { drift, field, hazards, power, refine, reserves } from './world';
@@ -173,7 +173,7 @@ function wantsLaunch(s: Sim, ship: Ship, ctx: Ctx): boolean {
     case 'harvester':
       return sys.gasGiant && lvl(s, 'fusion') > 0 && s.pirates.length === 0;
     case 'repair':
-      return s.ships.some((x) => x.mode !== 'docked' && x.hull < maxHull(s, x.cls) * 0.85);
+      return s.ships.some((x) => !isStowed(x) && x.hull < maxHull(s, x.cls) * 0.85);
     case 'drone':
       return !ship.idleUntil || s.time >= ship.idleUntil;
     default:

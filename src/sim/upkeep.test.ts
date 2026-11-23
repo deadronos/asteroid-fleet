@@ -50,6 +50,13 @@ describe('power upkeep', () => {
     expect(u.launched.drone).toBe(1);
     expect(u.total).toBeCloseTo(upkeepRate(s));
     expect(u.hangarRate).toBeCloseTo(docked);
+
+    // Carried drones inside a barge bay are stowed and pay no upkeep (#225).
+    drone.mode = 'carried';
+    expect(upkeepRate(s)).toBeCloseTo(docked);
+    const uc = upkeep(s);
+    expect(uc.launched.drone).toBe(0);
+    expect(uc.total).toBeCloseTo(docked);
   });
 
   it('drains the pool by the upkeep every tick', () => {

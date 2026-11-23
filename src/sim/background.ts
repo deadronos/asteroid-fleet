@@ -18,6 +18,7 @@ import {
   createShip,
   emit,
   h2Storm,
+  isStowed,
   maxEnergy,
   refineThroughput,
   solarRate,
@@ -50,7 +51,7 @@ export interface BackgroundReport {
 const BUFFER_ORDER: ShipClass[] = ['fighter', 'drone', 'scout', 'repair', 'hauler', 'harvester'];
 
 /** A ship out in the field. Docked and carried ships are safe from a wave. */
-const exposed = (x: Ship) => x.mode !== 'docked' && x.mode !== 'carried';
+const exposed = (x: Ship) => !isStowed(x);
 
 /**
  * Ships a background wave may take: launched ones the free reserves will rebuild, plus
@@ -120,7 +121,7 @@ export function materialise(s: Sim) {
   const c = s.carrier.pos;
   for (const x of s.ships) {
     x.targetId = -1;
-    if (x.mode === 'docked' || x.mode === 'carried') continue;
+    if (isStowed(x)) continue;
     x.mode = 'idle';
     x.station = null;
     const off = onSphere(() => rand(s), 6, 0.5);

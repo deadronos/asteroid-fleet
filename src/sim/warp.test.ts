@@ -90,6 +90,18 @@ describe('warp jump', () => {
     for (let i = 0; i < 20; i++) stepSim(s);
     expect(s.carrier.pos).toEqual(before);
   });
+
+  it('keeps the warp arrival FX after enterSystem resets fx (#224)', () => {
+    const { s } = recallGame();
+    s.carrier.pos = { x: 42, y: 0, z: -15 };
+    for (const x of s.ships) x.mode = 'docked';
+    expect(order(s, { type: 'jumpNow' })).toBeNull();
+    expect(s.systemId).toBe(1);
+    const warpFx = s.fx.filter((f) => f.kind === 'warp');
+    expect(warpFx).toHaveLength(1);
+    expect(warpFx[0].a).toEqual(s.carrier.pos);
+    expect(warpFx[0].ttl).toBe(1.5);
+  });
 });
 
 const cost = () => {

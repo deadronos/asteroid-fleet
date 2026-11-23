@@ -93,10 +93,15 @@ export function hangarUpkeep(count: number): number {
   return e;
 }
 
-/** Energy/s the hangars and launched ships draw right now (#60). Docked ships are free. */
+/** Whether a ship is stowed in a carrier hangar or a barge bay, off the map (#225). */
+export function isStowed(ship: Pick<Ship, 'mode'>): boolean {
+  return ship.mode === 'docked' || ship.mode === 'carried';
+}
+
+/** Energy/s the hangars and launched ships draw right now (#60). Stowed ships are free (#225). */
 export function upkeepRate(s: Sim): number {
   let total = hangarUpkeep(s.hangars.length);
-  for (const x of s.ships) if (x.mode !== 'docked') total += SHIP_UPKEEP[x.cls];
+  for (const x of s.ships) if (!isStowed(x)) total += SHIP_UPKEEP[x.cls];
   return total;
 }
 
@@ -104,7 +109,7 @@ export interface Upkeep {
   hangars: number;
   /** Energy/s for the hangars alone. */
   hangarRate: number;
-  /** Launched (not docked) ships per class. */
+  /** Launched (not docked or carried) ships per class. */
   launched: Record<ShipClass, number>;
   /** Energy/s for all hangars and launched ships. */
   total: number;
@@ -119,7 +124,7 @@ export function upkeep(s: Sim): Upkeep {
   const hangarRate = hangarUpkeep(s.hangars.length);
   let total = hangarRate;
   for (const x of s.ships) {
-    if (x.mode === 'docked') continue;
+    if (isStowed(x)) continue;
     launched[x.cls]++;
     total += SHIP_UPKEEP[x.cls];
   }
