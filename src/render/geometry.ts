@@ -113,3 +113,90 @@ void main() {
   vP = position;
   gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
 }`;
+
+/** Shared vertex shader for Fresnel rim shells (carrier shield, hazard bounds, H2 storm). */
+export const FRESNEL_VERT = /* glsl */ `
+varying vec3 vNormalV;
+varying vec3 vViewDir;
+varying vec3 vLocalPos;
+void main() {
+  vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
+  vNormalV = normalize(normalMatrix * normal);
+  vViewDir = normalize(-mvPos.xyz);
+  vLocalPos = normalize(position);
+  gl_Position = projectionMatrix * mvPos;
+}`;
+
+export const SHIELD_FRAG = /* glsl */ `
+uniform float uTime;
+uniform float uShield;
+uniform float uHitFlash;
+uniform vec3 uColor;
+varying vec3 vNormalV;
+varying vec3 vViewDir;
+varying vec3 vLocalPos;
+void main() {
+  float ndotv = abs(dot(normalize(vNormalV), normalize(vViewDir)));
+  float fresnel = pow(max(1.0 - ndotv, 0.001), 2.5);
+  float band = 0.85 + 0.15 * sin(vLocalPos.y * 18.0 - uTime * 3.0);
+  float lowMask = 1.0 - smoothstep(0.05, 0.25, uShield);
+  float flicker = mix(1.0, 0.45 + 0.55 * sin(uTime * 28.0) * sin(uTime * 11.0), lowMask);
+  vec3 col = mix(uColor, vec3(0.85, 0.96, 1.0), uHitFlash * 0.7) * (1.25 + uHitFlash * 2.2);
+  float alpha = clamp(
+    fresnel * (0.58 * (0.25 + 0.75 * uShield) * flicker + uHitFlash * 1.15) * band + uHitFlash * 0.18,
+    0.0,
+    1.0
+  );
+  gl_FragColor = vec4(col, alpha);
+}`;
+
+export const DEBRIS_SHELL_FRAG = /* glsl */ `
+uniform vec3 uColor;
+varying vec3 vNormalV;
+varying vec3 vViewDir;
+varying vec3 vLocalPos;
+void main() {
+  float ndotv = abs(dot(normalize(vNormalV), normalize(vViewDir)));
+  float fresnel = pow(max(1.0 - ndotv, 0.001), 2.6);
+  float ring = 0.8 + 0.2 * sin(vLocalPos.y * 10.0);
+  float alpha = clamp(fresnel * 0.34 * ring + 0.02, 0.0, 0.5);
+  gl_FragColor = vec4(uColor, alpha);
+}`;
+
+export const RADIATION_FRAG = /* glsl */ `
+uniform float uTime;
+uniform vec3 uColor;
+varying vec3 vNormalV;
+varying vec3 vViewDir;
+varying vec3 vLocalPos;
+void main() {
+  float ndotv = abs(dot(normalize(vNormalV), normalize(vViewDir)));
+  float fresnel = pow(max(1.0 - ndotv, 0.001), 2.0);
+  vec3 p = vLocalPos * 4.5;
+  float w1 = sin(p.x + uTime * 0.9) * cos(p.y - uTime * 0.7) + sin(p.z + uTime * 0.6);
+  float w2 = sin(p.y * 2.1 - uTime * 1.4) * cos(p.z * 2.1 + uTime * 1.1);
+  float wave = clamp(0.55 + 0.25 * w1 + 0.2 * w2, 0.25, 1.35);
+  float pulse = 0.8 + 0.2 * sin(uTime * 2.2);
+  float alpha = clamp((fresnel * 0.65 + 0.08) * wave * pulse, 0.0, 0.85);
+  gl_FragColor = vec4(uColor * (1.1 + fresnel * 0.9), alpha);
+}`;
+
+export const STORM_FRAG = /* glsl */ `
+uniform float uTime;
+varying vec3 vNormalV;
+varying vec3 vViewDir;
+varying vec3 vLocalPos;
+void main() {
+  float ndotv = abs(dot(normalize(vNormalV), normalize(vViewDir)));
+  float fresnel = pow(max(1.0 - ndotv, 0.001), 1.8);
+  float t = uTime * 0.7 + vLocalPos.y * 2.4;
+  float c = cos(t);
+  float s = sin(t);
+  vec3 q = vec3(vLocalPos.x * c - vLocalPos.z * s, vLocalPos.y, vLocalPos.x * s + vLocalPos.z * c);
+  float w1 = sin(q.x * 5.0 + q.y * 4.0) * cos(q.z * 5.0 - uTime * 0.9);
+  float w2 = sin((q.x + q.z) * 7.0 - q.y * 6.0 + uTime * 1.4);
+  float bands = smoothstep(-0.25, 0.85, w1 * 0.6 + w2 * 0.4);
+  vec3 col = mix(vec3(1.0, 0.52, 0.22), vec3(0.75, 0.92, 1.0), bands * 0.55);
+  float alpha = clamp((fresnel * 0.55 + 0.12) * (0.35 + 0.65 * bands), 0.0, 0.85);
+  gl_FragColor = vec4(col * (1.2 + fresnel * 0.8), alpha);
+}`;

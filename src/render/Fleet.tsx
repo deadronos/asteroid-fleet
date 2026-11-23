@@ -1,12 +1,19 @@
 import { useFrame, useLoader, type ThreeEvent } from '@react-three/fiber';
-import { Suspense, useMemo, useRef } from 'react';
+import { Suspense, useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { SHIP_STATS } from '../sim/config';
 import { shipGeometry } from './geometry';
 import { focus } from './focus';
 import { CLASSES, fleetFrame } from './frameState';
-import { SHIP_LENGTH, SHIP_MODEL, bakeModel, modelUrl, type ModelClass } from './models';
+import {
+  SHIP_LENGTH,
+  SHIP_MODEL,
+  bakeShipModel,
+  modelUrl,
+  type BakedShip,
+  type ModelClass,
+} from './models';
 import { PALETTE } from '../ui/palette';
 import { FAR_SHIP_MIN_PX } from './constants';
 
@@ -22,7 +29,8 @@ const classColor = (cls: ModelClass) => (cls === 'pirate' ? PALETTE.pirate : SHI
 
 /**
  * Ships beyond `lodDistance` from the camera draw as the cheap placeholder
- * shape; nearer ones use the glTF model. Both are instanced, one draw call each.
+ * shape; nearer ones use the glTF hull plus a sibling unlit `glow` pass (#233).
+ * Both are instanced, one draw call each.
  */
 function ShipLayer({
   cls,
@@ -30,15 +38,17 @@ function ShipLayer({
   lodDistance,
 }: {
   cls: ModelClass;
-  model: THREE.BufferGeometry | null;
+  model: BakedShip | null;
   lodDistance: number;
 }) {
   const near = useRef<THREE.InstancedMesh>(null);
+  const glow = useRef<THREE.InstancedMesh>(null);
   const far = useRef<THREE.InstancedMesh>(null);
   // Ship id per instance, so a click can focus the camera on it.
   const nearIds = useMemo(() => new Int32Array(MAX_PER_CLASS), []);
   const farIds = useMemo(() => new Int32Array(MAX_PER_CLASS), []);
   const farGeo = useMemo(() => shipGeometry(cls), [cls]);
+  useEffect(() => () => farGeo.dispose(), [farGeo]);
   // Longest extent of the far shape, in world units.
   const farSize = useMemo(() => {
     farGeo.computeBoundingBox();
@@ -50,6 +60,7 @@ function ShipLayer({
   const ci = CLASSES.indexOf(cls);
   useFrame(({ camera, size }) => {
     const nm = near.current;
+    const gm = glow.current;
     const fm = far.current;
     if (!fm) return;
     const f = fleetFrame;
@@ -76,7 +87,9 @@ function ShipLayer({
         dummy.scale.setScalar(1);
         dummy.updateMatrix();
         nearIds[nn] = f.ids[i];
-        nm.setMatrixAt(nn++, dummy.matrix);
+        nm.setMatrixAt(nn, dummy.matrix);
+        if (gm) gm.setMatrixAt(nn, dummy.matrix);
+        nn++;
       } else {
         dummy.scale.setScalar(Math.max(1, Math.sqrt(d2) * minScalePerDist));
         dummy.updateMatrix();
@@ -86,10 +99,17 @@ function ShipLayer({
     }
     dummy.scale.setScalar(1);
     fm.count = nf;
+    fm.visible = nf > 0;
     fm.instanceMatrix.needsUpdate = true;
     if (nm) {
       nm.count = nn;
+      nm.visible = nn > 0;
       nm.instanceMatrix.needsUpdate = true;
+    }
+    if (gm) {
+      gm.count = nn;
+      gm.visible = nn > 0;
+      gm.instanceMatrix.needsUpdate = true;
     }
   });
 
@@ -104,8 +124,9 @@ function ShipLayer({
       {model && (
         <instancedMesh
           ref={near}
-          args={[model, undefined, MAX_PER_CLASS]}
+          args={[model.hull, undefined, MAX_PER_CLASS]}
           frustumCulled={false}
+          visible={false}
           onClick={onClick(nearIds)}
         >
           <meshStandardMaterial
@@ -118,10 +139,22 @@ function ShipLayer({
           />
         </instancedMesh>
       )}
+      {model?.glow && (
+        <instancedMesh
+          ref={glow}
+          args={[model.glow, undefined, MAX_PER_CLASS]}
+          frustumCulled={false}
+          raycast={() => null}
+          visible={false}
+        >
+          <meshBasicMaterial vertexColors toneMapped={false} />
+        </instancedMesh>
+      )}
       <instancedMesh
         ref={far}
         args={[farGeo, undefined, MAX_PER_CLASS]}
         frustumCulled={false}
+        visible={false}
         onClick={onClick(farIds)}
       >
         <meshStandardMaterial
@@ -162,6 +195,7 @@ function trailGeometry(): THREE.BufferGeometry {
 function Trails() {
   const mesh = useRef<THREE.InstancedMesh>(null);
   const geo = useMemo(() => trailGeometry(), []);
+  useEffect(() => () => geo.dispose(), [geo]);
   useFrame(() => {
     const m = mesh.current;
     if (!m) return;
@@ -186,8 +220,11 @@ function Trails() {
     }
     dummy.scale.setScalar(1);
     m.count = n;
-    m.instanceMatrix.needsUpdate = true;
-    if (m.instanceColor) m.instanceColor.needsUpdate = true;
+    m.visible = n > 0;
+    if (n > 0) {
+      m.instanceMatrix.needsUpdate = true;
+      if (m.instanceColor) m.instanceColor.needsUpdate = true;
+    }
   });
   return (
     <instancedMesh
@@ -195,6 +232,7 @@ function Trails() {
       args={[geo, undefined, MAX_TRAILS]}
       frustumCulled={false}
       raycast={() => null}
+      visible={false}
     >
       <meshBasicMaterial
         vertexColors
@@ -207,13 +245,7 @@ function Trails() {
   );
 }
 
-function Layers({
-  models,
-  lodDistance,
-}: {
-  models: THREE.BufferGeometry[] | null;
-  lodDistance: number;
-}) {
+function Layers({ models, lodDistance }: { models: BakedShip[] | null; lodDistance: number }) {
   return (
     <>
       {CLASSES.map((c, i) => (
@@ -226,8 +258,18 @@ function Layers({
 function ModelLayers({ lodDistance }: { lodDistance: number }) {
   const gltfs = useLoader(GLTFLoader, URLS);
   const models = useMemo(
-    () => gltfs.map((g, i) => bakeModel(g.scene, classColor(CLASSES[i]), SHIP_LENGTH[CLASSES[i]])),
+    () =>
+      gltfs.map((g, i) => bakeShipModel(g.scene, classColor(CLASSES[i]), SHIP_LENGTH[CLASSES[i]])),
     [gltfs],
+  );
+  useEffect(
+    () => () => {
+      for (const m of models) {
+        m.hull.dispose();
+        m.glow?.dispose();
+      }
+    },
+    [models],
   );
   return <Layers models={models} lodDistance={lodDistance} />;
 }
