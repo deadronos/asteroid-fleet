@@ -6,7 +6,7 @@ The v0.0.14 review is grouped under five umbrellas:
 - **#220** — Visuals, FX and game feel (#231–#237) — _done_
 - **#221** — Performance and render hygiene (#238–#241) — _done_
 - **#222** — Gameplay, balance and progression (#242–#245)
-- **#223** — UX, accessibility, saves and maintainability (#246–#250)
+- **#223** — UX, accessibility, saves and maintainability (#246–#250) — _done_
 
 Also open from earlier: **#161** (Combat fidelity: firing arcs, hit chance, evasion and pirate types).
 
@@ -20,12 +20,7 @@ Also open from earlier: **#161** (Combat fidelity: firing arcs, hit chance, evas
 - #231, #232, #233, #234: Batch 4a volumetric beams, particle explosions, ship glow, Fresnel shields & hazards (#254)
 - #235, #236, #237: Batch 4b procedural Web Audio synth, UI/camera feel, and diegetic 3D cues (#255) — completes umbrella #220
 - #242, #243, #246, #247, #248: Batch 5 pre-Fusion pacing & hazard-safe respawn, safe drone stance, live rule-card badges, progressive disclosure, touch/keyboard hangar moves (#256)
-
-## Batch 6a — Code health (#223)
-
-Clean up structural debt before the larger gameplay additions (completes umbrella #223).
-
-- #250: code health pass (deduplicate hangar board helpers, lint-enforce `sim/` purity, dispose GPU resources, co-locate research scalars, split monoliths)
+- #250: Batch 6a code health pass (#257) — completes umbrella #223
 
 ## Batch 6b — Progression & hangar depth (#222)
 
