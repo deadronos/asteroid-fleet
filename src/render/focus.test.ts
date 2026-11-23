@@ -131,11 +131,11 @@ describe('shakeDecay', () => {
 });
 
 describe('warpFov', () => {
-  it('kicks only in the final two seconds and returns to base', () => {
-    expect(warpFov(0, 10)).toBe(55);
-    expect(warpFov(8, 10)).toBe(55);
-    expect(warpFov(9, 10)).toBeCloseTo(57.5);
-    expect(warpFov(9.99, 10)).toBeCloseTo(60, 1);
-    expect(warpFov(10, 10)).toBe(55); // jump: charge complete
+  it('kicks only in the final two seconds of countdown and returns to base', () => {
+    expect(warpFov(10)).toBe(55);
+    expect(warpFov(2)).toBe(55);
+    expect(warpFov(1)).toBeCloseTo(57.5);
+    expect(warpFov(0.01)).toBeCloseTo(60, 1);
+    expect(warpFov(0)).toBe(55); // jump: charge complete
   });
 });

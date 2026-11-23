@@ -402,7 +402,7 @@ export function FocusReticle() {
     if (i < 0) return;
     g.position.set(fleetFrame.pos[i * 3], fleetFrame.pos[i * 3 + 1], fleetFrame.pos[i * 3 + 2]);
     const t = st.clock.elapsedTime;
-    g.rotation.z = t * 0.7;
+    g.rotation.y = t * 0.7;
     g.scale.setScalar(1 + 0.05 * Math.sin(t * 5));
   });
   return (

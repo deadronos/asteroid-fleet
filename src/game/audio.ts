@@ -71,20 +71,19 @@ export function unlock(): void {
 /** True when a cue may play: unmuted, unlocked, under the voice cap and past its rate limit. */
 function ready(kind: Cue): AudioContext | null {
   const s = getSettings();
-  if (!s.sound || s.volume <= 0) return null;
-  const c = ensure();
-  if (!c || c.state === 'suspended' || voices >= MAX_VOICES) return null;
-  const t = c.currentTime;
-  if (t - (last.get(kind) ?? -1) < GAP[kind]) return null;
+  if (!s.sound || s.volume <= 0 || !ctx || ctx.state === 'suspended' || voices >= MAX_VOICES)
+    return null;
+  const t = ctx.currentTime;
+  if (t - (last.get(kind) ?? -Infinity) < GAP[kind]) return null;
   last.set(kind, t);
   master!.gain.value = s.volume;
-  return c;
+  return ctx;
 }
 
-function voice(src: AudioScheduledSourceNode, end: number): void {
+function voice(src: AudioScheduledSourceNode, start: number, end: number): void {
   voices++;
   src.addEventListener('ended', () => void voices--, { once: true });
-  src.start();
+  src.start(start);
   src.stop(end);
 }
 
@@ -108,7 +107,7 @@ function tone(
   g.gain.exponentialRampToValueAtTime(gain, t + Math.min(0.012, dur * 0.25));
   g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
   o.connect(g).connect(master!);
-  voice(o, t + dur + 0.01);
+  voice(o, t, t + dur + 0.01);
 }
 
 /** A short filtered burst from the shared noise buffer. */
@@ -130,7 +129,7 @@ function hiss(
   g.gain.setValueAtTime(gain, t);
   g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
   src.connect(f).connect(g).connect(master!);
-  voice(src, t + dur);
+  voice(src, t, t + dur);
 }
 
 /** Play one gated cue. Safe to call every frame from the render loop. */
@@ -196,29 +195,53 @@ const EVENT_CUE: Partial<Record<SimEventKind, Cue>> = {
 
 let seenEpoch = -1;
 let lastId = 0;
-/** Play cues for newly arrived events, ignoring merges and a previous run's events. */
-export function events(list: readonly BusEvent[], epoch: number): void {
+let seenOp = -1;
+let prevFx: readonly Fx[] = [];
+/** Play cues for newly arrived events, ignoring merges, other carriers and previous runs. */
+export function events(list: readonly BusEvent[], epoch: number, carrierId?: number): void {
   if (epoch !== seenEpoch) {
     seenEpoch = epoch;
     lastId = 0;
   }
+  const prev = lastId;
   for (let i = list.length - 1; i >= 0; i--) {
     const e = list[i];
-    if (e.id <= lastId) continue;
-    lastId = e.id;
+    if (e.id > lastId) lastId = e.id;
+    if (e.id <= prev) continue;
+    if (carrierId !== undefined && e.carrierId !== carrierId) continue;
     const cue = EVENT_CUE[e.kind];
     if (cue) play(cue);
   }
 }
 
-/** One frame of combat FX: at most one rate-limited cue per kind, whatever the battle size. */
-export function frame(fx: readonly Fx[]): void {
+/** One frame of combat FX: fires only for newly spawned FX, rate-limited per kind. */
+export function frame(fx: readonly Fx[], opId = 0): void {
+  if (seenOp >= 0 && opId !== seenOp) {
+    seenOp = opId;
+    prevFx = fx;
+    return;
+  }
+  seenOp = opId;
+  if (fx === prevFx) return;
+  const prev = prevFx;
+  prevFx = fx;
   let laser = false;
   let pirate = false;
   let turret = false;
   let boom = false;
   let warp = false;
   for (const f of fx) {
+    if (
+      prev.some(
+        (p) =>
+          p.kind === f.kind &&
+          p.a.x === f.a.x &&
+          p.a.y === f.a.y &&
+          p.a.z === f.a.z &&
+          p.ttl >= f.ttl,
+      )
+    )
+      continue;
     if (f.kind === 'laser') laser = true;
     else if (f.kind === 'pirateLaser') pirate = true;
     else if (f.kind === 'turretLaser') turret = true;
@@ -242,4 +265,6 @@ export function resetAudio(): void {
   last.clear();
   seenEpoch = -1;
   lastId = 0;
+  seenOp = -1;
+  prevFx = [];
 }

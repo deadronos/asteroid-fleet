@@ -5,7 +5,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { engine } from '../game/engine';
 import { CAMERA_OFFSET } from './constants';
 import { fleetFrame } from './frameState';
-import type { Vec3 } from '../sim/types';
+import type { Fx, Vec3 } from '../sim/types';
 import { useHotkeys } from '../ui/hotkeys';
 import {
   easeFactor,
@@ -68,6 +68,7 @@ export function CameraRig({
   const hull = useRef(-1);
   const warping = useRef(false);
   const lastBoom = useRef(-Infinity);
+  const prevFx = useRef<readonly Fx[]>([]);
 
   // Taking over the orbit cancels an in-flight tactical move, so the user is never fought.
   useEffect(() => {
@@ -117,11 +118,19 @@ export function CameraRig({
 
     const jumped = !started.current || system.current !== s.systemId || carrierId.current !== s.id;
     if (jumped) {
+      const switched = !started.current || carrierId.current !== s.id;
       trans.current.active = false;
       delta.copy(goal).sub(anchor.current);
       anchor.current.copy(goal);
       c.target.add(delta);
       camera.position.add(delta);
+      if (switched) {
+        hull.current = s.carrier.hull;
+        warping.current = !!s.warp;
+        shake.current = 0;
+        shakeOff.current.set(0, 0, 0);
+        prevFx.current = s.fx;
+      }
       started.current = true;
       system.current = s.systemId;
       carrierId.current = s.id;
@@ -172,8 +181,8 @@ export function CameraRig({
     }
     c.update();
 
-    // Warp charge widens the lens slightly; it eases back to 55 on jump or cancel.
-    const targetFov = !reduceMotion && s.warp ? warpFov(s.warp.charge, s.warp.total) : 55;
+    // Warp charge widens the lens slightly in the final two seconds; eases back to 55 on jump/cancel.
+    const targetFov = !reduceMotion && s.warp ? warpFov(s.warp.charge) : 55;
     const nextFov = fov.current + (targetFov - fov.current) * easeFactor(dt, 5);
     if (Math.abs(nextFov - fov.current) > 1e-4) {
       fov.current = nextFov;
@@ -187,18 +196,32 @@ export function CameraRig({
       hull.current = s.carrier.hull;
       if (s.warp && !warping.current) shake.current = Math.min(1, shake.current + 0.35);
       warping.current = !!s.warp;
-      if (now - lastBoom.current > 0.12) {
-        for (const f of s.fx) {
-          if (f.kind !== 'explosion') continue;
-          const dx = f.a.x - c.target.x;
-          const dy = f.a.y - c.target.y;
-          const dz = f.a.z - c.target.z;
-          if (dx * dx + dy * dy + dz * dz < 3600) {
-            shake.current = Math.min(1, shake.current + 0.12);
-            lastBoom.current = now;
-            break;
+      if (s.fx !== prevFx.current) {
+        if (now - lastBoom.current > 0.12) {
+          for (const f of s.fx) {
+            if (f.kind !== 'explosion') continue;
+            if (
+              prevFx.current.some(
+                (p) =>
+                  p.kind === 'explosion' &&
+                  p.a.x === f.a.x &&
+                  p.a.y === f.a.y &&
+                  p.a.z === f.a.z &&
+                  p.ttl >= f.ttl,
+              )
+            )
+              continue;
+            const dx = f.a.x - c.target.x;
+            const dy = f.a.y - c.target.y;
+            const dz = f.a.z - c.target.z;
+            if (dx * dx + dy * dy + dz * dz < 3600) {
+              shake.current = Math.min(1, shake.current + 0.12);
+              lastBoom.current = now;
+              break;
+            }
           }
         }
+        prevFx.current = s.fx;
       }
       shake.current = shakeDecay(shake.current, dt);
       if (shake.current > 0.002) {

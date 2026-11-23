@@ -50,10 +50,9 @@ export function shakeDecay(v: number, dt: number, rate = 6): number {
   return v * Math.exp(-Math.max(0, dt) * rate);
 }
 
-/** FOV target during the last two seconds of warp charge, easing back to base otherwise (#237). */
-export function warpFov(charge: number, total: number, base = 55, kick = 5): number {
-  const left = total - charge;
-  return left > 0 && left < 2 ? base + kick * (1 - left / 2) : base;
+/** FOV target during the last two seconds of warp charge (`charge` counts down to 0) (#237). */
+export function warpFov(charge: number, base = 55, kick = 5): number {
+  return charge > 0 && charge < 2 ? base + kick * (1 - charge / 2) : base;
 }
 
 let exitRequested = false;

@@ -10,11 +10,7 @@ export function AudioBridge() {
     const click = (e: MouseEvent) => {
       if ((e.target as Element | null)?.closest?.('button')) play('ui');
     };
-    const sync = () =>
-      events(
-        engine.events.filter((e) => e.carrierId === engine.focusedCarrierId),
-        engine.epoch,
-      );
+    const sync = () => events(engine.events, engine.epoch, engine.focusedCarrierId);
     window.addEventListener('pointerdown', gesture);
     window.addEventListener('keydown', gesture);
     document.addEventListener('click', click);
@@ -27,6 +23,6 @@ export function AudioBridge() {
       off();
     };
   }, []);
-  useFrame(() => frame(engine.view.fx));
+  useFrame(() => frame(engine.view.fx, engine.view.id));
   return null;
 }
