@@ -12,15 +12,9 @@ Also open from earlier: **#161** (Combat fidelity: firing arcs, hit chance, evas
 
 ---
 
-## Batch 1 — Quick bug fixes (#219, no design decisions)
+## Done
 
-Fast, self-contained correctness fixes. Safe to land together or as small PRs before visual/balance work.
-
-- #224: push `'warp'` FX after `enterSystem`, and move `.warp-cut` out of `CarrierBar` so it plays with one carrier
-- #225: skip `'carried'` drones in `pirateTargetScore`, `hazards`, `repairDrone`, and `upkeepRate`
-- #226: add `128`-instance bounds check in `Explosions`
-- #227: make `advanceHeading` frame-rate independent with `easeFactor(dt, ...)`
-- #228: emit `s.systems[s.systemId].name` in `CarrierOnline` on deep-space starts
+- #224, #225, #226, #227, #228: Batch 1 quick bug fixes (#251)
 
 ## Batch 2 — Design decisions & save hardening (#219, #223)
 
