@@ -1,5 +1,5 @@
 import { useFrame, useThree } from '@react-three/fiber';
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { engine, lerpCarrier } from '../game/engine';
 import { COVER_RADIUS, SHIP_STATS } from '../sim/config';
@@ -85,6 +85,7 @@ export function Tactical({ on }: { on: boolean }) {
     g.setAttribute('shape', new THREE.BufferAttribute(new Float32Array(MAX_ICONS), 1));
     return g;
   }, []);
+  useEffect(() => () => geo.dispose(), [geo]);
   const ring = useRef<THREE.Group>(null);
   const warn = useRef<THREE.Mesh>(null);
   useFrame(() => {

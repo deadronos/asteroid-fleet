@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { engine, useGame } from '../game/engine';
 import { marksPayout, researchMult, researchPayout } from '../sim/costs';
+import { RESEARCH_DESC } from './researchText';
 import {
   CARRIER_COST,
   HULLS,
@@ -157,7 +158,7 @@ export function ResearchPanel() {
               <div key={n.id} className={`node ${st.maxed ? 'maxed' : ''}`}>
                 <span className="nname">{n.name}</span>
                 <span className="ndesc">
-                  {n.desc}
+                  {RESEARCH_DESC[n.id]}
                   {n.tier && r.tier < n.tier && ` · needs ${TIER_NAMES[n.tier].toLowerCase()}`}
                   {n.repeat &&
                     (st.level > 0

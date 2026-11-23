@@ -29,7 +29,7 @@ import {
   haulerJob,
 } from './mining';
 import { copy, moveAway, onSphere, rand } from './math';
-import { lvl, repeatEffect } from './research';
+import { lvl, repeatEffect, SCALE_ENERGY_LAUNCHINTERVAL } from './research';
 import { CHALLENGES, challengeProgress } from './modifiers';
 import { bind, emit, isStowed, maxHull, stateOf } from './state';
 import { stepRoutes } from './routes';
@@ -224,7 +224,7 @@ function launch(s: Sim, dt: number, ctx: Ctx) {
     else assignBargeBay(s, next, ctx);
     h.launchTimer =
       HANGAR_TYPES[h.type].launchInterval *
-      (1 - 0.08 * lvl(s, 'bays')) *
+      (1 - SCALE_ENERGY_LAUNCHINTERVAL * lvl(s, 'bays')) *
       (1 - repeatEffect(s, 'deepLaunch'));
   }
 }

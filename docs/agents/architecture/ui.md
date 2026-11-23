@@ -1,6 +1,6 @@
 # UI (`src/ui/`)
 
-Source of truth: `App.tsx`, `../game/engine.ts` (`useGame`), `hotkeys.ts`, `Modal.tsx`, `Tabs.tsx`, `styles.css`, `palette.ts`.
+Source of truth: `App.tsx`, `../game/engine.ts` (`useGame`), `hotkeys.ts`, `Modal.tsx`, `Tabs.tsx`, `FleetPanel.tsx` with `HangarBoard.tsx` / `ShipDetail.tsx` / `ShipShop.tsx` and `fleetBoard.ts`, `researchText.ts`, `styles.css`, `palette.ts`.
 
 ## Reading state
 
@@ -11,12 +11,12 @@ Source of truth: `App.tsx`, `../game/engine.ts` (`useGame`), `hotkeys.ts`, `Moda
 ## Structure
 
 - `App.tsx` is the shell: HUD, side panels in `Tabs`, the log/inbox, modals and the lazily loaded scene. Heavy panels (`Scene`, `ResearchPanel`, `SettingsMenu`, `CarrierPanel`, `DoctrinePanel`...) are `lazy()` imports, which keeps the initial bundle inside budget ([../workflow.md](../workflow.md)). New large panels should be lazy too.
-- One component per panel file (`FleetPanel`, `CarrierPanel`, `DoctrinePanel`, `RuleCards`, `ResearchPanel`, `StarMap`, `Shipyard`, `Goals`, `LogPanel`...). Pure helpers sit beside them as `.ts` files (`format.ts`, `inbox.ts`, `cardText.ts`, `mapLayout.ts`, `carriers.ts`) and are unit-tested on their own.
-- Text for sim data lives in the UI: event text in `events.ts`, card labels in `cardText.ts`, numbers via `fmt` / `formatSimTime` in `format.ts`.
+- One component per panel file (`FleetPanel`, `CarrierPanel`, `DoctrinePanel`, `RuleCards`, `ResearchPanel`, `StarMap`, `Shipyard`, `Goals`, `LogPanel`...). Pure helpers sit beside them as `.ts` files (`format.ts`, `inbox.ts`, `cardText.ts`, `mapLayout.ts`, `carriers.ts`, `fleetBoard.ts`) and are unit-tested on their own. A large panel may compose sibling components: `FleetPanel` is the shell around `HangarBoard`, `ShipDetail` and `ShipShop` (#250).
+- Text for sim data lives in the UI: event text in `events.ts`, card labels in `cardText.ts`, research node descriptions in `researchText.ts`, numbers via `fmt` / `formatSimTime` in `format.ts`. Keeping the descriptions out of `sim/research.ts` also keeps them out of the worker and fallback bundles (#250).
 - Disabled buttons explain why. Refusal reasons come from shared sim helpers such as `warpBlocked` (`sim/warpReason.ts`) or the cost checks in `sim/costs.ts`, so the UI and the command interpreter agree.
 - `RuleCards` derives live firing status and ship counts from the mirror with one structural-equality selector at the 5 Hz tick, using the sim's own condition helpers rather than a second source of truth (#246).
 - `ResearchPanel` hides Admiralty, challenges, the shop and carrier buying until the player has prestiged or imported equivalent progress, and only renders branches for unlocked ship classes (#247). The full glossary is a lazy `Guide` reached from Settings and the shortcut help; first-run shows a short `Launch` card (#247).
-- `FleetPanel` dispatches `moveShip` from tap/click on a ship followed by a highlighted empty slot, or the same pair with Enter/Space; Escape clears the selection. Desktop drag and drop still works (#248).
+- `FleetPanel` dispatches `moveShip` from tap/click on a ship followed by a highlighted empty slot, or the same pair with Enter/Space; Escape clears the selection. Desktop drag and drop still works (#248). Board synergy labels come from `repairSynergy` in `sim/hangar.ts`, including the bargeBay drone bonus, so the panel shows every bonus the sim applies (#250).
 
 ## Hotkeys and modals
 
@@ -26,7 +26,7 @@ Source of truth: `App.tsx`, `../game/engine.ts` (`useGame`), `hotkeys.ts`, `Moda
 
 ## Styling
 
-- One stylesheet, `styles.css`, with color and surface tokens as CSS custom properties on `:root` (#136). Use the tokens, not new literals.
+- One sectioned stylesheet, `styles.css`, with color and surface tokens as CSS custom properties on `:root` (#136). It stays a single file rather than CSS `@import`s, which would add requests to the initial load; use the tokens, not new literals (#250).
 - HUD bars, buttons, toasts, alerts and the hull-damage vignette use short CSS transitions and keyframes; every motion rule is disabled under `prefers-reduced-motion` (#237). The vignette mounts only when the focused carrier's hull percentage drops, so an undamaged HUD (or repair/carrier switch) never flashes.
 - Settings exposes `sound` (mute) and `volume` (0..1), persisted with the rest of `Settings` and read by the lazy Web Audio synth (#236).
 - Canvas and tactical colors come from `PALETTE` / `ICON_SHAPE` in `palette.ts`.

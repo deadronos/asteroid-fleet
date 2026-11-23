@@ -1,12 +1,12 @@
 # Architecture overview
 
-Source of truth: `src/main.tsx`, `src/sim/tick.ts`, `src/game/runner.ts`, `src/game/engine.ts`.
+Source of truth: `src/main.tsx`, `src/sim/tick.ts`, `src/sim/actions.ts` (facade over `orders.ts`, `reset.ts`, `offline.ts`), `src/game/runner.ts`, `src/game/engine.ts`.
 
 ## Layers
 
 | Folder        | What it is                                                                                                           | May import                                  |
 | ------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
-| `src/sim/`    | Deterministic simulation. Pure TypeScript, no React, no three.js, no DOM.                                            | nothing outside `sim/`                      |
+| `src/sim/`    | Deterministic simulation. Pure TypeScript, no React, no three.js, no DOM (lint-enforced).                            | nothing outside `sim/` (lint-enforced)      |
 | `src/game/`   | Sim host (worker or main thread), main-thread engine mirror, save/load. React only for `useSyncExternalStore` hooks. | `sim/` (never `ui/`, lint-enforced)         |
 | `src/render/` | React Three Fiber scene.                                                                                             | `sim/`, `game/`, `ui/palette`, `ui/hotkeys` |
 | `src/ui/`     | HTML/React panels over the canvas.                                                                                   | `sim/`, `game/`, `render/focus`             |
@@ -19,7 +19,7 @@ Tests may cross these lines (for example a sim test importing a `game/` helper);
 UI panel ──engine.dispatch(order)──► SimHost.post({t:'cmd'})
                                             │  (worker, or structuredClone on main thread)
                                             ▼
-                                   SimRunner.handle → apply(g, cmd)   src/sim/actions.ts
+                                   SimRunner.handle → apply(g, cmd)   src/sim/orders.ts (via actions.ts)
                                    SimRunner.pump   → step(g, op)     src/sim/tick.ts, 10 Hz
                                             │
               ┌─────────────── frame (every pump, typed arrays, transferred)
@@ -32,7 +32,7 @@ UI panel ──engine.dispatch(order)──► SimHost.post({t:'cmd'})
 ```
 
 - The worker owns the authoritative `GameState`. The main thread holds a mirror rebuilt from snapshots, which equals the sim state closely enough that saves taken from it are exact.
-- Player input only ever becomes a `Command` (`src/sim/actions.ts`). The UI never mutates state directly.
+- Player input only ever becomes a `Command` (`src/sim/orders.ts`, re-exported by `src/sim/actions.ts`). The UI never mutates state directly.
 - Rendering interpolates between the last two frames (`engine.alpha()`), so the scene stays smooth at display rate while the sim ticks at 10 Hz.
 - The engine is `globalThis.__fleet` in the browser console.
 

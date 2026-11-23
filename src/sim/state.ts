@@ -1,7 +1,7 @@
 import { DEFAULT_STANCE, ENERGY_MAX, HULLS } from './config';
 import { startSystem } from './modifiers';
 import { v3 } from './math';
-import { softcap } from './research';
+import { softcap, SCALE_HULL_FRAME, SCALE_WORLD_STARTCREDITS } from './research';
 import { createShip, maxEnergy } from './economy';
 import { emit } from './events';
 import { enterSystem, makeSystems } from './worldgen';
@@ -61,8 +61,8 @@ function buildOp(
     carrier: {
       pos: v3(),
       target: null,
-      hull: hd.hull * (1 + 0.12 * (levels.frame ?? 0)),
-      maxHull: hd.hull * (1 + 0.12 * (levels.frame ?? 0)),
+      hull: hd.hull * (1 + SCALE_HULL_FRAME * (levels.frame ?? 0)),
+      maxHull: hd.hull * (1 + SCALE_HULL_FRAME * (levels.frame ?? 0)),
       energy: ENERGY_MAX * 0.6,
       shield: 1,
       ore: 0,
@@ -143,7 +143,7 @@ export function newGame(seed = 1337, carry?: Carry): GameState {
     nextId: 1,
     credits:
       150 +
-      250 * (carry?.researchLevels.startCredits ?? 0) +
+      SCALE_WORLD_STARTCREDITS * (carry?.researchLevels.startCredits ?? 0) +
       Math.round(softcap(carry?.admiralty?.admCredits ?? 0, 5000)),
     research: carry?.research ?? 0,
     researchLevels: carry?.researchLevels ?? {},

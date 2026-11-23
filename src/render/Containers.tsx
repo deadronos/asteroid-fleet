@@ -1,5 +1,5 @@
 import { useFrame } from '@react-three/fiber';
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { engine } from '../game/engine';
 import { CONTAINER_TTL } from '../sim/mining';
@@ -12,6 +12,7 @@ const dummy = new THREE.Object3D();
 export function Containers() {
   const mesh = useRef<THREE.InstancedMesh>(null);
   const geo = useMemo(() => new THREE.BoxGeometry(1.2, 0.8, 0.8), []);
+  useEffect(() => () => geo.dispose(), [geo]);
   useFrame((st) => {
     const m = mesh.current;
     if (!m) return;

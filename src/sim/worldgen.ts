@@ -9,7 +9,12 @@ import { admiraltyEffect } from './admiralty';
 import { addPreset } from './cards';
 import { challengeBonus } from './modifiers';
 import { onSphere, seeded, v3 } from './math';
-import { lvl } from './research';
+import {
+  lvl,
+  SCALE_WORLD_RARECHANCE,
+  SCALE_WORLD_RAREVALUEFLAT,
+  SCALE_WORLD_RICHVALUE,
+} from './research';
 import { unlockHulls } from './economy';
 import { stateOf } from './view';
 import type {
@@ -99,7 +104,7 @@ export function spawnAsteroid(
   const maxOre = Math.round(80 + r() * 220);
   // Always draw the roll, so researching rare ore never shifts the rocks after this one.
   const rareRoll = r();
-  const rare = rareRoll < 0.04 * lvl(s, 'rare') ? 2.5 : 1;
+  const rare = rareRoll < SCALE_WORLD_RARECHANCE * lvl(s, 'rare') ? SCALE_WORLD_RAREVALUEFLAT : 1;
   return {
     id: s.nextId++,
     pos,
@@ -109,7 +114,7 @@ export function spawnAsteroid(
       ore.value *
       sys.oreMult *
       (1 + far / ORE_VALUE_DISTANCE_SCALE) *
-      (1 + 0.1 * lvl(s, 'rich')) *
+      (1 + SCALE_WORLD_RICHVALUE * lvl(s, 'rich')) *
       (1 + richBonus) *
       (1 + challengeBonus(s)) *
       (1 + admiraltyEffect(s, 'admYield')) *

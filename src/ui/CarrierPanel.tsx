@@ -1,3 +1,4 @@
+import { SCALE_MINING_YIELD } from '../sim/research';
 import { engine, useGame } from '../game/engine';
 import {
   MAX_REFINERY,
@@ -27,7 +28,11 @@ function throughput(s: Sim) {
   const barges = s.ships.filter((x) => x.cls === 'barge').length;
   const haulers = s.ships.filter((x) => x.cls === 'hauler').length;
   const mining =
-    drones * MINING_RATE * (1 + 0.15 * lvl(s, 'yield')) * (1 + repeatEffect(s, 'deepYield')) * 0.45; // ~45 % of a cycle spent drilling
+    drones *
+    MINING_RATE *
+    (1 + SCALE_MINING_YIELD * lvl(s, 'yield')) *
+    (1 + repeatEffect(s, 'deepYield')) *
+    0.45; // ~45 % of a cycle spent drilling
   const avgTrip = 30;
   const droneTransport =
     (drones * cargoCap(s, 'drone')) /
